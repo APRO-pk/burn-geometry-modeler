@@ -47,12 +47,24 @@ import type { SimulationResult } from './engine';
  *    peak Pc is compared against the equilibrium at PEAK Kn (agrees to 2.6%),
  *    plus a stronger quasi-steady invariant across the whole burn.
  *
- * 2. test_star_grain_continuity is not portable as written -- see the
- *    "KNOWN DEFECT" test below. Its geometry never reaches the star->cylinder
- *    transition (y_transition=0.0280 > web=0.0200), so both sampled areas are
- *    0.0 and its |a-b|/a is 0/0. Separately, the transition in the current
- *    engine is genuinely discontinuous, so a "<1% jump" assertion cannot pass
- *    for ANY geometry (240 reachable-transition geometries scanned, 0 under 1%).
+ * 2. test_star_grain_continuity is not portable as written. Its geometry never
+ *    reaches the star->cylinder transition (y_transition=0.0280 > web=0.0200),
+ *    so both sampled areas are 0.0 and its |a-b|/a is 0/0. The transition is
+ *    also still slightly discontinuous -- see the residual-defect test below.
+ *
+ * ---------------------------------------------------------------------------
+ * Star geometry accuracy (validated against ClipperLib polygon offsetting,
+ * the same library dxfProcessor uses for CustomDXF grains)
+ * ---------------------------------------------------------------------------
+ *   star-phase perimeter : exact to <0.001%  (was 3-42% low, and TRENDING THE
+ *                          WRONG WAY: burn area fell as the web burned back)
+ *   star-phase port area : exact to <0.01%   (was 88-280% high)
+ *   post-transition      : perimeter up to ~15% low at the transition,
+ *                          converging to <1% within a few mm of web
+ *   transition jump      : 0.6-15.3% depending on geometry (was 107-296%)
+ *
+ * For the app's default star (Ro=0.05, Rv=0.03, Rt=0.01, N=5) the transition
+ * is never reached, so the model is exact over the entire burn.
  * ============================================================================
  */
 
@@ -168,29 +180,73 @@ describe('Star grain port area (Step-2 regression: two-phase model)', () => {
     }
   });
 
-  it('equals the star-polygon closed form N*r^2*sin(2*theta)/2', () => {
+  it('starts at the exact star-polygon area N*Rv*Rt*sin(theta)', () => {
     const theta = Math.PI / N;
-    for (const y of [0, 0.002, 0.005, 0.008]) {
-      const rMean = valleyRadius + y;
-      const expected = (N * rMean ** 2 * Math.sin(2 * theta)) / 2;
+    const expected = N * valleyRadius * tipRadius * Math.sin(theta);
+    expectRelClose(star.get_port_area(0), expected, 1e-12);
+    expect(expected).toBeCloseTo(8.816778784e-4, 12);
+  });
+
+  it('matches the closed form obtained by integrating dA/dy = perimeter(y)', () => {
+    const A0 = N * valleyRadius * tipRadius * Math.sin(Math.PI / N);
+    for (const y of [0, 0.002, 0.005, 0.008, 0.012]) {
+      const expected =
+        A0 +
+        2 * N * star.initial_straight_length * y +
+        N * y * y * (star.point_exterior_angle / 2 - 1 / Math.tan(star.epsilon));
       expectRelClose(star.get_port_area(y), expected, 1e-12);
     }
   });
 
-  it('holds a constant ratio to the circumscribing circle of N*sin(2*theta)/(2*pi)', () => {
-    const theta = Math.PI / N;
-    const expectedRatio = (N * Math.sin(2 * theta)) / (2 * Math.PI); // 0.7568 for N=5
-    for (const y of [0, 0.003, 0.007]) {
-      const ratio = star.get_port_area(y) / (Math.PI * (valleyRadius + y) ** 2);
-      expectRelClose(ratio, expectedRatio, 1e-12);
+  it('satisfies dA/dy = perimeter (internal consistency of area and burn area)', () => {
+    const h = 1e-7;
+    for (const y of [0.002, 0.008, 0.014]) {
+      const dAdy = (star.get_port_area(y + h) - star.get_port_area(y - h)) / (2 * h);
+      const perimeter = star.get_burning_area(y) / length;
+      expectRelClose(dAdy, perimeter, 1e-8);
     }
-    expect(expectedRatio).toBeCloseTo(0.756827, 6);
   });
 
   it('never exceeds the casing circle area', () => {
     const outerArea = Math.PI * outerRadius ** 2;
     for (let y = 0; y <= outerRadius - valleyRadius; y += 0.001) {
       expect(star.get_port_area(y)).toBeLessThanOrEqual(outerArea + 1e-12);
+    }
+  });
+
+  it('port area increases monotonically with web', () => {
+    let prev = -Infinity;
+    for (let y = 0; y < outerRadius - valleyRadius; y += 0.0005) {
+      const a = star.get_port_area(y);
+      expect(a).toBeGreaterThan(prev);
+      prev = a;
+    }
+  });
+
+  // Independent ground truth: exact polygon offsetting of the star cross-section,
+  // computed with ClipperLib (the same library dxfProcessor uses). Values are
+  // hard-coded so the test needs no geometry dependency of its own.
+  it('matches ClipperLib polygon-offset ground truth for perimeter and area', () => {
+    const GROUND_TRUTH: Array<[number, number, number]> = [
+      // [ y, perimeter (m), port area (m^2) ]
+      [0.0, 0.226845552, 8.816814306e-4],
+      [0.005, 0.251816320, 2.078330385e-3],
+      [0.01, 0.276786753, 3.399841496e-3],
+      [0.015, 0.301757354, 4.846200857e-3],
+      [0.0199, 0.326228992, 6.384763385e-3],
+    ];
+    for (const [y, perim, area] of GROUND_TRUTH) {
+      expectRelClose(star.get_burning_area(y) / length, perim, 1e-5);
+      expectRelClose(star.get_port_area(y), area, 1e-5);
+    }
+  });
+
+  it('burning area increases with web (it previously decreased, which was wrong)', () => {
+    let prev = -Infinity;
+    for (let y = 0; y < outerRadius - valleyRadius; y += 0.0005) {
+      const a = star.get_burning_area(y);
+      expect(a).toBeGreaterThan(prev);
+      prev = a;
     }
   });
 });
@@ -208,14 +264,15 @@ describe('Star grain burning-area transition', () => {
     expect(s.get_burning_area(yTransition + 1e-7)).toBe(0);
   });
 
-  it.fails('KNOWN DEFECT: transition is discontinuous, so jump is NOT < 1%', () => {
-    // The requested regression case. It cannot pass against the current
-    // engine: the star branch gives perimeter 2*N*l_straight + 2*pi*y, which
-    // tends to 2*pi*y as l_straight -> 0, while the cylinder branch gives
-    // 2*pi*(Rv + y). The perimeter therefore jumps by exactly 2*pi*Rv.
-    // Marked it.fails so the suite stays green while tracking the defect:
-    // when get_burning_area is made continuous, THIS TEST WILL START FAILING
-    // and should be converted to a normal passing test.
+  it.fails('RESIDUAL DEFECT: transition jump is reduced but still not < 1%', () => {
+    // Originally the star branch used 2*pi*y for the tip arcs, giving a jump of
+    // 2*pi*valley_radius (107-296% depending on geometry). The star branch is
+    // now exact, so the whole remaining jump is the post-transition cylinder
+    // approximation undershooting the true offset perimeter: 9.70% here.
+    // Closing it fully needs a model of the merging star-point arcs.
+    // Kept as it.fails so the suite stays green while tracking the residual:
+    // when the post-transition branch is modelled properly, THIS TEST WILL
+    // START FAILING and should become a normal passing test.
     const s = new Star(0.4, 0.05, 0.03, 0.01, 8); // N=8 so the transition is reachable
     const yT = s.initial_straight_length * Math.tan(s.epsilon);
     const before = s.get_burning_area(yT - 1e-7);
@@ -223,20 +280,26 @@ describe('Star grain burning-area transition', () => {
     expect(Math.abs(before - after) / before).toBeLessThan(0.01);
   });
 
-  it('quantifies the current discontinuity as exactly 2*pi*valley_radius of perimeter', () => {
-    // Locks in present behaviour so a Rust port reproduces it verbatim, and
-    // so the magnitude is visible if anyone changes the model.
-    const length = 0.4;
-    const valleyRadius = 0.03;
-    const s = new Star(length, 0.05, valleyRadius, 0.01, 8);
+  it('pins the residual transition jump, much smaller than before the fix', () => {
+    // Locks in present behaviour so a Rust port reproduces it, and makes the
+    // magnitude visible if anyone changes the model.
+    const s = new Star(0.4, 0.05, 0.03, 0.01, 8);
     const yT = s.initial_straight_length * Math.tan(s.epsilon);
+    expect(yT).toBeLessThan(0.05 - 0.03); // transition IS reachable here
     const before = s.get_burning_area(yT - 1e-7);
     const after = s.get_burning_area(yT + 1e-7);
+    const jump = Math.abs(before - after) / before;
 
-    expect(yT).toBeLessThan(0.05 - valleyRadius); // transition IS reachable here
-    const perimeterJump = (after - before) / length;
-    expectRelClose(perimeterJump, 2 * Math.PI * valleyRadius, 1e-4);
-    expect(Math.abs(before - after) / before).toBeGreaterThan(2.0); // ~219%
+    expect(jump).toBeCloseTo(0.0970, 3); // was 2.193 (219%) before the fix
+    expect(jump).toBeLessThan(0.16);
+  });
+
+  it('exposes the star-point exterior angle used for the tip arcs', () => {
+    // The core of the fix: the arc term is N*tau_c*y, not the convex-polygon
+    // Steiner term 2*pi*y. For N=5 the star points are sharp (interior 30 deg).
+    const s = new Star(0.4, 0.05, 0.03, 0.01, 5);
+    expect((s.point_exterior_angle * 180) / Math.PI).toBeCloseTo(149.965, 3);
+    expect(5 * s.point_exterior_angle).toBeGreaterThan(2 * Math.PI); // 13.09 vs 6.28
   });
 });
 

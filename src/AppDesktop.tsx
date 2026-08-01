@@ -418,7 +418,10 @@ export default function AppDesktop() {
           const totalMotorVolume = Math.PI * Math.pow(outerRadius, 2) * length * (grainType === 'BATES' ? numSegments : 1);
           
           if (grainType === 'Star') {
-            propVol = Math.PI * (Math.pow(outerRadius, 2) - Math.pow(valleyRadius, 2)) * length;
+            // Subtract the actual star port area, not a circle of valleyRadius.
+            // The star port is much smaller than that circle, so the old form
+            // understated propellant volume (and therefore mass and Isp).
+            propVol = (Math.PI * Math.pow(outerRadius, 2) - grain.get_port_area(0)) * length;
           } else if (grainType === 'RodAndTube') {
             propVol = Math.PI * (Math.pow(outerRadius, 2) - Math.pow(innerRadius, 2)) * length + Math.PI * Math.pow(rodRadius, 2) * length;
           } else if (grainType === 'MoonBurner') {
