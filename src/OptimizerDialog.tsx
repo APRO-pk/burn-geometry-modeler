@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Check, X } from 'lucide-react';
-import { SolidPropellant, MotorSimulation, BATES, Star, Tubular, RodAndTube, MoonBurner, Finocyl, CustomDXF } from './engine';
+import { SolidPropellant, MotorSimulation, BATES, Star, Tubular, RodAndTube, MoonBurner, Finocyl, CustomDXF, SIM_DT } from './engine';
 
 interface OptimizerProps {
   currentConfig: any;
@@ -40,9 +40,13 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
           else if (config.grainType === 'CustomDXF' && dxfData) grain = new CustomDXF(config.length, config.outerRadius, dxfData.dx, dxfData.perimTable, dxfData.areaTable);
           else grain = new BATES(config.length, config.outerRadius, config.innerRadius);
 
-          const sim = new MotorSimulation(prop, grain, 0.005);
+          const sim = new MotorSimulation(prop, grain, SIM_DT);
           sim.set_efficiencies(0.95, 0.98); // fixed for quick sweep
-          sim.set_nozzle(config.throatDiameter, config.expansionRatio, config.erosionRate, null);
+          // Quick sweep uses an idealized, non-eroding nozzle (null thermal props).
+          // Pass erosion coefficient 0: with null props a nonzero coefficient would
+          // hit the engine's fallback erosion model, whose Pc^0.8 term (Pc in Pa) is
+          // wildly over-scaled and balloons the throat until the chamber depressurizes.
+          sim.set_nozzle(config.throatDiameter, config.expansionRatio, 0, null);
           const { results: simRes, warnings: simWarnings } = sim.run();
 
           if (simRes.length > 0) {
