@@ -15,7 +15,8 @@ import {
   calculate_discontinuity_stress,
   export_to_eng,
   SimulationResult,
-  NozzleMaterialProps
+  NozzleMaterialProps,
+  SIM_DT
 } from './engine';
 import {
   LineChart,
@@ -365,7 +366,7 @@ export default function AppDesktop() {
         } else {
           grain = new BATES(length, outerRadius, innerRadius);
         }
-        const sim = new MotorSimulation(prop, grain, 0.001, T_init);
+        const sim = new MotorSimulation(prop, grain, SIM_DT, T_init);
         sim.set_efficiencies(cStarEff, cfEff);
         sim.set_erosive_burning(erosiveModel);
         const igniter = new Igniter(igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN);
@@ -880,7 +881,7 @@ export default function AppDesktop() {
         } else {
           grain = new BATES(length, outerRadius, innerRadius);
         }
-        const sim = new MotorSimulation(prop, grain, 0.005, T_init); // coarser dt for speed
+        const sim = new MotorSimulation(prop, grain, SIM_DT, T_init);
         sim.set_efficiencies(cStarEff, cfEff);
         sim.set_erosive_burning(erosiveModel);
         const igniter = new Igniter(igniterMass * varFactor(), igniterSurfaceArea, igniterDensity, igniterA, igniterN);

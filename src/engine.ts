@@ -1,3 +1,7 @@
+// Shared nominal integration timestep (s), used by both the nominal run and
+// Monte Carlo sweeps so dispersion results stay comparable to the baseline.
+export const SIM_DT = 0.001;
+
 export class SolidPropellant {
   density: number;
   a: number;
@@ -143,8 +147,17 @@ export class Star extends GrainGeometry {
   }
 
   get_port_area(y: number): number {
-    const r_cyl = this.valley_radius + y;
-    return Math.PI * Math.pow(r_cyl, 2);
+    const outer_area = Math.PI * Math.pow(this.outer_radius, 2);
+    const l_straight = this.initial_straight_length - y / Math.tan(this.epsilon);
+
+    if (l_straight > 0) {
+      const r_mean = this.valley_radius + y;
+      const star_area = (this.N * Math.pow(r_mean, 2) * Math.sin(2 * this.theta)) / 2;
+      return Math.min(outer_area, star_area);
+    } else {
+      const r_cyl = this.valley_radius + y;
+      return Math.min(outer_area, Math.PI * Math.pow(r_cyl, 2));
+    }
   }
 }
 
@@ -542,6 +555,10 @@ export class MotorSimulation {
     const gamma = this.propellant.gamma;
     let total_propellant_consumed = 0;
 
+    // Critical pressure ratio for choked nozzle flow. Below Pc = Pa * crit the
+    // throat is subsonic, so the isentropic C_F relation does not apply.
+    const crit = Math.pow((gamma + 1) / 2, gamma / (gamma - 1));
+
     while (true) {
       const Ab = this.grain.get_burning_area(this.y);
       const A_port = this.grain.get_port_area(this.y);
@@ -667,10 +684,14 @@ export class MotorSimulation {
       let term3 = 1 - Math.pow(Pe / this.Pc, (gamma - 1) / gamma);
       if (term3 < 0) term3 = 0;
 
+      // Report no thrust until the nozzle chokes; during the ignition fill
+      // transient the throat is subsonic and the isentropic C_F is not valid.
+      const is_choked = this.Pc >= this.Pa * crit;
+
       const C_F_ideal =
         Math.sqrt(term1 * term2 * term3) + ((Pe - this.Pa) / this.Pc) * this.expansion_ratio;
-      const C_F = C_F_ideal * this.cf_eff;
-      const Thrust = C_F * this.Pc * At;
+      const C_F = is_choked ? C_F_ideal * this.cf_eff : 0;
+      const Thrust = is_choked ? C_F * this.Pc * At : 0;
 
       this.results.push({
         Time: this.time,
