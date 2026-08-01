@@ -2,6 +2,11 @@ node_modules/
 build/
 dist/
 coverage/
+
+# Rust build artifacts (crates/burn-core). The generated wasm-pack output in
+# crates/burn-core/pkg-* IS committed, so the JS build and tests work without
+# a Rust toolchain installed.
+target/
 .DS_Store
 *.log
 .env*
