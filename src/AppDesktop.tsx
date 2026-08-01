@@ -163,9 +163,12 @@ export default function AppDesktop() {
   }), [unitSystem, imperialPrefs]);
 
   const DEFAULT_PROPELLANTS: PropellantData[] = [
-    { id: '1', name: 'APCP (Typical)', density: 1528, a: 0.0053, n: 0.3, molWeight: 0.024, kErosive: 0.001, gThreshold: 500, flameTemp: 2700, gamma: 1.18 },
-    { id: '2', name: 'KNSB (Sorbitol)', density: 1800, a: 0.005, n: 0.32, molWeight: 0.040, kErosive: 0.0005, gThreshold: 400, flameTemp: 1600, gamma: 1.13 },
-    { id: '3', name: 'KNDX (Dextrose)', density: 1878, a: 0.006, n: 0.35, molWeight: 0.042, kErosive: 0.0006, gThreshold: 450, flameTemp: 1700, gamma: 1.14 }
+    // Burn-rate coefficient `a` is in SI (r_b = a * Pc^n with Pc in Pa, r_b in m/s),
+    // matching the engine. Published St. Robert coefficients are usually quoted for
+    // Pc in MPa; convert with a_SI = a_MPa / 10^(6n) before entering them here.
+    { id: '1', name: 'APCP (Typical)', density: 1528, a: 8.40e-5, n: 0.3, molWeight: 0.024, kErosive: 0.001, gThreshold: 500, flameTemp: 2700, gamma: 1.18 },
+    { id: '2', name: 'KNSB (Sorbitol)', density: 1800, a: 6.01e-5, n: 0.32, molWeight: 0.040, kErosive: 0.0005, gThreshold: 400, flameTemp: 1600, gamma: 1.13 },
+    { id: '3', name: 'KNDX (Dextrose)', density: 1878, a: 4.77e-5, n: 0.35, molWeight: 0.042, kErosive: 0.0006, gThreshold: 450, flameTemp: 1700, gamma: 1.14 }
   ];
 
   const [propellants, setPropellants] = useState<PropellantData[]>(DEFAULT_PROPELLANTS);
@@ -174,7 +177,7 @@ export default function AppDesktop() {
 
   // Propellant inputs (Current applied configuration)
   const [density, setDensity] = useState<number>(1528);
-  const [a, setA] = useState<number>(0.0053);
+  const [a, setA] = useState<number>(8.40e-5); // SI (Pc in Pa); matches APCP default above
   const [n, setN] = useState<number>(0.3);
   const [molWeight, setMolWeight] = useState<number>(0.024);
   const [kErosive, setKErosive] = useState<number>(0.001);

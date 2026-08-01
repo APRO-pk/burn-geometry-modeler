@@ -34,7 +34,7 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
       id: Math.random().toString(36).substring(7),
       name: 'New Propellant',
       density: 1500,
-      a: 0.005,
+      a: 7.9e-5, // SI burn-rate coeff (r_b = a * Pc^n, Pc in Pa, r_b in m/s)
       n: 0.3,
       molWeight: 0.030,
       kErosive: 0.001,
