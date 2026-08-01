@@ -210,7 +210,6 @@ export default function AppDesktop() {
   const [expansionRatio, setExpansionRatio] = useState<number>(7.0);
   const [gamma, setGamma] = useState<number>(1.2);
   const [flameTemp, setFlameTemp] = useState<number>(3000);
-  const [erosionRate, setErosionRate] = useState<number>(0.0001);
   const [nozzleMaterial, setNozzleMaterial] = useState<'Graphite' | 'Phenolic' | 'Custom'>('Graphite');
   const [cStarEff, setCStarEff] = useState<number>(0.95);
   const [cfEff, setCfEff] = useState<number>(0.98);
@@ -384,7 +383,7 @@ export default function AppDesktop() {
           nozzleProps = { type: 'Custom', density: nozzleDensity, heat_of_ablation: nozzleHeatOfAblation, oxidation_temp: nozzleOxidationTemp, thermal_shock_coeff: nozzleThermalShock, thermal_conductivity: nozzleThermalConductivity, specific_heat: nozzleSpecificHeat, k_temp_coeff: nozzleKTempCoeff, cp_temp_coeff: nozzleCpTempCoeff };
         }
         
-        sim.set_nozzle(throatDiameter, expansionRatio, erosionRate, nozzleProps);
+        sim.set_nozzle(throatDiameter, expansionRatio, nozzleProps);
 
         const { results: simResults, warnings: simWarnings } = sim.run();
         setResults(simResults);
@@ -899,7 +898,7 @@ export default function AppDesktop() {
           nozzleProps = { type: 'Custom', density: nozzleDensity, heat_of_ablation: nozzleHeatOfAblation, oxidation_temp: nozzleOxidationTemp, thermal_shock_coeff: nozzleThermalShock, thermal_conductivity: nozzleThermalConductivity, specific_heat: nozzleSpecificHeat, k_temp_coeff: nozzleKTempCoeff, cp_temp_coeff: nozzleCpTempCoeff };
         }
         
-        sim.set_nozzle(randDt, expansionRatio, erosionRate, nozzleProps);
+        sim.set_nozzle(randDt, expansionRatio, nozzleProps);
         
         const { results: res, warnings: simWarnings } = sim.run();
         if (res.length > 0) {
@@ -1010,7 +1009,7 @@ export default function AppDesktop() {
     } else if (type === 'casing') {
       payload = { type: 'casing', casingMaterial, casingYieldStress, casingYoungsModulus };
     } else if (type === 'nozzle') {
-      payload = { type: 'nozzle', nozzleMaterial, erosionRate, nozzleDensity, nozzleHeatOfAblation, nozzleOxidationTemp, nozzleThermalShock, nozzleThermalConductivity, nozzleSpecificHeat, nozzleKTempCoeff, nozzleCpTempCoeff };
+      payload = { type: 'nozzle', nozzleMaterial, nozzleDensity, nozzleHeatOfAblation, nozzleOxidationTemp, nozzleThermalShock, nozzleThermalConductivity, nozzleSpecificHeat, nozzleKTempCoeff, nozzleCpTempCoeff };
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1052,7 +1051,6 @@ export default function AppDesktop() {
                 addLog('Casing material loaded successfully.');
               } else if (data.type === 'nozzle' && type === 'nozzle') {
                 if (data.nozzleMaterial) setNozzleMaterial(data.nozzleMaterial);
-                if (data.erosionRate !== undefined) setErosionRate(data.erosionRate);
                 if (data.nozzleDensity) setNozzleDensity(data.nozzleDensity);
                 if (data.nozzleHeatOfAblation) setNozzleHeatOfAblation(data.nozzleHeatOfAblation);
                 if (data.nozzleOxidationTemp) setNozzleOxidationTemp(data.nozzleOxidationTemp);
@@ -1086,13 +1084,13 @@ export default function AppDesktop() {
   const captureDesignState = useCallback(() => ({
       density, a, n, molWeight, kErosive, gThreshold, T_ref, sigma_p, T_init,
       grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
-      throatDiameter, expansionRatio, gamma, flameTemp, erosionRate, nozzleMaterial,
+      throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
       igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
       casingMaterial, casingYieldStress, casingYoungsModulus
   }), [
       density, a, n, molWeight, kErosive, gThreshold,
       grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
-      throatDiameter, expansionRatio, gamma, flameTemp, erosionRate, nozzleMaterial,
+      throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
       igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
       casingMaterial, casingYieldStress, casingYoungsModulus
   ]);
@@ -1123,7 +1121,6 @@ export default function AppDesktop() {
       if (config.expansionRatio !== undefined) setExpansionRatio(config.expansionRatio);
       if (config.gamma !== undefined) setGamma(config.gamma);
       if (config.flameTemp !== undefined) setFlameTemp(config.flameTemp);
-      if (config.erosionRate !== undefined) setErosionRate(config.erosionRate);
       if (config.nozzleMaterial !== undefined) setNozzleMaterial(config.nozzleMaterial);
       if (config.igniterMass !== undefined) setIgniterMass(config.igniterMass);
       if (config.igniterSurfaceArea !== undefined) setIgniterSurfaceArea(config.igniterSurfaceArea);
@@ -1208,7 +1205,7 @@ export default function AppDesktop() {
     const config = {
       density, a, n, molWeight, kErosive, gThreshold, T_ref, sigma_p, T_init,
       grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
-      throatDiameter, expansionRatio, gamma, flameTemp, erosionRate, nozzleMaterial,
+      throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
       igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
       casingMaterial, casingYieldStress, casingYoungsModulus,
       mcRuns, mcVariance
@@ -1288,7 +1285,6 @@ export default function AppDesktop() {
           if (config.expansionRatio) setExpansionRatio(config.expansionRatio);
           if (config.gamma) setGamma(config.gamma);
           if (config.flameTemp) setFlameTemp(config.flameTemp);
-          if (config.erosionRate) setErosionRate(config.erosionRate);
           if (config.nozzleMaterial) setNozzleMaterial(config.nozzleMaterial);
           if (config.igniterMass) setIgniterMass(config.igniterMass);
           if (config.igniterSurfaceArea) setIgniterSurfaceArea(config.igniterSurfaceArea);
@@ -1686,7 +1682,6 @@ export default function AppDesktop() {
                 
                 {nozzleMaterial === 'Custom' && (
                   <>
-                    <InputBox label="Fallback Eros" value={erosionRate} onChange={setErosionRate} suffix="m/s/Pa" />
                     <InputBox label="Density" value={nozzleDensity} onChange={setNozzleDensity} suffix="kg/m³" unitCat="Density" />
                     <InputBox label="Heat Ablat" value={nozzleHeatOfAblation} onChange={setNozzleHeatOfAblation} suffix="J/kg" />
                     <InputBox label="Oxidat Temp" value={nozzleOxidationTemp} onChange={setNozzleOxidationTemp} suffix="K" unitCat="Temperature" />
@@ -2161,8 +2156,6 @@ export default function AppDesktop() {
                       <h3 className="font-mono font-bold text-[#ffaa00] mb-4 pb-2 border-b border-[#333] text-sm tracking-wide">NOZZLE RESIN</h3>
                       <p className="font-mono text-[#eee] font-bold mb-4">{nozzleMaterial}</p>
                       <div className="grid grid-cols-2 gap-y-2 text-xs font-mono">
-                        <div className="text-[#888]">Fallback Eros:</div>
-                        <div className="text-[#00ff00] font-bold">{erosionRate} m/s/Pa</div>
                         <div className="text-[#888]">Thermal Cond:</div>
                         <div className="text-[#00ff00] font-bold">{nozzleMaterial === 'Custom' ? nozzleThermalConductivity : (nozzleMaterial === 'Graphite' ? 100 : 1.2)} W/m-K</div>
                         <div className="text-[#888]">Specific Heat:</div>
@@ -2350,12 +2343,8 @@ export default function AppDesktop() {
                           <p className="text-[#888] mb-1">Throat Material:</p>
                           <p className="text-[#eee]">{nozzleMaterial}</p>
                         </div>
-                        <div>
-                          <p className="text-[#888] mb-1">Base Erosion Coeff:</p>
-                          <p className="text-[#eee]">{erosionRate.toExponential(2)}</p>
-                        </div>
-                        <div className="col-span-2 text-[#888] text-[10px] leading-tight flex items-center">
-                          Note: Using enhanced model considering convective heat transfer, gas temperature, and boundary layer thickness (Pc^0.8 * Tf^4 * Dt^-0.2).
+                        <div className="col-span-2 md:col-span-3 text-[#888] text-[10px] leading-tight flex items-center">
+                          Note: Convective ablation model driven by the selected throat material's thermal properties. Bartz heat-transfer coefficient scales as Pc^0.8 * Tf^0.5 * Dt^-0.2; recession begins once the surface reaches the material's oxidation temperature.
                         </div>
                         
                         <div className="col-span-2 border-t border-[#333] pt-4 mt-2">

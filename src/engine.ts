@@ -431,7 +431,6 @@ export class MotorSimulation {
   Pc: number;
   Pa: number;
   D_t: number;
-  erosion_coefficient: number; // fallback m/s per Pa
   nozzle_props: NozzleMaterialProps | null;
   nozzle_surface_temp: number; // K
   results: SimulationResult[];
@@ -451,7 +450,6 @@ export class MotorSimulation {
     this.Pc = 101325.0;
     this.Pa = 101325.0;
     this.D_t = 0.0;
-    this.erosion_coefficient = 0.0;
     this.nozzle_props = null;
     this.nozzle_surface_temp = 300.0; // Assume 300K initial ambient
     this.results = [];
@@ -472,10 +470,9 @@ export class MotorSimulation {
     this.erosive_model = model;
   }
 
-  set_nozzle(D_t: number, expansion_ratio: number, erosion_coefficient: number = 0.0, props: NozzleMaterialProps | null = null) {
+  set_nozzle(D_t: number, expansion_ratio: number, props: NozzleMaterialProps | null = null) {
     this.D_t = D_t;
     this.expansion_ratio = expansion_ratio;
-    this.erosion_coefficient = erosion_coefficient;
     this.nozzle_props = props;
   }
 
@@ -685,16 +682,12 @@ export class MotorSimulation {
           current_erosion_rate = ablation_rate * 2.0;
 
           // Clamp surface temperature near oxidation point to indicate phase change is capping it
-          this.nozzle_surface_temp = oxidation_temp; 
+          this.nozzle_surface_temp = oxidation_temp;
         }
-      } else {
-        // Fallback backward-compatible erosion model
-        const temp_factor = Math.pow(this.propellant.flame_temp / 3000.0, 4);
-        const D_t_factor = Math.pow(0.015 / this.D_t, 0.2);
-        const adjusted_coeff = this.erosion_coefficient * 25.0; 
-        current_erosion_rate = adjusted_coeff * Math.pow(this.Pc, 0.8) * temp_factor * D_t_factor;
       }
-      
+      // When no nozzle material is supplied the throat is treated as
+      // non-eroding (current_erosion_rate stays 0).
+
       this.D_t += current_erosion_rate * this.dt;
       
       this.time += this.dt;

@@ -43,10 +43,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
           const sim = new MotorSimulation(prop, grain, SIM_DT);
           sim.set_efficiencies(0.95, 0.98); // fixed for quick sweep
           // Quick sweep uses an idealized, non-eroding nozzle (null thermal props).
-          // Pass erosion coefficient 0: with null props a nonzero coefficient would
-          // hit the engine's fallback erosion model, whose Pc^0.8 term (Pc in Pa) is
-          // wildly over-scaled and balloons the throat until the chamber depressurizes.
-          sim.set_nozzle(config.throatDiameter, config.expansionRatio, 0, null);
+          sim.set_nozzle(config.throatDiameter, config.expansionRatio, null);
           const { results: simRes, warnings: simWarnings } = sim.run();
 
           if (simRes.length > 0) {
