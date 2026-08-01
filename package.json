@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "wasm:build": "bash scripts/build-wasm.sh"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
