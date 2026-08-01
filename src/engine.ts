@@ -2,6 +2,12 @@
 // Monte Carlo sweeps so dispersion results stay comparable to the baseline.
 export const SIM_DT = 0.001;
 
+// Numerical floors that keep the chamber-pressure ODE well-posed. Physically
+// negligible; they exist so a degenerate geometry cannot divide by zero or
+// feed a negative base into the fractional-exponent burn-rate law.
+const PC_FLOOR = 1.0; // Pa
+const V_C_FLOOR = 1e-9; // m^3
+
 export class SolidPropellant {
   density: number;
   a: number;
@@ -549,7 +555,7 @@ export class MotorSimulation {
 
   run(): { results: SimulationResult[]; warnings: string[] } {
     const warnings = this.check_stability();
-    let V_c = this.grain.get_port_area(this.y) * this.grain.length;
+    let V_c = Math.max(this.grain.get_port_area(this.y) * this.grain.length, V_C_FLOOR);
 
     const pr_ratio = this._solve_pe_pc();
     const gamma = this.propellant.gamma;
@@ -613,13 +619,28 @@ export class MotorSimulation {
       const m_dot_out = C_D_eff * this.Pc * At;
 
       const dVc_dt = Ab * r_b;
-      const dPc_dt =
-        ((this.propellant.R_spec * this.propellant.flame_temp) / V_c) *
-        (m_dot_in -
-          m_dot_out -
-          (this.Pc / (this.propellant.R_spec * this.propellant.flame_temp)) * dVc_dt);
+      const RT = this.propellant.R_spec * this.propellant.flame_temp;
 
-      this.Pc += dPc_dt * this.dt;
+      // Chamber pressure ODE, written as dPc/dt = A_gain - B_loss * Pc, where
+      // the nozzle outflow and the volume-growth term are both linear in Pc.
+      // These are stiff during the ignition fill, so they are taken implicitly
+      // (backward Euler). Explicit Euler overshot badly here: a single step
+      // could drive Pc negative, and Math.pow(negative, n) then poisoned the
+      // rest of the run with NaN. Because A_gain >= 0 and B_loss >= 0, this
+      // form keeps Pc strictly positive and is unconditionally stable, while
+      // converging to the same equilibrium pressure as the explicit form.
+      const A_gain = (RT / V_c) * m_dot_in;
+      const B_loss = (RT * C_D_eff * At + dVc_dt) / V_c;
+      this.Pc = (this.Pc + A_gain * this.dt) / (1 + B_loss * this.dt);
+      if (this.Pc < PC_FLOOR) this.Pc = PC_FLOOR;
+
+      if (!Number.isFinite(this.Pc)) {
+        warnings.push(
+          'Critical: pressure solution diverged (non-finite). Simulation stopped early. Check grain geometry, throat diameter, and propellant burn-rate coefficients.'
+        );
+        break;
+      }
+
       this.y += r_b * this.dt;
       V_c += dVc_dt * this.dt;
       
@@ -688,10 +709,15 @@ export class MotorSimulation {
       // transient the throat is subsonic and the isentropic C_F is not valid.
       const is_choked = this.Pc >= this.Pa * crit;
 
+      // The over-expansion term ((Pe - Pa)/Pc) * epsilon can dominate at low
+      // chamber pressure and drive C_F negative. A real nozzle does not pull
+      // backwards there: the flow separates from the wall and the exit
+      // pressure recovers toward ambient. Modelling separation properly is a
+      // larger change, so clamp at zero rather than report negative thrust.
       const C_F_ideal =
         Math.sqrt(term1 * term2 * term3) + ((Pe - this.Pa) / this.Pc) * this.expansion_ratio;
-      const C_F = is_choked ? C_F_ideal * this.cf_eff : 0;
-      const Thrust = is_choked ? C_F * this.Pc * At : 0;
+      const C_F = is_choked ? Math.max(0, C_F_ideal * this.cf_eff) : 0;
+      const Thrust = C_F * this.Pc * At;
 
       this.results.push({
         Time: this.time,
