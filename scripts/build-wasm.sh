@@ -60,6 +60,10 @@ wasm-pack build --release --target nodejs --out-dir pkg-node --out-name burn_cor
 echo "==> wasm-pack build (web target) -> pkg-web"
 wasm-pack build --release --target web --out-dir pkg-web --out-name burn_core
 
+# wasm-pack drops a `.gitignore` containing `*` into each out-dir, which would
+# hide the artifacts we specifically want committed. Remove it every build.
+rm -f pkg-node/.gitignore pkg-web/.gitignore
+
 echo
 echo "Done. Artifacts:"
 ls -la pkg-node/*.wasm pkg-node/*.js pkg-web/*.wasm pkg-web/*.js 2>/dev/null || true

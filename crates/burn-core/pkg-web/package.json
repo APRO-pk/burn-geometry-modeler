@@ -1,0 +1,17 @@
+{
+  "name": "burn-core",
+  "type": "module",
+  "description": "APRO solid motor internal-ballistics core (RK4), compiled to WASM",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "burn_core_bg.wasm",
+    "burn_core.js",
+    "burn_core.d.ts"
+  ],
+  "main": "burn_core.js",
+  "types": "burn_core.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

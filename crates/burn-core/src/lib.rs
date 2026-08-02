@@ -18,7 +18,10 @@
 //!   nozzle:     { throat_diameter, expansion_ratio, material?: {...} },
 //!   igniter?:   { mass, surface_area, density, a, n },
 //!   options?:   { dt?, t_init?, c_star_eff?, cf_eff?, erosive_model?,
-//!                 ambient_pressure?, max_time? }
+//!                 ambient_pressure?, max_time?,
+//!                 model?: "0D" | "quasi1D",   // default "0D"
+//!                 stations?,                  // quasi-1-D cells, default 20
+//!                 friction_factor? }          // Darcy, port bore, default 0.02
 //! }
 //! ```
 //!
@@ -31,6 +34,7 @@ use wasm_bindgen::prelude::*;
 pub mod grain;
 pub mod igniter;
 pub mod nozzle;
+pub mod port;
 pub mod propellant;
 pub mod sim;
 
@@ -53,6 +57,7 @@ pub const FIELDS: [&str; N_FIELDS] = [
     "y",
     "MassFlow",
     "PropellantMassGen",
+    "PcNozzle",
 ];
 
 #[derive(Debug, Clone, Deserialize)]
@@ -110,7 +115,35 @@ fn to_js(out: sim::RunOutput) -> Result<JsValue, JsValue> {
     }
     js_sys::Reflect::set(&obj, &JsValue::from_str("warnings"), &warns)?;
 
+    // Axial profiles, present only for quasi-1-D runs.
+    if let Some(st) = out.stations.as_ref() {
+        let s = js_sys::Object::new();
+        set_f64_array(&s, "x", &st.x)?;
+        set_f64_array(&s, "web", &st.web)?;
+        set_f64_array(&s, "pressure", &st.peak.pressure)?;
+        set_f64_array(&s, "massFlux", &st.peak.mass_flux)?;
+        set_f64_array(&s, "burnRate", &st.peak.burn_rate)?;
+        set_f64_array(&s, "erosiveRate", &st.peak.erosive_rate)?;
+        set_f64_array(&s, "massFlow", &st.peak.mass_flow)?;
+        set_f64_array(&s, "portArea", &st.peak.port_area)?;
+        set_f64_array(&s, "peakWeb", &st.peak.web)?;
+        js_sys::Reflect::set(
+            &s,
+            &JsValue::from_str("count"),
+            &JsValue::from_f64(st.count as f64),
+        )?;
+        js_sys::Reflect::set(&obj, &JsValue::from_str("stations"), &s)?;
+    }
+
     Ok(obj.into())
+}
+
+/// Copy a slice into a JS-owned Float64Array and attach it under `key`.
+fn set_f64_array(obj: &js_sys::Object, key: &str, src: &[f64]) -> Result<(), JsValue> {
+    let arr = js_sys::Float64Array::new_with_length(src.len() as u32);
+    arr.copy_from(src);
+    js_sys::Reflect::set(obj, &JsValue::from_str(key), &arr)?;
+    Ok(())
 }
 
 /// Stateful solver: `configure(...)` once, then `run()`.

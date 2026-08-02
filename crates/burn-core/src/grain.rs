@@ -288,6 +288,92 @@ impl Grain {
         }
     }
 
+    /// Burning area contributed by the END FACES, which is area the quasi-1-D
+    /// model cannot distribute along the port.
+    ///
+    /// Only BATES has burning end faces in this model; every other geometry
+    /// computes its burning area as `perimeter * length`, i.e. purely lateral.
+    /// The invariant `lateral_area(y) + end_area(y) == burning_area(y)` holds for
+    /// all geometries and is asserted in the parity tests -- the quasi-1-D solver
+    /// depends on it to collapse onto the 0-D solver when the gradient vanishes.
+    pub fn end_area(&self, y: f64) -> f64 {
+        const PI: f64 = std::f64::consts::PI;
+        match self {
+            Grain::Bates {
+                length,
+                outer_radius,
+                inner_radius,
+                web,
+            } => {
+                if y >= *web {
+                    return 0.0;
+                }
+                let r = inner_radius + y;
+                if length - 2.0 * y <= 0.0 {
+                    return 0.0;
+                }
+                2.0 * PI * (outer_radius.powi(2) - r * r)
+            }
+            _ => 0.0,
+        }
+    }
+
+    /// Burning area contributed by the bore (lateral) surface -- the part the
+    /// quasi-1-D model spreads over its axial stations.
+    pub fn lateral_area(&self, y: f64) -> f64 {
+        self.burning_area(y) - self.end_area(y)
+    }
+
+    /// Wetted perimeter of the port cross-section, for the hydraulic diameter
+    /// `D_h = 4 A_port / P_wetted` used by the friction and erosive-burning terms.
+    ///
+    /// While the grain is burning this is the lateral burning area per unit
+    /// length, which for every geometry here is exactly the port perimeter.
+    ///
+    /// Once a station burns out that goes to zero, but the port has NOT
+    /// vanished -- it is now the full casing bore, and gas still flows through
+    /// it. Returning zero there is actively harmful: it collapses the hydraulic
+    /// diameter onto its floor and inflates the friction term by orders of
+    /// magnitude, which showed up as a phantom multi-MPa pressure loss across
+    /// burned-out aft stations. So the fallback is the perimeter of a circle of
+    /// the same area as the actual port, which is exact for the circular ports
+    /// every geometry here burns out into.
+    pub fn wetted_perimeter(&self, y: f64) -> f64 {
+        let l = self.length();
+        if l <= 0.0 {
+            return 0.0;
+        }
+        let p = match self {
+            // The BATES bore stays a full circle even as the end faces recede,
+            // so its wetted perimeter is not lateral_area/length (that shortens
+            // with the grain).
+            Grain::Bates {
+                outer_radius,
+                inner_radius,
+                web,
+                ..
+            } => {
+                if y >= *web {
+                    0.0
+                } else {
+                    2.0 * std::f64::consts::PI * (inner_radius + y).min(*outer_radius)
+                }
+            }
+            _ => self.lateral_area(y) / l,
+        };
+
+        if p > 0.0 {
+            return p;
+        }
+        let a = self.port_area(y);
+        if a > 0.0 {
+            // Equivalent-circle perimeter: 2*sqrt(pi*A).
+            2.0 * (std::f64::consts::PI * a).sqrt()
+        } else {
+            0.0
+        }
+    }
+
     pub fn burning_area(&self, y: f64) -> f64 {
         const PI: f64 = std::f64::consts::PI;
         match self {

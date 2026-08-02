@@ -416,10 +416,75 @@ export class CustomDXF extends GrainGeometry {
   }
 }
 
+/** The grain fields the UI carries, in the names the editors use. */
+export interface GrainUiParams {
+  grainType: string;
+  length: number;
+  outerRadius: number;
+  innerRadius: number;
+  valleyRadius?: number;
+  tipRadius?: number;
+  numPoints?: number;
+  rodRadius?: number;
+  offset?: number;
+  finWidth?: number;
+  finDepth?: number;
+}
+
+export interface DxfTables {
+  dx: number;
+  perimTable: number[];
+  areaTable: number[];
+}
+
+/**
+ * Build the grain for a set of UI inputs.
+ *
+ * This is the ONLY place the UI's field names get mapped onto the geometry
+ * constructors, because the constructors take positional arguments whose
+ * meaning shifts between geometries -- `innerRadius` is the tube bore for
+ * RodAndTube but the core radius for MoonBurner and Finocyl, and Finocyl takes
+ * (num_fins, w_fin, h_fin) in an order that does not match the order the fields
+ * appear in the editor. Written out per call site, that mapping drifts: the
+ * grain preview spent several commits passing Finocyl's fin depth as its fin
+ * COUNT and the star-point count as its fin HEIGHT, which made the previewed
+ * cross-section meaningless while the simulation stayed correct.
+ *
+ * `grainConfigFromUi` in src/wasmCore.ts is the same mapping for the Rust core,
+ * and src/wasm.parity.test.ts asserts the two agree for every geometry.
+ *
+ * Unknown or unsatisfiable types fall back to BATES.
+ */
+export function grainFromUi(p: GrainUiParams, dxf?: DxfTables | null): GrainGeometry {
+  const { length, outerRadius, innerRadius } = p;
+
+  switch (p.grainType) {
+    case 'Star':
+      return new Star(length, outerRadius, p.valleyRadius ?? 0, p.tipRadius ?? 0, p.numPoints ?? 0);
+    case 'Tubular':
+      return new Tubular(length, outerRadius, innerRadius);
+    case 'RodAndTube':
+      return new RodAndTube(length, outerRadius, p.rodRadius ?? 0, innerRadius);
+    case 'MoonBurner':
+      return new MoonBurner(length, outerRadius, innerRadius, p.offset ?? 0);
+    case 'Finocyl':
+      return new Finocyl(
+        length, outerRadius, innerRadius,
+        p.numPoints ?? 0, p.finWidth ?? 0, p.finDepth ?? 0
+      );
+    case 'CustomDXF':
+      if (dxf) return new CustomDXF(length, outerRadius, dxf.dx, dxf.perimTable, dxf.areaTable);
+      return new BATES(length, outerRadius, innerRadius);
+    default:
+      return new BATES(length, outerRadius, innerRadius);
+  }
+}
+
 export interface SimulationResult {
   Time: number;
-  Ab: number;
+  /** Head-end chamber pressure (Pa). Equals `PcNozzle` under the 0-D model. */
   Pc: number;
+  Ab: number;
   Thrust: number;
   PortMassFlux: number;
   ThroatArea: number;
@@ -427,6 +492,13 @@ export interface SimulationResult {
   y: number;
   MassFlow: number;
   PropellantMassGen: number;
+  /**
+   * Stagnation pressure at the nozzle entry (Pa).
+   *
+   * Only the quasi-1-D core resolves this separately from `Pc`; the deprecated
+   * TypeScript solver in this file has no axial dimension and does not set it.
+   */
+  PcNozzle?: number;
 }
 
 export class Igniter {

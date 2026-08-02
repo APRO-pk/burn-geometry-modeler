@@ -3,7 +3,9 @@ import {
   SolidPropellant,
   BATES,
   Star,
+  Finocyl,
   MotorSimulation,
+  grainFromUi,
   export_to_eng,
   SIM_DT,
 } from './engine';
@@ -300,6 +302,80 @@ describe('Star grain burning-area transition', () => {
     const s = new Star(0.4, 0.05, 0.03, 0.01, 5);
     expect((s.point_exterior_angle * 180) / Math.PI).toBeCloseTo(149.965, 3);
     expect(5 * s.point_exterior_angle).toBeGreaterThan(2 * Math.PI); // 13.09 vs 6.28
+  });
+});
+
+// =========================================================================
+describe('Finocyl at the app defaults (guards the UI argument mapping)', () => {
+  /*
+   * The grain editor used to build Finocyl grains as
+   *   new Finocyl(length, outerRadius, innerRadius, finDepth, finWidth, numPoints)
+   * against a constructor of
+   *   (length, outer_radius, r_tube, num_fins, w_fin, h_fin)
+   * so the fin DEPTH arrived as the fin COUNT and the star-point count as the
+   * fin HEIGHT. With these defaults that is 0.035 fins, each 5 m tall, which
+   * made the previewed cross-section and its area curves meaningless while the
+   * solver -- which mapped the fields correctly -- stayed right.
+   *
+   * Both mappings now go through grainFromUi, so these values are built the way
+   * the app builds them. src/wasm.parity.test.ts additionally cross-checks
+   * grainFromUi against the wasm core's grainConfigFromUi field by field.
+   */
+  const DEFAULTS = {
+    grainType: 'Finocyl',
+    length: 0.5,
+    outerRadius: 0.05,
+    innerRadius: 0.02, // r_tube
+    numPoints: 5, // num_fins
+    finWidth: 0.01, // w_fin
+    finDepth: 0.035, // h_fin
+  };
+  const grain = grainFromUi(DEFAULTS) as Finocyl;
+
+  it('assigns each editor field to the constructor argument it names', () => {
+    expect(grain.r_tube).toBe(0.02);
+    expect(grain.num_fins).toBe(5);
+    expect(grain.w_fin).toBe(0.01);
+    expect(grain.h_fin).toBe(0.035);
+  });
+
+  it('starts past the fins-reach-the-casing transition, as these defaults imply', () => {
+    // r_tube + h_fin = 0.055 > outer_radius = 0.05, so the slots are already
+    // against the casing at y = 0 and the whole burn runs in the second phase.
+    expect(grain.r_tube + grain.h_fin).toBeGreaterThan(grain.outer_radius);
+  });
+
+  it('matches the closed-form burning area at y = 0', () => {
+    // Phase 2: perimeter = 2*pi*r_bore - N*w_current + 2*N*effective_h
+    const perimeter = 2 * Math.PI * 0.02 - 5 * 0.01 + 2 * 5 * (0.05 - 0.02);
+    expectRelClose(grain.get_burning_area(0), perimeter * 0.5, 1e-12);
+    expect(grain.get_burning_area(0)).toBeCloseTo(0.18783185, 8);
+  });
+
+  it('matches the closed-form burning area part-way through the web', () => {
+    const y = 0.005;
+    const r_bore = 0.02 + y;
+    const w_current = 0.01 + 2 * y;
+    const perimeter = 2 * Math.PI * r_bore - 5 * w_current + 2 * 5 * (0.05 - r_bore);
+    expectRelClose(grain.get_burning_area(y), perimeter * 0.5, 1e-12);
+    expect(grain.get_burning_area(y)).toBeCloseTo(0.15353982, 8);
+  });
+
+  it('matches the closed-form port area at y = 0', () => {
+    // Bore circle plus N rectangular slots, the slots clipped at the casing.
+    const expected = Math.PI * 0.02 ** 2 + 5 * (0.05 - 0.02) * 0.01;
+    expectRelClose(grain.get_port_area(0), expected, 1e-12);
+    expect(grain.get_port_area(0)).toBeCloseTo(0.00275664, 8);
+  });
+
+  it('never reports a negative burning area as the widening slots consume the bore', () => {
+    // w_current grows as w_fin + 2y, so late in the web N*w_current exceeds the
+    // bore circumference and the raw perimeter goes negative. The model clamps
+    // at zero rather than reporting negative area; pinned so the clamp stays.
+    expect(grain.get_burning_area(0.0299)).toBe(0);
+    for (let y = 0; y <= 0.03; y += 0.001) {
+      expect(grain.get_burning_area(y)).toBeGreaterThanOrEqual(0);
+    }
   });
 });
 

@@ -1,14 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Settings, Check, X } from 'lucide-react';
-import { 
-  BATES, 
-  Star, 
-  Tubular, 
-  RodAndTube, 
-  MoonBurner, 
-  Finocyl, 
-  CustomDXF 
-} from './engine';
+import { grainFromUi } from './engine';
 import { DXFRegressionResults } from './dxfProcessor';
 
 interface GrainEditorProps {
@@ -48,16 +40,8 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
 
   // Create grain geometry instance
   const grain = useMemo(() => {
-    const { grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, offset, rodRadius, finDepth, finWidth } = params;
     try {
-      if (grainType === 'Star') return new Star(length, outerRadius, valleyRadius, tipRadius, numPoints);
-      if (grainType === 'BATES') return new BATES(length, outerRadius, innerRadius);
-      if (grainType === 'Tubular') return new Tubular(length, outerRadius, innerRadius);
-      if (grainType === 'RodAndTube') return new RodAndTube(length, outerRadius, rodRadius, innerRadius);
-      if (grainType === 'MoonBurner') return new MoonBurner(length, outerRadius, innerRadius, offset);
-      if (grainType === 'Finocyl') return new Finocyl(length, outerRadius, innerRadius, finDepth, finWidth, numPoints);
-      if (grainType === 'CustomDXF' && dxfData) return new CustomDXF(length, outerRadius, dxfData.dx, dxfData.perimTable, dxfData.areaTable);
-      return new BATES(length, outerRadius, innerRadius); // fallback
+      return grainFromUi(params, dxfData);
     } catch(e) {
       return null;
     }

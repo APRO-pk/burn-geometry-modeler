@@ -1,23 +1,17 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
-  SolidPropellant,
-  BATES,
-  Star,
-  Tubular,
-  RodAndTube,
-  MoonBurner,
-  Finocyl,
-  CustomDXF,
-  MotorSimulation,
-  Igniter,
+  grainFromUi,
   calculate_casing_thickness,
   calculate_casing_strain,
   calculate_discontinuity_stress,
   export_to_eng,
   SimulationResult,
   NozzleMaterialProps,
-  SIM_DT
+  GrainUiParams
 } from './engine';
+import { runMotor, warmUpMotorCore } from './wasmClient';
+import { grainConfigFromUi } from './wasmCore';
+import type { BurnConfig, SolverModelType, StationProfiles } from './wasmCore';
 import {
   LineChart,
   Line,
@@ -214,6 +208,12 @@ export default function AppDesktop() {
   const [cStarEff, setCStarEff] = useState<number>(0.95);
   const [cfEff, setCfEff] = useState<number>(0.98);
   const [erosiveModel, setErosiveModel] = useState<'None' | 'Lenoir-Robillard' | 'JPL'>('Lenoir-Robillard');
+
+  // Solver model. 0-D is the default: it is the fast path, and for the short,
+  // fat grains most hobby motors use it is within a fraction of a percent of the
+  // axially resolved answer anyway.
+  const [solverModel, setSolverModel] = useState<SolverModelType>('0D');
+  const [stationCount, setStationCount] = useState<number>(20);
   
   // Custom Nozzle Thermo
   const [nozzleDensity, setNozzleDensity] = useState<number>(1800);
@@ -268,6 +268,8 @@ export default function AppDesktop() {
 
   // Results & State
   const [results, setResults] = useState<SimulationResult[]>([]);
+  /** Axial station profiles from the last run. Undefined after a 0-D run. */
+  const [stations, setStations] = useState<StationProfiles | undefined>(undefined);
   const [stabilityWarnings, setStabilityWarnings] = useState<string[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
   const [visualizerIndex, setVisualizerIndex] = useState<number>(0);
@@ -286,6 +288,81 @@ export default function AppDesktop() {
     setLogs(prev => [...prev, `[${time}] ${msg}`]);
     setStatusMsg(msg);
   };
+
+  // Instantiate the wasm core in its worker while the user is still setting up,
+  // so the first Run does not wait on module compilation.
+  useEffect(() => {
+    warmUpMotorCore();
+  }, []);
+
+  /** The grain inputs, in the shared shape both grain mappings take. */
+  const grainUiParams = (): GrainUiParams => ({
+    grainType, length, outerRadius, innerRadius,
+    valleyRadius, tipRadius, numPoints, rodRadius, offset, finWidth, finDepth,
+  });
+
+  const buildNozzleMaterial = (): NozzleMaterialProps | null => {
+    if (nozzleMaterial === 'Graphite') {
+      return { type: 'Graphite', density: 1800, heat_of_ablation: 25e6, oxidation_temp: 1500, thermal_shock_coeff: 0.1, thermal_conductivity: 100, specific_heat: 710, k_temp_coeff: -0.0001, cp_temp_coeff: 0.0004 };
+    }
+    if (nozzleMaterial === 'Phenolic') {
+      return { type: 'Phenolic', density: 1200, heat_of_ablation: 15e6, oxidation_temp: 800, thermal_shock_coeff: 0.5, thermal_conductivity: 1.2, specific_heat: 1300, k_temp_coeff: 0.0001, cp_temp_coeff: 0.002 };
+    }
+    if (nozzleMaterial === 'Custom') {
+      return { type: 'Custom', density: nozzleDensity, heat_of_ablation: nozzleHeatOfAblation, oxidation_temp: nozzleOxidationTemp, thermal_shock_coeff: nozzleThermalShock, thermal_conductivity: nozzleThermalConductivity, specific_heat: nozzleSpecificHeat, k_temp_coeff: nozzleKTempCoeff, cp_temp_coeff: nozzleCpTempCoeff };
+    }
+    return null;
+  };
+
+  /**
+   * Assemble a full run configuration from the current inputs. `overrides` lets
+   * the Monte Carlo sweep perturb individual parameters without duplicating the
+   * mapping.
+   */
+  const buildBurnConfig = (
+    overrides: {
+      a?: number;
+      density?: number;
+      throatDiameter?: number;
+      igniterMass?: number;
+      /** Force a spatial model, overriding the UI toggle (Monte Carlo, sweeps). */
+      model?: SolverModelType;
+    } = {}
+  ): BurnConfig => ({
+    propellant: {
+      density: overrides.density ?? density,
+      a: overrides.a ?? a,
+      n,
+      flame_temp: flameTemp,
+      gamma,
+      molecular_weight: molWeight,
+      k_erosive: kErosive,
+      g_threshold: gThreshold,
+      t_ref: T_ref,
+      sigma_p,
+    },
+    grain: grainConfigFromUi(grainUiParams(), dxfData),
+    nozzle: {
+      throat_diameter: overrides.throatDiameter ?? throatDiameter,
+      expansion_ratio: expansionRatio,
+      material: buildNozzleMaterial(),
+    },
+    igniter: {
+      mass: overrides.igniterMass ?? igniterMass,
+      surface_area: igniterSurfaceArea,
+      density: igniterDensity,
+      a: igniterA,
+      n: igniterN,
+    },
+    options: {
+      t_init: T_init,
+      c_star_eff: cStarEff,
+      cf_eff: cfEff,
+      erosive_model: erosiveModel,
+      model: overrides.model ?? solverModel,
+      stations: stationCount,
+    },
+  });
 
   const runSimulation = () => {
     pushHistory();
@@ -331,61 +408,38 @@ export default function AppDesktop() {
       return;
     }
 
-    addLog('Starting simulation...');
+    addLog(
+      solverModel === 'quasi1D'
+        ? `Starting simulation (quasi-1-D, ${stationCount} axial stations)...`
+        : 'Starting simulation (0-D lumped chamber)...'
+    );
     setIsSimulating(true);
 
     // Yield control to the browser so it can render the 'loading' overlay
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        const prop = new SolidPropellant(
-          density,
-          a,
-          n,
-          flameTemp,
-          gamma,
-          molWeight,
-          kErosive,
-          gThreshold,
-          T_ref,
-          sigma_p
-        );
+        // Geometry is still evaluated in TypeScript for the propellant-volume
+        // maths below; the solver itself runs in the wasm core.
+        const grain = grainFromUi(grainUiParams(), dxfData);
 
-        let grain;
-        if (grainType === 'Star') {
-          grain = new Star(length, outerRadius, valleyRadius, tipRadius, numPoints);
-        } else if (grainType === 'BATES') {
-          grain = new BATES(length, outerRadius, innerRadius);
-        } else if (grainType === 'Tubular') {
-          grain = new Tubular(length, outerRadius, innerRadius);
-        } else if (grainType === 'RodAndTube') {
-          grain = new RodAndTube(length, outerRadius, rodRadius, innerRadius);
-        } else if (grainType === 'MoonBurner') {
-          grain = new MoonBurner(length, outerRadius, innerRadius, offset);
-        } else if (grainType === 'Finocyl') {
-          grain = new Finocyl(length, outerRadius, innerRadius, numPoints, finWidth, finDepth);
-        } else if (grainType === 'CustomDXF' && dxfData) {
-          grain = new CustomDXF(length, outerRadius, dxfData.dx, dxfData.perimTable, dxfData.areaTable);
-        } else {
-          grain = new BATES(length, outerRadius, innerRadius);
+        const {
+          results: simResults,
+          warnings: simWarnings,
+          stations: simStations,
+        } = await runMotor(buildBurnConfig());
+        setStations(simStations);
+        if (simStations) {
+          const N = simStations.count;
+          const headToNozzle = simResults.reduce((m, r) => {
+            if (r.Ab <= 0 || !r.PcNozzle) return m;
+            return Math.max(m, (r.Pc - r.PcNozzle) / r.Pc);
+          }, 0);
+          addLog(
+            `Axial solution: head-to-nozzle pressure drop up to ${(headToNozzle * 100).toFixed(1)}%, ` +
+              `aft mass flux ${simStations.massFlux[N - 1].toFixed(0)} kg/m²s ` +
+              `(${(simStations.massFlux[N - 1] / Math.max(simStations.massFlux[0], 1e-9)).toFixed(1)}x the head end).`
+          );
         }
-        const sim = new MotorSimulation(prop, grain, SIM_DT, T_init);
-        sim.set_efficiencies(cStarEff, cfEff);
-        sim.set_erosive_burning(erosiveModel);
-        const igniter = new Igniter(igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN);
-        sim.set_igniter(igniter);
-        
-        let nozzleProps: NozzleMaterialProps | null = null;
-        if (nozzleMaterial === 'Graphite') {
-          nozzleProps = { type: 'Graphite', density: 1800, heat_of_ablation: 25e6, oxidation_temp: 1500, thermal_shock_coeff: 0.1, thermal_conductivity: 100, specific_heat: 710, k_temp_coeff: -0.0001, cp_temp_coeff: 0.0004 };
-        } else if (nozzleMaterial === 'Phenolic') {
-          nozzleProps = { type: 'Phenolic', density: 1200, heat_of_ablation: 15e6, oxidation_temp: 800, thermal_shock_coeff: 0.5, thermal_conductivity: 1.2, specific_heat: 1300, k_temp_coeff: 0.0001, cp_temp_coeff: 0.002 };
-        } else if (nozzleMaterial === 'Custom') {
-          nozzleProps = { type: 'Custom', density: nozzleDensity, heat_of_ablation: nozzleHeatOfAblation, oxidation_temp: nozzleOxidationTemp, thermal_shock_coeff: nozzleThermalShock, thermal_conductivity: nozzleThermalConductivity, specific_heat: nozzleSpecificHeat, k_temp_coeff: nozzleKTempCoeff, cp_temp_coeff: nozzleCpTempCoeff };
-        }
-        
-        sim.set_nozzle(throatDiameter, expansionRatio, nozzleProps);
-
-        const { results: simResults, warnings: simWarnings } = sim.run();
         setResults(simResults);
         setStabilityWarnings(simWarnings);
         if (simWarnings.length > 0) {
@@ -842,68 +896,37 @@ export default function AppDesktop() {
     }
   };
 
-  const runMonteCarlo = () => {
-    addLog(`Starting Monte Carlo analysis (${mcRuns} runs, ${mcVariance}% variance)...`);
+  const runMonteCarlo = async () => {
+    // Always 0-D, whatever the toggle says. A quasi-1-D run costs roughly
+    // `stationCount` times more per step, so a 50-run sweep would take minutes
+    // instead of seconds -- and a dispersion study wants many samples of the
+    // same model far more than it wants axial detail in each one.
+    addLog(
+      `Starting Monte Carlo analysis (${mcRuns} runs, ${mcVariance}% variance, 0-D solver for speed)...`
+    );
     setIsSimulating(true);
     setMcResults([]);
-    
+
     const runs: any[] = [];
-    let currentRun = 0;
-    
-    const nextRun = () => {
-      if (currentRun >= mcRuns) {
-        setMcResults(runs);
-        setIsSimulating(false);
-        addLog('Monte Carlo analysis complete.');
-        setStatusMsg('System Ready');
-        return;
-      }
-      
+
+    // Each run is awaited in turn. The solve happens in the worker, so the main
+    // thread is free between runs and the UI keeps painting -- the old
+    // setTimeout(0) trampoline existed only to break up in-thread solving.
+    for (let currentRun = 0; currentRun < mcRuns; currentRun++) {
       setStatusMsg(`Performing Monte Carlo run ${currentRun + 1} of ${mcRuns}...`);
 
       try {
         const varFactor = () => 1 + (Math.random() * 2 - 1) * (mcVariance / 100);
-        const randA = a * varFactor();
-        const randDt = throatDiameter * varFactor();
-        const randDens = density * varFactor();
-  
-        const prop = new SolidPropellant(randDens, randA, n, flameTemp, gamma, molWeight, kErosive, gThreshold, T_ref, sigma_p);
-        let grain;
-        if (grainType === 'Star') {
-          grain = new Star(length, outerRadius, valleyRadius, tipRadius, numPoints);
-        } else if (grainType === 'BATES') {
-          grain = new BATES(length, outerRadius, innerRadius);
-        } else if (grainType === 'Tubular') {
-          grain = new Tubular(length, outerRadius, innerRadius);
-        } else if (grainType === 'RodAndTube') {
-          grain = new RodAndTube(length, outerRadius, rodRadius, innerRadius);
-        } else if (grainType === 'MoonBurner') {
-          grain = new MoonBurner(length, outerRadius, innerRadius, offset);
-        } else if (grainType === 'Finocyl') {
-          grain = new Finocyl(length, outerRadius, innerRadius, numPoints, finWidth, finDepth);
-        } else if (grainType === 'CustomDXF' && dxfData) {
-          grain = new CustomDXF(length, outerRadius, dxfData.dx, dxfData.perimTable, dxfData.areaTable);
-        } else {
-          grain = new BATES(length, outerRadius, innerRadius);
-        }
-        const sim = new MotorSimulation(prop, grain, SIM_DT, T_init);
-        sim.set_efficiencies(cStarEff, cfEff);
-        sim.set_erosive_burning(erosiveModel);
-        const igniter = new Igniter(igniterMass * varFactor(), igniterSurfaceArea, igniterDensity, igniterA, igniterN);
-        sim.set_igniter(igniter);
-        
-        let nozzleProps: NozzleMaterialProps | null = null;
-        if (nozzleMaterial === 'Graphite') {
-          nozzleProps = { type: 'Graphite', density: 1800, heat_of_ablation: 25e6, oxidation_temp: 1500, thermal_shock_coeff: 0.1, thermal_conductivity: 100, specific_heat: 710, k_temp_coeff: -0.0001, cp_temp_coeff: 0.0004 };
-        } else if (nozzleMaterial === 'Phenolic') {
-          nozzleProps = { type: 'Phenolic', density: 1200, heat_of_ablation: 15e6, oxidation_temp: 800, thermal_shock_coeff: 0.5, thermal_conductivity: 1.2, specific_heat: 1300, k_temp_coeff: 0.0001, cp_temp_coeff: 0.002 };
-        } else if (nozzleMaterial === 'Custom') {
-          nozzleProps = { type: 'Custom', density: nozzleDensity, heat_of_ablation: nozzleHeatOfAblation, oxidation_temp: nozzleOxidationTemp, thermal_shock_coeff: nozzleThermalShock, thermal_conductivity: nozzleThermalConductivity, specific_heat: nozzleSpecificHeat, k_temp_coeff: nozzleKTempCoeff, cp_temp_coeff: nozzleCpTempCoeff };
-        }
-        
-        sim.set_nozzle(randDt, expansionRatio, nozzleProps);
-        
-        const { results: res, warnings: simWarnings } = sim.run();
+        const { results: res } = await runMotor(
+          buildBurnConfig({
+            a: a * varFactor(),
+            density: density * varFactor(),
+            throatDiameter: throatDiameter * varFactor(),
+            igniterMass: igniterMass * varFactor(),
+            model: '0D',
+          })
+        );
+
         if (res.length > 0) {
           const maxPc = Math.max(...res.map(r => r.Pc)) / 1e6;
           const maxThrust = Math.max(...res.map(r => r.Thrust)) / 1000;
@@ -912,14 +935,26 @@ export default function AppDesktop() {
       } catch (e) {
         console.warn(`Monte Carlo Run ${currentRun} failed:`, e);
       }
-      
-      currentRun++;
-      setTimeout(nextRun, 0); // yield back to event loop to allow UI updates
-    };
-    
-    // kick off first run
-    setTimeout(nextRun, 50);
+    }
+
+    setMcResults(runs);
+    setIsSimulating(false);
+    addLog('Monte Carlo analysis complete.');
+    setStatusMsg('System Ready');
   };
+
+  /** Station profiles reshaped for the axial chart. Empty after a 0-D run. */
+  const axialData = useMemo(() => {
+    if (!stations) return [];
+    return Array.from({ length: stations.count }, (_, i) => ({
+      x: stations.x[i],
+      Pc_MPa: stations.pressure[i] / 1e6,
+      G: stations.massFlux[i],
+      rb_mm_s: stations.burnRate[i] * 1000,
+      erosive_mm_s: stations.erosiveRate[i] * 1000,
+      web_mm: stations.peakWeb[i] * 1000,
+    }));
+  }, [stations]);
 
   // Downsample results for charting to improve performance
   const chartData = useMemo(() => {
@@ -1211,7 +1246,8 @@ export default function AppDesktop() {
       throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
       igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
       casingMaterial, casingYieldStress, casingYoungsModulus,
-      mcRuns, mcVariance
+      mcRuns, mcVariance,
+      erosiveModel, solverModel, stationCount
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1299,6 +1335,9 @@ export default function AppDesktop() {
           if (config.casingYoungsModulus) setCasingYoungsModulus(config.casingYoungsModulus);
           if (config.mcRuns) setMcRuns(config.mcRuns);
           if (config.mcVariance) setMcVariance(config.mcVariance);
+          if (config.erosiveModel) setErosiveModel(config.erosiveModel);
+          if (config.solverModel) setSolverModel(config.solverModel);
+          if (config.stationCount) setStationCount(config.stationCount);
           addLog('Configuration loaded successfully.');
         } catch (err) {
           addLog('Error parsing config file.');
@@ -1593,6 +1632,43 @@ export default function AppDesktop() {
               </div>
             </div>
 
+            {/* QGroupBox: Solver Model */}
+            <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-3 bg-[#fafafa]">
+              <div className="absolute -top-2.5 left-2 bg-[#fafafa] px-1 text-[10px] font-bold text-[#666] uppercase">
+                Solver Model
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
+                <div className="col-span-2 flex items-center justify-between space-x-2">
+                  <span className="text-[#888] text-[10px]">Spatial Model</span>
+                  <select
+                    value={solverModel}
+                    onChange={e => setSolverModel(e.target.value as SolverModelType)}
+                    className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none font-mono text-right text-[10px]"
+                  >
+                    <option value="0D">0-D lumped chamber (fast)</option>
+                    <option value="quasi1D">Quasi-1-D axial port</option>
+                  </select>
+                </div>
+                {solverModel === 'quasi1D' && (
+                  <InputBox label="Axial Stations" value={stationCount} onChange={setStationCount} suffix="" />
+                )}
+                <div className="col-span-2 text-[9px] text-[#888] leading-snug border-t border-[#eee] pt-1">
+                  {solverModel === 'quasi1D' ? (
+                    <>
+                      Resolves pressure, mass flux and erosive burning along the port, so the aft end
+                      burns faster than the head. Costs ~{stationCount}x a 0-D run. Monte Carlo always
+                      uses 0-D.
+                    </>
+                  ) : (
+                    <>
+                      One pressure and one mass flux for the whole chamber. Accurate for short, fat
+                      grains; understates aft erosion on long, thin ones.
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* QGroupBox: Grain Geometry */}
             <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-3 bg-[#fafafa]">
               <div className="absolute -top-2.5 left-2 bg-[#fafafa] px-1 text-[10px] font-bold text-[#666] uppercase flex items-center space-x-2">
@@ -1832,6 +1908,36 @@ export default function AppDesktop() {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+
+                {/* Axial profile: only exists after a quasi-1-D run. This is the
+                    whole point of the model -- it shows the head end and the aft
+                    end of the same grain burning at different rates. */}
+                {stations && axialData.length > 0 && (
+                  <div className="flex-1 bg-black border border-[#555] relative flex flex-col">
+                    <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">
+                      Axial Profile at Peak Pressure &mdash; head end (x=0) to nozzle
+                    </div>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={axialData} margin={{ top: 20, right: 40, bottom: 5, left: 0 }}>
+                        <CartesianGrid strokeDasharray="1 3" stroke="#333" />
+                        <XAxis
+                          dataKey="x" type="number" domain={['dataMin', 'dataMax']} stroke="#666"
+                          tick={{ fill: '#888', fontSize: 10 }} tickFormatter={(v) => v.toFixed(2)}
+                        />
+                        <YAxis yAxisId="left" stroke="#00aaff" tick={{ fill: '#00aaff', fontSize: 10 }} tickFormatter={(v) => v.toFixed(2)} />
+                        <YAxis yAxisId="right" orientation="right" stroke="#ffaa00" tick={{ fill: '#ffaa00', fontSize: 10 }} tickFormatter={(v) => v.toFixed(1)} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '11px', fontFamily: 'monospace' }}
+                          labelFormatter={(v: any) => `x = ${Number(v).toFixed(3)} m`}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '10px' }} />
+                        <Line yAxisId="left" type="monotone" dataKey="Pc_MPa" name="Static Pc (MPa)" stroke="#00aaff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                        <Line yAxisId="right" type="monotone" dataKey="G" name="Mass flux (kg/m²s)" stroke="#ffaa00" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                        <Line yAxisId="right" type="monotone" dataKey="rb_mm_s" name="Burn rate (mm/s)" stroke="#00ff88" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </div>
             )}
 

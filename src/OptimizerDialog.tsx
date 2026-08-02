@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Check, X } from 'lucide-react';
-import { SolidPropellant, MotorSimulation, BATES, Star, Tubular, RodAndTube, MoonBurner, Finocyl, CustomDXF, SIM_DT } from './engine';
+import { runMotor } from './wasmClient';
+import { grainConfigFromUi } from './wasmCore';
 
 interface OptimizerProps {
   currentConfig: any;
@@ -17,46 +18,55 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
   const [results, setResults] = useState<any[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
-  const runSweep = () => {
+  const runSweep = async () => {
     setIsRunning(true);
-    setTimeout(() => {
-      const sweepResults = [];
-      const stepSize = (sweepMax - sweepMin) / Math.max(1, steps - 1);
-      
-      for (let i = 0; i < steps; i++) {
-        const val = sweepMin + i * stepSize;
-        const config = { ...currentConfig, [paramToSweep]: val };
-        
-        try {
-          const prop = new SolidPropellant(
-            config.density, config.a, config.n, config.flameTemp, config.gamma, config.molWeight, config.kErosive, config.gThreshold
-          );
-          let grain;
-          if (config.grainType === 'Star') grain = new Star(config.length, config.outerRadius, config.valleyRadius, config.tipRadius, config.numPoints);
-          else if (config.grainType === 'Tubular') grain = new Tubular(config.length, config.outerRadius, config.innerRadius);
-          else if (config.grainType === 'RodAndTube') grain = new RodAndTube(config.length, config.outerRadius, config.rodRadius, config.innerRadius);
-          else if (config.grainType === 'MoonBurner') grain = new MoonBurner(config.length, config.outerRadius, config.innerRadius, config.offset);
-          else if (config.grainType === 'Finocyl') grain = new Finocyl(config.length, config.outerRadius, config.innerRadius, config.numPoints, config.finWidth, config.finDepth);
-          else if (config.grainType === 'CustomDXF' && dxfData) grain = new CustomDXF(config.length, config.outerRadius, dxfData.dx, dxfData.perimTable, dxfData.areaTable);
-          else grain = new BATES(config.length, config.outerRadius, config.innerRadius);
+    const sweepResults = [];
+    const stepSize = (sweepMax - sweepMin) / Math.max(1, steps - 1);
 
-          const sim = new MotorSimulation(prop, grain, SIM_DT);
-          sim.set_efficiencies(0.95, 0.98); // fixed for quick sweep
-          // Quick sweep uses an idealized, non-eroding nozzle (null thermal props).
-          sim.set_nozzle(config.throatDiameter, config.expansionRatio, null);
-          const { results: simRes, warnings: simWarnings } = sim.run();
+    for (let i = 0; i < steps; i++) {
+      const val = sweepMin + i * stepSize;
+      const config = { ...currentConfig, [paramToSweep]: val };
 
-          if (simRes.length > 0) {
-            const maxPc = Math.max(...simRes.map((r:any) => r.Pc)) / 1e6;
-            const maxThrust = Math.max(...simRes.map((r:any) => r.Thrust)) / 1000;
-            const initialKn = simRes[0].Ab / simRes[0].ThroatArea;
-            sweepResults.push({ val, maxPc, maxThrust, initialKn, warnings: simWarnings });
-          }
-        } catch(e) { /* ignore fails */ }
-      }
-      setResults(sweepResults);
-      setIsRunning(false);
-    }, 50);
+      try {
+        // Same wasm core as the nominal run, so a swept point can be applied and
+        // re-run without the numbers moving. The two deliberate simplifications
+        // below are what makes this a "quick" sweep, and they are the only
+        // differences from the main simulation.
+        const { results: simRes, warnings: simWarnings } = await runMotor({
+          propellant: {
+            density: config.density,
+            a: config.a,
+            n: config.n,
+            flame_temp: config.flameTemp,
+            gamma: config.gamma,
+            molecular_weight: config.molWeight,
+            k_erosive: config.kErosive,
+            g_threshold: config.gThreshold,
+          },
+          grain: grainConfigFromUi(config, dxfData),
+          nozzle: {
+            throat_diameter: config.throatDiameter,
+            expansion_ratio: config.expansionRatio,
+            // Idealized, non-eroding throat.
+            material: null,
+          },
+          // No igniter: the sweep compares steady-state behaviour, not ignition.
+          igniter: null,
+          // Fixed efficiencies for a quick sweep.
+          options: { c_star_eff: 0.95, cf_eff: 0.98 },
+        });
+
+        if (simRes.length > 0) {
+          const maxPc = Math.max(...simRes.map((r: any) => r.Pc)) / 1e6;
+          const maxThrust = Math.max(...simRes.map((r: any) => r.Thrust)) / 1000;
+          const initialKn = simRes[0].Ab / simRes[0].ThroatArea;
+          sweepResults.push({ val, maxPc, maxThrust, initialKn, warnings: simWarnings });
+        }
+      } catch (e) { /* ignore fails */ }
+    }
+
+    setResults(sweepResults);
+    setIsRunning(false);
   };
 
   return (
