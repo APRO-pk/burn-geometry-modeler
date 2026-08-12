@@ -37,6 +37,7 @@ pub mod nozzle;
 pub mod port;
 pub mod propellant;
 pub mod sim;
+pub mod structural;
 
 use grain::{Grain, GrainConfig};
 use igniter::{Igniter, IgniterConfig};
@@ -204,4 +205,168 @@ pub fn sim_dt() -> f64 {
 #[wasm_bindgen]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+/// Closed-form case structural analysis at the run's peak pressure.
+///
+/// Independent of the ballistics solver: it takes the peak pressure as an input,
+/// so the UI can re-run it when the case material or bolt pattern changes
+/// without re-simulating the motor.
+#[wasm_bindgen]
+pub fn analyze_structure(config: JsValue) -> Result<JsValue, JsValue> {
+    let cfg: structural::StructuralConfig = serde_wasm_bindgen::from_value(config)
+        .map_err(|e| JsValue::from_str(&format!("invalid structural config: {e}")))?;
+    structural_to_js(&structural::analyze(&cfg))
+}
+
+/// Thin-wall sizing rule, exposed so the UI can show the wall a `pR/t`
+/// calculation would ask for next to what the real analysis says about it.
+#[wasm_bindgen]
+pub fn required_wall_thickness(
+    max_pressure: f64,
+    inner_radius: f64,
+    safety_factor: f64,
+    yield_stress: f64,
+) -> f64 {
+    structural::required_thickness_thin_wall(
+        max_pressure,
+        inner_radius,
+        safety_factor,
+        yield_stress,
+    )
+}
+
+fn stress_states_to_js(states: &[structural::StressState]) -> Result<JsValue, JsValue> {
+    let obj = js_sys::Object::new();
+    let field = |pick: fn(&structural::StressState) -> f64| -> Vec<f64> {
+        states.iter().map(pick).collect()
+    };
+    set_f64_array(&obj, "position", &field(|s| s.position))?;
+    set_f64_array(&obj, "hoop", &field(|s| s.hoop))?;
+    set_f64_array(&obj, "radial", &field(|s| s.radial))?;
+    set_f64_array(&obj, "axial", &field(|s| s.axial))?;
+    set_f64_array(&obj, "vonMises", &field(|s| s.von_mises))?;
+    Ok(obj.into())
+}
+
+fn stress_state_to_js(s: &structural::StressState) -> Result<JsValue, JsValue> {
+    let obj = js_sys::Object::new();
+    set_num(&obj, "position", s.position)?;
+    set_num(&obj, "hoop", s.hoop)?;
+    set_num(&obj, "radial", s.radial)?;
+    set_num(&obj, "axial", s.axial)?;
+    set_num(&obj, "vonMises", s.von_mises)?;
+    Ok(obj.into())
+}
+
+fn set_num(obj: &js_sys::Object, key: &str, v: f64) -> Result<(), JsValue> {
+    js_sys::Reflect::set(obj, &JsValue::from_str(key), &JsValue::from_f64(v))?;
+    Ok(())
+}
+
+fn set_str(obj: &js_sys::Object, key: &str, v: &str) -> Result<(), JsValue> {
+    js_sys::Reflect::set(obj, &JsValue::from_str(key), &JsValue::from_str(v))?;
+    Ok(())
+}
+
+fn set_strings(obj: &js_sys::Object, key: &str, v: &[String]) -> Result<(), JsValue> {
+    let arr = js_sys::Array::new();
+    for s in v {
+        arr.push(&JsValue::from_str(s));
+    }
+    js_sys::Reflect::set(obj, &JsValue::from_str(key), &arr)?;
+    Ok(())
+}
+
+fn structural_to_js(r: &structural::StructuralResult) -> Result<JsValue, JsValue> {
+    let root = js_sys::Object::new();
+
+    // ---- Lame ----
+    let lame = js_sys::Object::new();
+    js_sys::Reflect::set(
+        &lame,
+        &JsValue::from_str("profile"),
+        &stress_states_to_js(&r.lame.profile)?,
+    )?;
+    js_sys::Reflect::set(
+        &lame,
+        &JsValue::from_str("inner"),
+        &stress_state_to_js(&r.lame.inner)?,
+    )?;
+    js_sys::Reflect::set(
+        &lame,
+        &JsValue::from_str("outer"),
+        &stress_state_to_js(&r.lame.outer)?,
+    )?;
+    set_num(&lame, "axial", r.lame.axial)?;
+    set_num(&lame, "thinWallHoop", r.lame.thin_wall_hoop)?;
+    set_num(&lame, "thinWallError", r.lame.thin_wall_error)?;
+    set_num(&lame, "rMeanOverT", r.lame.r_mean_over_t)?;
+    js_sys::Reflect::set(
+        &lame,
+        &JsValue::from_str("thinWallApplicable"),
+        &JsValue::from_bool(r.lame.thin_wall_applicable),
+    )?;
+    js_sys::Reflect::set(&root, &JsValue::from_str("lame"), &lame)?;
+
+    // ---- edge bending ----
+    let edge = js_sys::Object::new();
+    set_num(&edge, "beta", r.edge.beta)?;
+    set_num(&edge, "characteristicLength", r.edge.characteristic_length)?;
+    set_num(&edge, "decayLength", r.edge.decay_length)?;
+    set_num(&edge, "flexuralRigidity", r.edge.flexural_rigidity)?;
+    set_num(&edge, "m0", r.edge.m0)?;
+    set_num(&edge, "q0", r.edge.q0)?;
+    set_num(&edge, "bendingStress", r.edge.bending_stress)?;
+    set_num(&edge, "bendingToHoop", r.edge.bending_to_hoop)?;
+    set_num(&edge, "membraneHoop", r.edge.membrane_hoop)?;
+    set_num(&edge, "peakLocation", r.edge.peak_location)?;
+    set_num(&edge, "peakLocationOverChar", r.edge.peak_location_over_char)?;
+    set_str(&edge, "peakSurface", r.edge.peak_surface)?;
+    js_sys::Reflect::set(
+        &edge,
+        &JsValue::from_str("peak"),
+        &stress_state_to_js(&r.edge.peak)?,
+    )?;
+    js_sys::Reflect::set(
+        &edge,
+        &JsValue::from_str("profile"),
+        &stress_states_to_js(&r.edge.profile)?,
+    )?;
+    js_sys::Reflect::set(&root, &JsValue::from_str("edge"), &edge)?;
+
+    // ---- bolts ----
+    if let Some(b) = r.bolts.as_ref() {
+        let o = js_sys::Object::new();
+        set_num(&o, "count", b.count)?;
+        set_num(&o, "diameter", b.diameter)?;
+        set_num(&o, "totalForce", b.total_force)?;
+        set_num(&o, "forcePerBolt", b.force_per_bolt)?;
+        set_num(&o, "nominalArea", b.nominal_area)?;
+        set_num(&o, "stressArea", b.stress_area)?;
+        set_num(&o, "nominalStress", b.nominal_stress)?;
+        set_num(&o, "stressAreaStress", b.stress_area_stress)?;
+        set_num(&o, "safetyFactorNominal", b.safety_factor_nominal)?;
+        set_num(&o, "safetyFactorStressArea", b.safety_factor_stress_area)?;
+        set_num(&o, "minEngagementSteel", b.min_engagement_steel)?;
+        set_num(&o, "minEngagementAluminium", b.min_engagement_aluminium)?;
+        set_num(&o, "edgeDistance", b.edge_distance)?;
+        set_num(&o, "minEdgeDistance", b.min_edge_distance)?;
+        set_num(&o, "shearOutArea", b.shear_out_area)?;
+        set_num(&o, "shearOutStress", b.shear_out_stress)?;
+        set_num(&o, "safetyFactorShearOut", b.safety_factor_shear_out)?;
+        js_sys::Reflect::set(&root, &JsValue::from_str("bolts"), &o)?;
+    }
+
+    // ---- summary ----
+    set_num(&root, "maxVonMises", r.max_von_mises)?;
+    set_str(&root, "whereMax", r.where_max)?;
+    set_num(&root, "safetyFactor", r.safety_factor)?;
+    set_num(&root, "marginOfSafety", r.margin_of_safety)?;
+    set_num(&root, "boreHoopStrain", r.bore_hoop_strain)?;
+    set_num(&root, "boreRadialGrowth", r.bore_radial_growth)?;
+    set_strings(&root, "assumptions", &r.assumptions)?;
+    set_strings(&root, "warnings", &r.warnings)?;
+
+    Ok(root.into())
 }

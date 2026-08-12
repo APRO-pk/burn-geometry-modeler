@@ -867,51 +867,31 @@ export class MotorSimulation {
   }
 }
 
-export function calculate_casing_thickness(
-  max_pressure: number,
-  case_radius: number,
-  safety_factor: number = 1.5,
-  yield_stress: number = 276e6
-): number {
-  return (max_pressure * case_radius * safety_factor) / yield_stress;
-}
-
-export function calculate_casing_strain(
-  max_pressure: number,
-  case_radius: number,
-  thickness: number,
-  youngs_modulus: number = 69e9
-): number {
-  // Hoop strain = (P * r) / (t * E)
-  return (max_pressure * case_radius) / (thickness * youngs_modulus);
-}
-
-export function calculate_discontinuity_stress(
-  max_pressure: number,
-  case_radius: number,
-  thickness: number,
-  poissons_ratio: number = 0.3
-) {
-  // Approximate maximum combined stress near end closure
-  // Hoop stress far from closure: P*r/t
-  const hoop_stress = (max_pressure * case_radius) / thickness;
-  const longitudinal_stress = (max_pressure * case_radius) / (2 * thickness);
-  
-  // Simplified edge bending calculation (cylindrical shell mated to rigid plate)
-  const beta = Math.pow(3 * (1 - poissons_ratio * poissons_ratio) / (Math.pow(case_radius, 2) * Math.pow(thickness, 2)), 0.25);
-  // Shear force Q0 and Moment M0 at junction
-  // Assuming perfectly clamped to a rigid bulkhead
-  const Q0 = (max_pressure * case_radius * case_radius * beta) / 2; // approximation
-  const M0 = (max_pressure * case_radius * case_radius) / 4; // approximation
-  
-  // The local bending stress is typically additive. A very common empirical rule for flat plate closures 
-  // gives bending stress ~ 1.5 to 2.5x the hoop stress right at the corner.
-  // Using a peak bending combination proxy for the FEA visualizer:
-  const max_bending_stress = 1.3 * hoop_stress; // approximation for visual proxy
-  const max_von_mises = Math.sqrt(Math.pow(hoop_stress + max_bending_stress, 2) - (hoop_stress + max_bending_stress)*longitudinal_stress + Math.pow(longitudinal_stress, 2));
-
-  return { hoop_stress, max_bending_stress, max_von_mises };
-}
+/*
+ * The structural analysis that used to live here has moved to the Rust core:
+ * crates/burn-core/src/structural.rs, reached through `analyzeStructure` in
+ * src/structuralClient.ts.
+ *
+ * What was here:
+ *   calculate_casing_thickness    thin-wall pR/t sizing rule. Still available,
+ *                                 as `required_wall_thickness` in the core, but
+ *                                 labelled a SIZING RULE rather than an
+ *                                 analysis result -- feeding its own answer back
+ *                                 through the real analysis gives a safety
+ *                                 factor below the one requested, because pR/t
+ *                                 knows nothing about the closure junction.
+ *   calculate_casing_strain       uniaxial hoop strain pR/tE, which ignores the
+ *                                 radial and axial stresses. Replaced by the
+ *                                 full triaxial Hooke's law at the bore.
+ *   calculate_discontinuity_stress  computed "max bending stress" as a literal
+ *                                 1.3x the hoop stress -- its own comment called
+ *                                 it "approximation for visual proxy". It also
+ *                                 computed beta, Q0 and M0 and then used none of
+ *                                 them. Replaced by real cylindrical-shell edge
+ *                                 bending, where the ratio is
+ *                                 sqrt(3)/sqrt(1-nu^2) ~ 1.82, so the old value
+ *                                 was ~30% low everywhere, non-conservatively.
+ */
 
 export function export_to_eng(
   results: SimulationResult[],

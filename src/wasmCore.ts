@@ -285,6 +285,126 @@ export function unpackResults(raw: RawRunOutput): SimulationResult[] {
   return out;
 }
 
+// --- structural analysis ---------------------------------------------------
+
+export interface BoltPatternConfig {
+  count: number;
+  /** Nominal (shank) diameter, m. */
+  diameter: number;
+  /** Bolt material yield stress, Pa. */
+  yield_stress: number;
+  /** Bolt centre to flange edge, m. Defaults to 1.5x diameter. */
+  edge_distance?: number;
+}
+
+export interface StructuralConfig {
+  /** Peak internal pressure, Pa GAUGE. */
+  max_pressure: number;
+  /** Case bore radius, m. */
+  inner_radius: number;
+  wall_thickness: number;
+  yield_stress: number;
+  youngs_modulus: number;
+  poissons_ratio?: number;
+  /** Material name; only used to decide whether to raise the composite caveat. */
+  material?: string;
+  case_length?: number;
+  bolts?: BoltPatternConfig;
+  wall_stations?: number;
+  axial_stations?: number;
+}
+
+/** Stress state in the principal directions of an axisymmetric vessel, Pa. */
+export interface StressState {
+  /** Radius (Lame) or distance from the junction (edge bending), m. */
+  position: number;
+  hoop: number;
+  radial: number;
+  axial: number;
+  vonMises: number;
+}
+
+/** The same quantities as parallel arrays, for charting. */
+export interface StressProfile {
+  position: Float64Array;
+  hoop: Float64Array;
+  radial: Float64Array;
+  axial: Float64Array;
+  vonMises: Float64Array;
+}
+
+export interface LameResult {
+  profile: StressProfile;
+  inner: StressState;
+  outer: StressState;
+  /** Uniform through the wall for a closed-end cylinder. */
+  axial: number;
+  /** p*R_mean/t, for comparison only. */
+  thinWallHoop: number;
+  /** Relative error thin-wall would make against the exact bore hoop stress. */
+  thinWallError: number;
+  rMeanOverT: number;
+  thinWallApplicable: boolean;
+}
+
+export interface EdgeBendingResult {
+  /** Attenuation parameter [3(1-nu^2)/(R^2 t^2)]^(1/4), 1/m. */
+  beta: number;
+  characteristicLength: number;
+  /** ~3/beta, beyond which the junction is not felt. */
+  decayLength: number;
+  flexuralRigidity: number;
+  /** Clamped-edge moment, N*m/m. */
+  m0: number;
+  /** Clamped-edge shear, N/m. */
+  q0: number;
+  /** 6*M0/t^2, Pa. */
+  bendingStress: number;
+  /** sqrt(3)/sqrt(1-nu^2). Constant; the code this replaced hard-coded 1.3. */
+  bendingToHoop: number;
+  membraneHoop: number;
+  profile: StressProfile;
+  peak: StressState;
+  peakLocation: number;
+  peakLocationOverChar: number;
+  peakSurface: 'bore' | 'outer';
+}
+
+export interface BoltResult {
+  count: number;
+  diameter: number;
+  totalForce: number;
+  forcePerBolt: number;
+  nominalArea: number;
+  stressArea: number;
+  nominalStress: number;
+  stressAreaStress: number;
+  safetyFactorNominal: number;
+  safetyFactorStressArea: number;
+  minEngagementSteel: number;
+  minEngagementAluminium: number;
+  edgeDistance: number;
+  minEdgeDistance: number;
+  shearOutArea: number;
+  shearOutStress: number;
+  safetyFactorShearOut: number;
+}
+
+export interface StructuralResult {
+  lame: LameResult;
+  edge: EdgeBendingResult;
+  bolts?: BoltResult;
+  maxVonMises: number;
+  whereMax: string;
+  safetyFactor: number;
+  /** yield/vonMises - 1. Negative means the case yields. */
+  marginOfSafety: number;
+  boreHoopStrain: number;
+  boreRadialGrowth: number;
+  assumptions: string[];
+  warnings: string[];
+}
+
 // --- worker protocol -------------------------------------------------------
 
 export interface BurnWorkerRequest {

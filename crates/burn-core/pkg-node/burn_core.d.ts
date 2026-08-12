@@ -14,6 +14,19 @@ export function sim_dt(): number;
  */
 export function version(): string;
 /**
+ * Closed-form case structural analysis at the run's peak pressure.
+ *
+ * Independent of the ballistics solver: it takes the peak pressure as an input,
+ * so the UI can re-run it when the case material or bolt pattern changes
+ * without re-simulating the motor.
+ */
+export function analyze_structure(config: any): any;
+/**
+ * Thin-wall sizing rule, exposed so the UI can show the wall a `pR/t`
+ * calculation would ask for next to what the real analysis says about it.
+ */
+export function required_wall_thickness(max_pressure: number, inner_radius: number, safety_factor: number, yield_stress: number): number;
+/**
  * Stateful solver: `configure(...)` once, then `run()`.
  */
 export class Solver {

@@ -2,6 +2,8 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const __wbg_solver_free: (a: number, b: number) => void;
+export const analyze_structure: (a: any) => [number, number, number];
+export const required_wall_thickness: (a: number, b: number, c: number, d: number) => number;
 export const sim_dt: () => number;
 export const simulate: (a: any) => [number, number, number];
 export const solver_configure: (a: number, b: any) => [number, number];

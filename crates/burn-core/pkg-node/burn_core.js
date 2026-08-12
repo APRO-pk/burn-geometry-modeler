@@ -216,6 +216,37 @@ module.exports.version = function() {
     }
 };
 
+/**
+ * Closed-form case structural analysis at the run's peak pressure.
+ *
+ * Independent of the ballistics solver: it takes the peak pressure as an input,
+ * so the UI can re-run it when the case material or bolt pattern changes
+ * without re-simulating the motor.
+ * @param {any} config
+ * @returns {any}
+ */
+module.exports.analyze_structure = function(config) {
+    const ret = wasm.analyze_structure(config);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+};
+
+/**
+ * Thin-wall sizing rule, exposed so the UI can show the wall a `pR/t`
+ * calculation would ask for next to what the real analysis says about it.
+ * @param {number} max_pressure
+ * @param {number} inner_radius
+ * @param {number} safety_factor
+ * @param {number} yield_stress
+ * @returns {number}
+ */
+module.exports.required_wall_thickness = function(max_pressure, inner_radius, safety_factor, yield_stress) {
+    const ret = wasm.required_wall_thickness(max_pressure, inner_radius, safety_factor, yield_stress);
+    return ret;
+};
+
 const SolverFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_solver_free(ptr >>> 0, 1));
