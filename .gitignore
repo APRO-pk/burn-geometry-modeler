@@ -11,3 +11,7 @@ target/
 *.log
 .env*
 !.env.example
+
+# Surrogate training data: regenerable from the seed with `npm run surrogate:sample`.
+# The trained model (src/surrogate/model.json) IS committed -- the app needs it.
+tools/data/

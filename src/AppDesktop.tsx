@@ -28,6 +28,7 @@ import { PropellantEditor, PropellantData } from './PropellantEditor';
 import { GrainEditor } from './GrainEditor';
 import { exportBurnsimXML, parseBurnsimXML } from './BurnsimHandler';
 import { OptimizerDialog } from './OptimizerDialog';
+import { SurrogatePanel } from './SurrogatePanel';
 
 // Unit Conversion Factors mapping to base SI units
 const UNIT_FACTORS: Record<string, Record<string, number>> = {
@@ -277,7 +278,7 @@ export default function AppDesktop() {
   const [metrics, setMetrics] = useState<any>(null);
   const [visualizerIndex, setVisualizerIndex] = useState<number>(0);
   const [statusMsg, setStatusMsg] = useState<string>('System Ready');
-  const [activeTab, setActiveTab] = useState<'ballistics' | 'extended_graphs' | 'geometry' | 'thermo' | 'montecarlo' | 'structural' | 'materials' | 'statistics'>('ballistics');
+  const [activeTab, setActiveTab] = useState<'ballistics' | 'extended_graphs' | 'geometry' | 'thermo' | 'montecarlo' | 'structural' | 'materials' | 'statistics' | 'surrogate'>('ballistics');
 
   // Monte Carlo State
   const [mcRuns, setMcRuns] = useState<number>(50);
@@ -997,6 +998,35 @@ export default function AppDesktop() {
       vonMises: p.vonMises[i] / 1e6,
     }));
   }, [structural]);
+
+  /**
+   * The current design in the surrogate's own parameter set. Memoised so the
+   * panel's prediction effect only re-fires when a value the model actually
+   * consumes changes, not on every unrelated render.
+   */
+  const surrogateDesign = useMemo(
+    () => ({
+      length,
+      outer_radius: outerRadius,
+      inner_radius: innerRadius,
+      throat_diameter: throatDiameter,
+      expansion_ratio: expansionRatio,
+      a,
+      n,
+      density,
+    }),
+    [length, outerRadius, innerRadius, throatDiameter, expansionRatio, a, n, density]
+  );
+
+  /** Push a design found by inverse search back into the main inputs. */
+  const applySurrogateDesign = useCallback((d: typeof surrogateDesign) => {
+    pushHistory();
+    setLength(d.length);
+    setOuterRadius(d.outer_radius);
+    setInnerRadius(d.inner_radius);
+    setThroatDiameter(d.throat_diameter);
+    setExpansionRatio(d.expansion_ratio);
+  }, []);
 
   /** Station profiles reshaped for the axial chart. Empty after a 0-D run. */
   const axialData = useMemo(() => {
@@ -1921,7 +1951,8 @@ export default function AppDesktop() {
               { id: 'thermo', label: 'Propellant Thermo' },
               { id: 'materials', label: 'Material Properties' },
               { id: 'montecarlo', label: 'Monte Carlo' },
-              { id: 'structural', label: 'Structural Analysis' }
+              { id: 'structural', label: 'Structural Analysis' },
+              { id: 'surrogate', label: 'Surrogate (fast)' }
             ].map(tab => (
               <button 
                 key={tab.id}
@@ -2775,6 +2806,27 @@ export default function AppDesktop() {
             )}
 
             {/* TAB: STATISTICS */}
+            {/* TAB: SURROGATE */}
+            {activeTab === 'surrogate' && (
+              <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
+                <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">
+                  Physics-Trained Surrogate
+                </div>
+                {grainType !== 'BATES' ? (
+                  <div className="text-[#666] italic font-mono text-xs mt-6 max-w-lg text-center">
+                    The surrogate was trained on BATES grains only. Switch the grain type to BATES to
+                    use it, or keep using the full solver — which handles every geometry.
+                  </div>
+                ) : (
+                  <SurrogatePanel
+                    design={surrogateDesign}
+                    onApplyDesign={applySurrogateDesign}
+                    addLog={addLog}
+                  />
+                )}
+              </div>
+            )}
+
             {activeTab === 'statistics' && (
               <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
                 <div className="absolute top-1 left-2 z-10 text-[#00ff00] text-[10px] font-mono">Motor Statistics & Summary</div>
