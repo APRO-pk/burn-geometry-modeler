@@ -558,18 +558,28 @@ describe('KNDX golden reference (Step-3A constants, captured from engine.ts @ 3b
 // =========================================================================
 describe('physical invariants of the wasm output', () => {
   it('produces only finite, physically signed values on every case', () => {
+    // Scanned in a plain loop with a single assertion at the end, rather than
+    // an expect() per field per row. 13 cases x ~2000 rows x 7 fields is
+    // ~180k expect() calls, which took 8.5s and intermittently blew the 5s
+    // default timeout -- a slow test that fails on load, not on correctness.
+    // This reports the same violations, names the exact row, and runs instantly.
+    const bad: string[] = [];
     for (const c of CASES) {
       const { results } = runWasm(wasmConfig(c));
-      for (const r of results) {
-        expect(Number.isFinite(r.Pc), `${c.name} Pc`).toBe(true);
-        expect(Number.isFinite(r.Thrust), `${c.name} Thrust`).toBe(true);
-        expect(r.Pc, `${c.name} Pc`).toBeGreaterThan(0);
-        expect(r.Thrust, `${c.name} Thrust`).toBeGreaterThanOrEqual(0);
-        expect(r.Ab, `${c.name} Ab`).toBeGreaterThanOrEqual(0);
-        expect(r.PortArea, `${c.name} PortArea`).toBeGreaterThanOrEqual(0);
-        expect(r.y, `${c.name} y`).toBeGreaterThanOrEqual(0);
+      for (let i = 0; i < results.length && bad.length < 5; i++) {
+        const r = results[i];
+        const fail = (what: string, v: number) =>
+          bad.push(`${c.name} row ${i}: ${what} = ${v}`);
+        if (!Number.isFinite(r.Pc)) fail('Pc not finite', r.Pc);
+        if (!Number.isFinite(r.Thrust)) fail('Thrust not finite', r.Thrust);
+        if (!(r.Pc > 0)) fail('Pc not positive', r.Pc);
+        if (!(r.Thrust >= 0)) fail('Thrust negative', r.Thrust);
+        if (!(r.Ab >= 0)) fail('Ab negative', r.Ab);
+        if (!(r.PortArea >= 0)) fail('PortArea negative', r.PortArea);
+        if (!(r.y >= 0)) fail('y negative', r.y);
       }
     }
+    expect(bad, bad.join('; ')).toEqual([]);
   });
 
   it('advances time monotonically by exactly dt', () => {

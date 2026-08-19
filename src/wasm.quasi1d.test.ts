@@ -523,17 +523,26 @@ describe('quasi-1-D physical invariants', () => {
   for (const [name, r] of cases) {
     it(`${name}: every reported value is finite and physically signed`, () => {
       expect(r.results.length).toBeGreaterThan(50);
-      for (const row of r.results) {
-        expect(Number.isFinite(row.Pc), 'Pc finite').toBe(true);
-        expect(Number.isFinite(row.PcNozzle!), 'PcNozzle finite').toBe(true);
-        expect(Number.isFinite(row.Thrust), 'Thrust finite').toBe(true);
-        expect(row.Pc).toBeGreaterThan(0);
-        expect(row.PcNozzle!).toBeGreaterThan(0);
-        expect(row.PcNozzle!).toBeLessThanOrEqual(row.Pc * (1 + 1e-12));
-        expect(row.Thrust).toBeGreaterThanOrEqual(0);
-        expect(row.Ab).toBeGreaterThanOrEqual(0);
-        expect(row.PortArea).toBeGreaterThan(0);
+      // Scanned rather than asserted per field per row: an expect() call per
+      // check over thousands of rows costs seconds and turns a correctness test
+      // into a timeout risk. One assertion, same coverage, names the bad row.
+      const bad: string[] = [];
+      for (let i = 0; i < r.results.length && bad.length < 5; i++) {
+        const row = r.results[i];
+        const fail = (what: string) => bad.push(`row ${i}: ${what}`);
+        if (!Number.isFinite(row.Pc)) fail(`Pc = ${row.Pc}`);
+        if (!Number.isFinite(row.PcNozzle!)) fail(`PcNozzle = ${row.PcNozzle}`);
+        if (!Number.isFinite(row.Thrust)) fail(`Thrust = ${row.Thrust}`);
+        if (!(row.Pc > 0)) fail(`Pc not positive (${row.Pc})`);
+        if (!(row.PcNozzle! > 0)) fail(`PcNozzle not positive (${row.PcNozzle})`);
+        if (!(row.PcNozzle! <= row.Pc * (1 + 1e-12))) {
+          fail(`PcNozzle ${row.PcNozzle} exceeds head Pc ${row.Pc}`);
+        }
+        if (!(row.Thrust >= 0)) fail(`Thrust negative (${row.Thrust})`);
+        if (!(row.Ab >= 0)) fail(`Ab negative (${row.Ab})`);
+        if (!(row.PortArea > 0)) fail(`PortArea not positive (${row.PortArea})`);
       }
+      expect(bad, bad.join('; ')).toEqual([]);
     });
 
     it(`${name}: station profiles are finite and non-negative`, () => {

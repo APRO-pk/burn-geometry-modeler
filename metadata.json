@@ -1,6 +1,6 @@
 {
   "name": "Burn & geometry Modeler",
-  "description": "",
+  "description": "Solid rocket motor internal ballistics, grain geometry, and case structural analysis",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
