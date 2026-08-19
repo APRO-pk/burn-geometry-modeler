@@ -22,138 +22,186 @@ npm run surrogate:rebuild
 That is sampling plus training. The two halves can be run separately:
 
 ```bash
-npm run surrogate:sample -- --n 6000 --seed 1 --out tools/data/samples.csv
-npm run surrogate:train  -- --data tools/data/samples.csv --train 800 --calib 600
+npm run surrogate:sample -- --n 10500 --seed 1 --out tools/data/samples.csv
+npm run surrogate:train  -- --data tools/data/samples.csv --train 1000 --calib 900
 ```
+
+Sampling ~10,500 draws takes about 15 minutes; the fit takes a few minutes more.
 
 **Rebuild whenever the 0-D physics changes.** The surrogate is fitted to a
 specific version of `burn-core`; if the solver's answers move, the surrogate is
-silently stale and its error bars become fiction. `src/surrogate.test.ts`
-catches this — it compares the shipped model against fresh solves from the
-current core, so a stale model fails CI rather than misleading a user.
+silently stale and its error bars become fiction. `src/surrogate.test.ts` catches
+this — it compares the shipped model against fresh solves from the current core,
+per geometry, so a stale model fails CI rather than misleading a user.
 
-### Sampling flags
+---
 
-| Flag | Default | Meaning |
-| --- | --- | --- |
-| `--n` | 4000 | Latin Hypercube points to attempt (not all are accepted) |
-| `--seed` | 1 | PRNG seed; the same seed reproduces the dataset exactly |
-| `--out` | `tools/data/samples.csv` | Output path |
+## One model, every geometry
 
-### Training flags
+The surrogate covers **all seven grain types** — BATES, Star, Tubular, Rod &
+Tube, MoonBurner, Finocyl and Custom DXF — with a single Gaussian process.
 
-| Flag | Default | Meaning |
-| --- | --- | --- |
-| `--data` | `tools/data/samples.csv` | Input dataset |
-| `--train` | 700 | GP training points (drives artifact size — see below) |
-| `--calib` | 600 | Rows reserved for calibrating the uncertainty band |
-| `--seed` | 7 | Split and multi-start seed |
-| `--out` | `src/surrogate/model.json` | Exported artifact |
+That is possible because of what the solver actually consumes. Grep `self.grain`
+in `crates/burn-core/src/sim.rs` and there are exactly three things:
+
+```
+burning_area(y)        port_area(y)        length()
+```
+
+Nothing else. Not the grain kind, not its parameters — those exist only to
+produce those two curves. So a feature vector that **describes the curves** is
+sufficient in principle to predict the run, whatever geometry produced them.
+
+The alternative — seven models, one per kind — would have needed seven parameter
+lists, seven envelopes, seven sampling ranges and seven metrics tables, and any
+geometry nobody trained on would have been unsupported forever. Describing the
+curves instead means Custom DXF is covered like everything else, despite being
+an arbitrary traced profile with no parameters at all.
+
+### The features
+
+`src/surrogate/features.ts` — imported by both the trainer and the browser, so
+they cannot drift.
+
+| Group | Features |
+| --- | --- |
+| Propellant & nozzle | `log_a`, `n`, `log_density`, `log_throat_diameter`, `expansion_ratio`, `log_burn_rate_ref` |
+| Grain scale | `log_length`, `log_outer_radius`, `log_ab0`, `log_aport0`, `log_web`, `log_prop_mass`, `log_kn0`, `log_port_to_throat` |
+| Grain shape | `Ab(y)/Ab(0)` at nine web fractions, `Aport(y)/Aport(0)` at three |
+| Curve landmarks | `ab_peak_fraction`, `log_ab_peak_ratio`, `log_tb_shape` |
+
+Three of these earned their place by fixing a measured weakness:
+
+**Logs everywhere.** Internal ballistics is multiplicative — pressure goes as
+`Kn^(1/(1-n))`, burn time as `web/(a Pc^n)` — so in log coordinates most of the
+response is nearly flat, which is what a squared-exponential kernel fits best.
+
+**Nine curve samples, not five.** Five sufficed for the smooth geometries but
+stepped straight over the *kinks*: Finocyl when its fin slots reach the casing,
+Rod & Tube when the central rod burns through. Those two sat at burn-time R² of
+0.57 and 0.77 until the grid was refined and `ab_peak_fraction` added.
+
+**`log_tb_shape`.** Quasi-steadily, `r_b ~ Ab^(n/(1-n))`, so
+
+```
+t_b  ~  INTEGRAL over the web of (Ab(y)/Ab0)^(-n/(1-n)) dy
+```
+
+That integral is exactly computable from the curve and the pressure exponent,
+and it is the *one* combination burn time actually depends on. Handing it over
+rather than leaving the GP to infer it took overall burn-time R² from 0.878 to
+0.954 in a single change.
+
+### Geometry is validated, not duplicated
+
+Features are derived using the TypeScript grain classes in `src/engine.ts` — the
+ones `src/wasm.parity.test.ts` proves **bit-exact** against the Rust
+implementations (worst relative error 0 on burning area, 3e-16 on port area).
+That avoids maintaining a second copy of seven geometry models that could
+silently disagree with the solver.
+
+The burnout web is found numerically, by bracketing the first zero of the
+burning area and bisecting. There is no closed form covering all seven kinds,
+and the numeric search is correct for geometries added later. It also has to
+scan **past** the casing radius: a MoonBurner burns out at
+`outer + offset - core`, and bounding the scan at `outer_radius` understated the
+web — and with it the burn time — for that entire geometry.
 
 ---
 
 ## How the design space is sampled
 
-`tools/designSpace.mts`. Two decisions matter more than the rest, and both took
-a couple of attempts to get right.
+`tools/designSpace.mts` and `src/surrogate/shape.ts`.
 
-**Sampling parameters are not model features.** The model takes throat diameter
-as an input because that is what a user types. The sampler does not draw it
-independently — a large grain with a small throat sits at 200 MPa, a small grain
-with a large throat never chokes, and a box over both wastes most of its draws.
-Instead the sampler draws a target chamber pressure and inverts the equilibrium
-relation for the throat.
+**Sampling parameters are not model features.** The sampler works in the
+parameters a designer types; the model works in curve descriptors. Drawing the
+throat independently of the grain gives mostly 200 MPa motors and motors that
+never choke, so the sampler draws a Kn *feasible for the propellant it already
+drew* and sizes the throat from it.
 
-**`a` and `n` cannot be drawn independently either.** `a` is the burn rate
-extrapolated to 1 Pa, so its magnitude is meaningless without `n`. Sweeping a box
-over the pair generates mostly propellants that do not exist. The sampler draws
-**burn rate at 7 MPa** and derives `a = r_ref / P_ref^n`, which is how
-propellants are actually characterised and is far better conditioned.
+**`a` and `n` cannot be drawn independently.** `a` is the burn rate extrapolated
+to 1 Pa, so its magnitude is meaningless without `n`, and a box over the pair is
+mostly propellants that do not exist. The sampler draws burn rate at 7 MPa and
+derives `a = r_ref / P_ref^n`.
 
-Getting these wrong is not merely inefficient. The first version accepted 36% of
-draws, and the rejected 64% were not scattered — they were the entire high-`n`
-region. A surrogate trained on the survivors would have had a hole exactly where
-the pressure exponent gets interesting. After the reparameterisation, acceptance
-is ~84% and `n` covers its full range.
+**Shape is drawn as fractions.** Bore as a fraction of the casing, fin height as
+a fraction of the remaining web. Proportions stay sane at every motor size, and
+validity is largely automatic.
 
-Remaining rejections are motors that are geometrically impossible (the throat
-cannot be fed by the port) or outside the pressure and burn-time bands in
-`ACCEPTANCE`. Those bounds are part of the model's contract: the surrogate is
-only claimed to be valid for designs that would have passed them.
+**The sampler and the optimiser build grains through the same function.**
+`grainFromShape` in `src/surrogate/shape.ts`. When those were written separately,
+the inverse search returned a 57 mm throat inside a 46 mm bore — a shape the
+sampler would have rejected, so the model had never seen anything like it and
+was free to invent whatever the objective wanted there.
+
+Draws are spread evenly across the seven geometries: the model needs to see the
+*variety of curves* the geometries produce, and a progressive BATES teaches it
+nothing about a regressive Rod & Tube.
 
 ---
 
-## How the model works
+## The model
 
-A Gaussian process with an ARD squared-exponential kernel, fitted by coordinate
-descent on the log marginal likelihood (`tools/gp.mts`). Deliberately small.
+ARD squared-exponential GP, hyperparameters by coordinate descent on the log
+marginal likelihood (`tools/gp.mts`). Deliberately small.
 
-**Feature expansion is the reason it is accurate.** `src/surrogate/features.ts`
-turns the 8 raw parameters into 14, by taking logs of the positive ones and
-adding exactly-computable combinations (initial Kn, propellant mass, web,
-reference burn rate, port-to-throat ratio, L/D). Internal ballistics is
-multiplicative — pressure goes as `Kn^(1/(1-n))`, burn time as `web / (a Pc^n)` —
-so in log coordinates most of the response is nearly flat, which is what a
-squared-exponential kernel fits best. This single change took peak-pressure
-MAPE from 18.2% to 2.7% and burn time from 32% to 5%.
+**One kernel is shared across all five outputs**, shipping one Cholesky factor
+instead of five. The cost is that the shared predictive variance is not right for
+each output individually — left alone, Isp's 95% band covered 78% of held-out
+points while total impulse's covered 99.9%. A per-output scale factor fitted on a
+**separate calibration split** fixes it; calibrating on the test split would make
+the reported coverage circular.
 
-That file is imported by both the trainer and the browser, so the two cannot
-drift apart.
-
-**One kernel is shared across all five outputs.** That ships one Cholesky
-factor instead of five, cutting the artifact 5x. The cost is that the shared
-predictive variance is not right for each output individually — left alone, Isp's
-95% band covered 78% of held-out points while total impulse's covered 99.9%. A
-per-output scale factor fitted on a **separate calibration split** fixes it. The
-test split is never used for calibration, or the reported coverage would be
-circular.
+**The split is stratified by geometry.** With seven kinds and a few hundred
+training rows, an unstratified draw can leave one kind with a handful of points
+by luck — and because the model is geometry-agnostic, that shows up as a quiet
+accuracy hole rather than an obvious failure.
 
 **Artifact size is why the training set is a subset.** Exact GP prediction needs
-the Cholesky factor at inference time to produce variance, and that is O(N²). At
-N=800 the packed lower triangle is ~1.7 MB as base64 Float32; at N=5000 it would
-be 50 MB. The held-out remainder measures what the subsetting cost, which is how
-to choose N honestly.
+the Cholesky factor at inference time to produce variance, and that is O(N²). The
+held-out remainder measures what the subsetting cost, which is how to choose N
+honestly.
 
 ---
 
 ## Current model
 
-Trained on 5037 accepted samples (6000 attempted), 800 training points, 600
-calibration, 3637 held out.
+See `metrics` and `metricsByKind` inside `src/surrogate/model.json` for the
+numbers the shipped artifact was measured at, and the Surrogate tab shows both
+the overall figures and the ones for the geometry you are currently editing.
 
-| Output | R² | MAE | MAPE | 95% band coverage |
-| --- | --- | --- | --- | --- |
-| Peak chamber pressure | 0.9986 | 0.115 MPa | 1.55% | 93.4% |
-| Total impulse | 0.9997 | 73.2 N·s | 1.00% | 94.9% |
-| Specific impulse | 0.9925 | 0.78 s | 0.60% | 95.0% |
-| Peak Kn | 0.9991 | 6.20 | 0.96% | 92.9% |
-| Burn time | 0.9975 | 0.102 s | 3.33% | 94.9% |
+`npm run surrogate:train` prints them at the end of every fit:
 
-Prediction with uncertainty takes well under 1 ms; mean-only prediction (used by
-the Monte Carlo path, which skips the O(N²) variance solve) is a few
-microseconds, so 10,000 dispersion samples stay interactive.
+```
+held-out performance (test split, after calibration):
+  target            R^2      MAE          MAPE     95% coverage
+per-geometry (test split): R^2 / MAPE on peak Pc and impulse
+```
 
 ### Scope
 
-- **BATES grains only.** The Surrogate tab says so and disables itself for other
-  geometries. The full solver handles all seven.
+- All seven grain geometries. Custom DXF needs a profile loaded first — its
+  burn-back curves come from the traced file.
 - Fixed propellant thermochemistry (flame temperature, γ, molecular weight).
 - No igniter, no nozzle erosion, no erosive burning — the 0-D defaults.
+- Inverse design over a Custom DXF grain moves length, casing radius, throat and
+  expansion ratio only. The cross-section is the user's data; there is no shape
+  to optimise.
 
 ### The envelope guardrail
 
-`checkEnvelope` tests each feature against its training range and the UI refuses
-to present a bare prediction outside it.
+`checkEnvelope` tests each **expanded** feature against its training range, and
+the UI refuses to present a bare prediction outside it. The test is over the
+expanded features rather than raw parameters because with seven geometries there
+is no common raw parameter list to bound — a Star has no `inner_radius`, a
+Finocyl has no `valley_radius`.
 
-This is a **necessary, not sufficient** condition, and the tests say so
-explicitly. The sampled region is the image of a box under a nonlinear map, so a
-per-feature box test cannot certify coverage: a design can pass it and still sit
-well off the training manifold (for instance, a throat unrelated to its grain).
-Point accuracy does degrade there — R² on peak pressure falls from ~0.99 to ~0.8
-— and `src/surrogate.test.ts` measures exactly that case. What holds is the part
-that matters: the GP widens its bands off-manifold and keeps covering the truth,
-so the number is still presented with an honest admission of doubt, and the
-verify button is still one click away.
+This is a **necessary, not sufficient** condition, and the tests say so. The
+sampled region is the image of a box under a nonlinear map, so a design can pass
+the box test and still sit off the training manifold. Point accuracy degrades
+there; what holds is that the GP widens its bands and keeps covering the truth,
+so the number still arrives with honest doubt attached and the verify button is
+one click away.
 
 ---
 
@@ -162,16 +210,17 @@ verify button is still one click away.
 | Path | Role |
 | --- | --- |
 | `tools/designSpace.mts` | Sampling ranges, acceptance bounds, LHS, PRNG |
-| `tools/sample.mts` | Drives the physics core, writes the CSV |
+| `tools/sample.mts` | Drives the physics core across all geometries, writes the CSV |
 | `tools/gp.mts` | Cholesky, kernel, marginal likelihood, hyperparameter fit |
-| `tools/train.mts` | Split, fit, calibrate, evaluate, export |
-| `src/surrogate/features.ts` | Feature expansion — shared by trainer and browser |
+| `tools/train.mts` | Split, fit, calibrate, evaluate (overall and per kind), export |
+| `src/surrogate/features.ts` | Feature extraction — shared by trainer and browser |
+| `src/surrogate/shape.ts` | What a legal grain shape is — shared by sampler and optimiser |
 | `src/surrogate/predict.ts` | Browser inference, envelope check |
 | `src/surrogate/optimize.ts` | Inverse design search, dispersion sweep |
 | `src/surrogate/model.json` | The exported artifact (generated; committed) |
 | `src/SurrogatePanel.tsx` | The three UI features |
-| `src/surrogate.test.ts` | Validation against the live physics core |
+| `src/surrogate.test.ts` | Validation against the live physics core, per geometry |
 
 `tools/data/samples.csv` is the generated dataset. It is reproducible from the
-seed, so it does not need to be committed, but keeping it makes retraining
-without re-sampling possible.
+seed, so it is gitignored, but keeping it locally makes retraining without
+re-sampling possible.

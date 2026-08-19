@@ -29,6 +29,7 @@ import { GrainEditor } from './GrainEditor';
 import { exportBurnsimXML, parseBurnsimXML } from './BurnsimHandler';
 import { OptimizerDialog } from './OptimizerDialog';
 import { SurrogatePanel } from './SurrogatePanel';
+import type { SurrogateGrain } from './surrogate/features';
 
 // Unit Conversion Factors mapping to base SI units
 const UNIT_FACTORS: Record<string, Record<string, number>> = {
@@ -1006,24 +1007,66 @@ export default function AppDesktop() {
    */
   const surrogateDesign = useMemo(
     () => ({
-      length,
-      outer_radius: outerRadius,
-      inner_radius: innerRadius,
+      // The surrogate takes the grain itself, not a flat parameter list: it
+      // predicts from the burn-back curves, so every geometry goes through the
+      // same path and grainConfigFromUi is the one place that mapping lives.
+      grain: grainConfigFromUi(grainUiParams(), dxfData) as SurrogateGrain,
       throat_diameter: throatDiameter,
       expansion_ratio: expansionRatio,
       a,
       n,
       density,
     }),
-    [length, outerRadius, innerRadius, throatDiameter, expansionRatio, a, n, density]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints,
+      rodRadius, offset, finWidth, finDepth, dxfData,
+      throatDiameter, expansionRatio, a, n, density,
+    ]
   );
 
-  /** Push a design found by inverse search back into the main inputs. */
-  const applySurrogateDesign = useCallback((d: typeof surrogateDesign) => {
+  /**
+   * Push a design found by inverse search back into the main inputs.
+   *
+   * The search returns a grain of whatever geometry was active, so this unpacks
+   * each kind into the editor fields it corresponds to. Note that several kinds
+   * share `innerRadius` for different physical things -- the tube bore, the
+   * MoonBurner core, the Finocyl bore -- which is the editor's existing
+   * convention, mirrored by grainConfigFromUi in the other direction.
+   */
+  const applySurrogateDesign = useCallback((d: { grain: SurrogateGrain; throat_diameter: number; expansion_ratio: number }) => {
     pushHistory();
-    setLength(d.length);
-    setOuterRadius(d.outer_radius);
-    setInnerRadius(d.inner_radius);
+    const g = d.grain;
+    setLength(g.length);
+    setOuterRadius(g.outer_radius);
+    switch (g.kind) {
+      case 'BATES':
+      case 'Tubular':
+        setInnerRadius(g.inner_radius);
+        break;
+      case 'Star':
+        setValleyRadius(g.valley_radius);
+        setTipRadius(g.tip_radius);
+        setNumPoints(g.num_points);
+        break;
+      case 'RodAndTube':
+        setRodRadius(g.rod_radius);
+        setInnerRadius(g.tube_inner_radius);
+        break;
+      case 'MoonBurner':
+        setInnerRadius(g.core_radius);
+        setOffset(g.offset);
+        break;
+      case 'Finocyl':
+        setInnerRadius(g.r_tube);
+        setNumPoints(g.num_fins);
+        setFinWidth(g.w_fin);
+        setFinDepth(g.h_fin);
+        break;
+      case 'CustomDXF':
+        // The traced profile is the user's file; only the scale changes.
+        break;
+    }
     setThroatDiameter(d.throat_diameter);
     setExpansionRatio(d.expansion_ratio);
   }, []);
@@ -2812,10 +2855,10 @@ export default function AppDesktop() {
                 <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">
                   Physics-Trained Surrogate
                 </div>
-                {grainType !== 'BATES' ? (
+                {grainType === 'CustomDXF' && !dxfData ? (
                   <div className="text-[#666] italic font-mono text-xs mt-6 max-w-lg text-center">
-                    The surrogate was trained on BATES grains only. Switch the grain type to BATES to
-                    use it, or keep using the full solver — which handles every geometry.
+                    Load a DXF profile first — the surrogate predicts from the grain's burn-back
+                    curves, and a Custom DXF grain has none until its cross-section is traced.
                   </div>
                 ) : (
                   <SurrogatePanel

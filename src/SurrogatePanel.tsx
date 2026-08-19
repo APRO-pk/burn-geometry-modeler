@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Zap, Play, Check, AlertTriangle } from 'lucide-react';
 import {
   checkEnvelope,
@@ -7,9 +7,12 @@ import {
   predict,
   surrogateInfo,
   surrogateMetrics,
+  surrogateMetricsByKind,
 } from './surrogate/predict';
 import type { SurrogateTarget } from './surrogate/predict';
-import type { RawDesign } from './surrogate/features';
+import { describeGrain } from './surrogate/features';
+import type { RawDesign, SurrogateGrain } from './surrogate/features';
+import { GRAIN_SHAPE_PARAMS, shapeFromGrain } from './surrogate/shape';
 import { dispersionSweep, histogram, inverseDesign } from './surrogate/optimize';
 import type { Candidate } from './surrogate/optimize';
 import { runMotor } from './wasmClient';
@@ -34,7 +37,6 @@ const LABEL: Record<SurrogateTarget, string> = {
   burn_time: 'Burn Time',
 };
 
-/** Short names for the provenance line, where the full labels do not fit. */
 const SHORT: Record<SurrogateTarget, string> = {
   peak_pc: 'Pc',
   total_impulse: 'It',
@@ -52,11 +54,31 @@ const FORMAT: Record<SurrogateTarget, (v: number) => string> = {
 };
 
 export interface SurrogatePanelProps {
-  /** The design currently in the main editor. */
+  /** The design currently in the main editor, in the surrogate's own shape. */
   design: RawDesign;
   /** Apply a design found by inverse search back into the main editor. */
   onApplyDesign: (d: RawDesign) => void;
   addLog: (msg: string) => void;
+}
+
+/** A one-line summary of a grain's shape, for the candidate table. */
+function describeShape(g: SurrogateGrain): string {
+  const mm = (v: number) => (v * 1000).toFixed(0);
+  switch (g.kind) {
+    case 'BATES':
+    case 'Tubular':
+      return `⌀${mm(g.outer_radius * 2)}/${mm(g.inner_radius * 2)}`;
+    case 'Star':
+      return `⌀${mm(g.outer_radius * 2)} · ${g.num_points}pt · v${mm(g.valley_radius)}/t${mm(g.tip_radius)}`;
+    case 'RodAndTube':
+      return `⌀${mm(g.outer_radius * 2)} · rod ${mm(g.rod_radius * 2)} · bore ${mm(g.tube_inner_radius * 2)}`;
+    case 'MoonBurner':
+      return `⌀${mm(g.outer_radius * 2)} · core ${mm(g.core_radius * 2)} · off ${mm(g.offset)}`;
+    case 'Finocyl':
+      return `⌀${mm(g.outer_radius * 2)} · ${g.num_fins} fins × ${mm(g.h_fin)}mm`;
+    case 'CustomDXF':
+      return `⌀${mm(g.outer_radius * 2)} · traced profile`;
+  }
 }
 
 /** Ground truth for one design, via the same worker the Run button uses. */
@@ -70,12 +92,7 @@ async function solveTruth(d: RawDesign): Promise<Record<SurrogateTarget, number>
       gamma: 1.13,
       molecular_weight: 0.042,
     },
-    grain: {
-      kind: 'BATES',
-      length: d.length,
-      outer_radius: d.outer_radius,
-      inner_radius: d.inner_radius,
-    },
+    grain: d.grain as BurnConfig['grain'],
     nozzle: {
       throat_diameter: d.throat_diameter,
       expansion_ratio: d.expansion_ratio,
@@ -97,12 +114,13 @@ async function solveTruth(d: RawDesign): Promise<Record<SurrogateTarget, number>
         (results[i].Time - results[i - 1].Time);
     }
   }
-  const propMass =
-    Math.PI * (d.outer_radius ** 2 - d.inner_radius ** 2) * d.length * d.density;
+  // Propellant mass comes from the same descriptor the features use, so Isp is
+  // computed the way the model was trained rather than by a parallel formula.
+  const propMass = describeGrain(d.grain, d.density, d.n).propMass;
   return {
     peak_pc,
     total_impulse,
-    isp: total_impulse / (propMass * 9.80665),
+    isp: total_impulse / (Math.max(propMass, 1e-9) * 9.80665),
     max_kn,
     burn_time: results[results.length - 1].Time,
   };
@@ -118,13 +136,18 @@ function EnvelopeWarning({ design }: { design: RawDesign }) {
         <AlertTriangle className="w-3 h-3" />
         <span>OUTSIDE TRAINING ENVELOPE — surrogate values are extrapolation</span>
       </div>
-      {env.violations.map((v) => (
+      {env.violations.slice(0, 4).map((v) => (
         <div key={v.feature}>
           {v.feature} = {v.value.toPrecision(4)} is outside the sampled range [
           {v.min.toPrecision(4)}, {v.max.toPrecision(4)}]
         </div>
       ))}
-      <div className="mt-1 text-[#ff8888]">Use “Verify with full solve” — do not trust the prediction here.</div>
+      {env.violations.length > 4 && (
+        <div>…and {env.violations.length - 4} more.</div>
+      )}
+      <div className="mt-1 text-[#ff8888]">
+        Use “Verify with full solve” — do not trust the prediction here.
+      </div>
     </div>
   );
 }
@@ -180,7 +203,6 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
     }
   }, [design, prediction, addLog]);
 
-  // Any edit invalidates a previous verification.
   useEffect(() => {
     setVerify(null);
   }, [design]);
@@ -194,28 +216,33 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
   const [candidateTruth, setCandidateTruth] = useState<Record<SurrogateTarget, number> | null>(null);
   const [searching, setSearching] = useState(false);
 
+  const kind = design.grain.kind;
+  const shapeSpec = GRAIN_SHAPE_PARAMS[kind];
+
   const runSearch = useCallback(async () => {
     if (!ready) return;
     setSearching(true);
     setCandidateTruth(null);
-    const info = surrogateInfo()!;
-    const env = info.envelope;
     const t0 = performance.now();
     const found = inverseDesign(
       {
-        length: env.length as [number, number],
-        outer_radius: env.outer_radius as [number, number],
-        inner_radius: [env.inner_radius[0], env.inner_radius[1]],
-        throat_diameter: env.throat_diameter as [number, number],
-        expansion_ratio: env.expansion_ratio as [number, number],
+        length: [0.08, 1.1],
+        outer_radius: [0.018, 0.09],
+        throat_diameter: [0.003, 0.09],
+        expansion_ratio: [1.0, 12.0],
       },
-      { maxImpulse: targetImpulse, minImpulse: targetImpulse * 0.92, maxPeakPc: targetMaxPc * 1e6 },
-      { fixed: { a: design.a, n: design.n, density: design.density }, restarts: 8 }
+      { maxImpulse: targetImpulse, minImpulse: targetImpulse * 0.9, maxPeakPc: targetMaxPc * 1e6 },
+      {
+        fixed: { a: design.a, n: design.n, density: design.density },
+        kind,
+        seedGrain: design.grain,
+        restarts: 10,
+      }
     );
     setSearchMs(performance.now() - t0);
     setCandidates(found);
 
-    // Auto-verify the winner: the brief requires it, and an unverified
+    // Auto-verify the winner: the point of the exercise. An unverified
     // optimisation result over an approximate model is exactly the kind of
     // number that gets built.
     if (found.length) {
@@ -223,16 +250,16 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
         const truth = await solveTruth(found[0].design);
         setCandidateTruth(truth);
         addLog(
-          `Inverse design: best candidate verified — impulse ${truth.total_impulse.toFixed(0)} N·s ` +
-            `(target ≤ ${targetImpulse}), peak Pc ${(truth.peak_pc / 1e6).toFixed(2)} MPa ` +
-            `(limit ${targetMaxPc}).`
+          `Inverse design (${kind}): best candidate verified — impulse ` +
+            `${truth.total_impulse.toFixed(0)} N·s (target ≤ ${targetImpulse}), peak Pc ` +
+            `${(truth.peak_pc / 1e6).toFixed(2)} MPa (limit ${targetMaxPc}).`
         );
       } catch (e) {
         addLog(`Candidate verification failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     setSearching(false);
-  }, [ready, targetImpulse, targetMaxPc, design, addLog]);
+  }, [ready, targetImpulse, targetMaxPc, design, kind, addLog]);
 
   // --- c. real-time Monte Carlo -------------------------------------------
 
@@ -257,7 +284,6 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
     setConfirming(true);
     const N = 40;
     const t0 = performance.now();
-    // Same perturbation recipe as the surrogate sweep, but through the physics.
     let s = 4242 >>> 0;
     const rnd = () => {
       s = (s + 0x6d2b79f5) >>> 0;
@@ -304,7 +330,7 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
     return (
       <div className="text-[#ff6666] font-mono text-xs p-6">
         Surrogate model failed to load: {loadError}
-        <div className="text-[#888] mt-2">Rebuild it with: npm run surrogate:sample &amp;&amp; npm run surrogate:train</div>
+        <div className="text-[#888] mt-2">Rebuild it with: npm run surrogate:rebuild</div>
       </div>
     );
   }
@@ -314,18 +340,31 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
 
   const info = surrogateInfo()!;
   const metrics = surrogateMetrics()!;
+  const byKind = surrogateMetricsByKind();
+  const kindMetrics = byKind?.[kind];
   const mcHist = mcResult ? histogram(mcResult[mcTarget].values, 44) : [];
 
   return (
     <div className="w-full max-w-5xl space-y-6 mt-6 text-xs font-mono">
       {/* ---- provenance ---- */}
       <div className="bg-[#111] border border-[#333] rounded p-3 text-[10px] text-[#888] leading-snug">
-        <span className="text-[#00aaff] font-bold">SURROGATE MODEL</span> — Gaussian process
-        trained on {info.dataset.trainRows} solves of the same Rust core the Run button uses
-        ({info.dataset.totalRows} sampled, {info.dataset.testRows} held out).
-        Every number below is an approximation with a 95% band, and every panel can be checked
-        against a real solve. Held-out accuracy:{' '}
-        {TARGETS.map((t) => `${SHORT[t]} R²=${metrics[t].r2.toFixed(4)}`).join(', ')}.
+        <span className="text-[#00aaff] font-bold">SURROGATE MODEL</span> — one Gaussian process
+        covering all {info.grainKinds.length} grain geometries, trained on {String(info.dataset.trainRows)}{' '}
+        solves of the same Rust core the Run button uses ({String(info.dataset.totalRows)} sampled,{' '}
+        {String(info.dataset.testRows)} held out). It predicts from the grain's burn-back CURVES
+        rather than its parameters, which is why one model covers every geometry.
+        <div className="mt-1">
+          Held-out, all geometries:{' '}
+          {TARGETS.map((t) => `${SHORT[t]} R²=${metrics[t].r2.toFixed(4)}`).join(', ')}.
+          {kindMetrics && (
+            <>
+              {' '}For <span className="text-[#00aaff]">{kind}</span> specifically: Pc R²=
+              {kindMetrics.peak_pc.r2.toFixed(4)} / {kindMetrics.peak_pc.mape.toFixed(2)}% MAPE,
+              It R²={kindMetrics.total_impulse.r2.toFixed(4)}, tb R²=
+              {kindMetrics.burn_time.r2.toFixed(4)}.
+            </>
+          )}
+        </div>
       </div>
 
       <EnvelopeWarning design={design} />
@@ -335,7 +374,7 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
         <div className="flex justify-between items-center border-b border-[#333] pb-2 mb-3">
           <h3 className="font-bold text-[#00aaff] text-sm flex items-center space-x-2">
             <Zap className="w-4 h-4" />
-            <span>INSTANT PREDICTION</span>
+            <span>INSTANT PREDICTION — {kind}</span>
           </h3>
           <div className="flex items-center space-x-3">
             <span className="text-[#666] text-[10px]">{predictMs.toFixed(2)} ms</span>
@@ -363,7 +402,9 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
             {TARGETS.map((t) => {
               const delta = verify ? (verify.predicted[t] - verify.truth[t]) / verify.truth[t] : 0;
               const covered =
-                verify && verify.truth[t] >= prediction.lower[t] && verify.truth[t] <= prediction.upper[t];
+                verify &&
+                verify.truth[t] >= prediction.lower[t] &&
+                verify.truth[t] <= prediction.upper[t];
               return (
                 <tr key={t} className="border-t border-[#222]">
                   <td className="py-1">{LABEL[t]}</td>
@@ -394,7 +435,7 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
       {/* ---- b. inverse design ---- */}
       <div className="bg-[#111] border border-[#333] p-4 rounded">
         <h3 className="font-bold text-[#00aaff] text-sm border-b border-[#333] pb-2 mb-3">
-          INVERSE DESIGN
+          INVERSE DESIGN — searching {kind} geometry
         </h3>
         <div className="flex flex-wrap items-end gap-4 mb-3">
           <label className="flex flex-col space-y-1">
@@ -429,6 +470,22 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
           )}
         </div>
 
+        <p className="text-[#666] text-[10px] mb-2 leading-snug">
+          {shapeSpec.length > 0 ? (
+            <>
+              Free variables: length, casing radius, throat, expansion ratio, and this geometry's
+              shape — {shapeSpec.map((p) => p.label.toLowerCase()).join(', ')}. Propellant is held
+              fixed.
+            </>
+          ) : (
+            <>
+              A Custom DXF cross-section comes from a traced file, so there is no shape to optimise:
+              the search moves length, casing radius, throat and expansion ratio only, keeping your
+              profile.
+            </>
+          )}
+        </p>
+
         {candidates && candidates.length > 0 && (
           <>
             <table className="w-full text-[11px]">
@@ -436,13 +493,12 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
                 <tr>
                   <th className="text-left py-1">#</th>
                   <th className="text-right py-1">Length</th>
-                  <th className="text-right py-1">OD / ID</th>
+                  <th className="text-left py-1 pl-3">Grain</th>
                   <th className="text-right py-1">Throat</th>
                   <th className="text-right py-1">ε</th>
                   <th className="text-right py-1">Impulse</th>
                   <th className="text-right py-1">Peak Pc</th>
                   <th className="text-right py-1">±band</th>
-                  <th className="text-right py-1">Feasible</th>
                   <th className="text-right py-1"></th>
                 </tr>
               </thead>
@@ -450,10 +506,8 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
                 {candidates.slice(0, 5).map((c, i) => (
                   <tr key={i} className="border-t border-[#222] hover:bg-[#1a1a1a]">
                     <td className="py-1">{i + 1}</td>
-                    <td className="text-right">{(c.design.length * 1000).toFixed(0)} mm</td>
-                    <td className="text-right">
-                      {(c.design.outer_radius * 2000).toFixed(0)}/{(c.design.inner_radius * 2000).toFixed(0)} mm
-                    </td>
+                    <td className="text-right">{(c.design.grain.length * 1000).toFixed(0)} mm</td>
+                    <td className="pl-3 text-[10px] text-[#bbb]">{describeShape(c.design.grain)}</td>
                     <td className="text-right">{(c.design.throat_diameter * 1000).toFixed(1)} mm</td>
                     <td className="text-right">{c.design.expansion_ratio.toFixed(1)}</td>
                     <td className="text-right text-[#ffaa00]">{c.predicted.total_impulse.toFixed(0)}</td>
@@ -461,14 +515,11 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
                     <td className={`text-right ${c.band > 0.1 ? 'text-[#ff6666]' : 'text-[#888]'}`}>
                       {(c.band * 100).toFixed(1)}%
                     </td>
-                    <td className={`text-right ${c.penalty === 0 ? 'text-[#00ff88]' : 'text-[#ff6666]'}`}>
-                      {c.penalty === 0 ? 'yes' : `miss ${(c.penalty * 100).toFixed(0)}%`}
-                    </td>
                     <td className="text-right">
                       <button
                         onClick={() => {
                           onApplyDesign(c.design);
-                          addLog(`Applied surrogate candidate ${i + 1} to the design inputs.`);
+                          addLog(`Applied surrogate candidate ${i + 1} (${kind}) to the design inputs.`);
                         }}
                         className="text-[#00aaff] hover:text-white border border-[#444] px-1 rounded text-[10px]"
                       >
@@ -527,7 +578,10 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
           </>
         )}
         {candidates && candidates.length === 0 && (
-          <p className="text-[#ff6666] text-[10px]">No feasible design found inside the training envelope.</p>
+          <p className="text-[#ff6666] text-[10px]">
+            No feasible {kind} design found inside the training envelope. Try relaxing the pressure
+            limit or the impulse target.
+          </p>
         )}
       </div>
 
@@ -594,11 +648,7 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
                 ([label, key]) => (
                   <div key={key}>
                     <p className="text-[#888] text-[10px]">{label}</p>
-                    <p className="text-[#eee]">
-                      {key === 'sd'
-                        ? FORMAT[mcTarget](mcResult[mcTarget].sd)
-                        : FORMAT[mcTarget](mcResult[mcTarget][key])}
-                    </p>
+                    <p className="text-[#eee]">{FORMAT[mcTarget](mcResult[mcTarget][key])}</p>
                   </div>
                 )
               )}
