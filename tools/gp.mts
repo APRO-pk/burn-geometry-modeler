@@ -172,6 +172,63 @@ export function negLogMarginalLikelihood(
  * size, and coordinate descent on 10 parameters converges in a couple of
  * hundred likelihood evaluations. Multi-start guards the obvious local optima.
  */
+/**
+ * Take a stratified-by-position subset of a design matrix.
+ *
+ * Used to fit hyperparameters on fewer points than the final model carries;
+ * see `fitHypers`. Rows are taken on an even stride rather than at random so
+ * the subset is reproducible and cannot cluster.
+ */
+export function subsetRows(
+  X: Float64Array,
+  Y: Float64Array[],
+  n: number,
+  d: number,
+  want: number
+): { X: Float64Array; Y: Float64Array[]; n: number } {
+  if (want >= n) return { X, Y, n };
+  const idx: number[] = [];
+  for (let i = 0; i < want; i++) idx.push(Math.floor((i * n) / want));
+
+  const Xs = new Float64Array(want * d);
+  idx.forEach((row, i) => {
+    for (let k = 0; k < d; k++) Xs[i * d + k] = X[row * d + k];
+  });
+  const Ys = Y.map((y) => {
+    const out = new Float64Array(want);
+    idx.forEach((row, i) => {
+      out[i] = y[row];
+    });
+    return out;
+  });
+  return { X: Xs, Y: Ys, n: want };
+}
+
+/**
+ * Fit hyperparameters by coordinate descent on the negative log marginal
+ * likelihood.
+ *
+ * Gradient-free on purpose. The analytic gradient needs the full K^-1, which
+ * costs more per evaluation than a few extra line-search steps at this problem
+ * size, and coordinate descent converges in a couple of hundred likelihood
+ * evaluations. Multi-start guards the obvious local optima.
+ *
+ * # On fitting a subset
+ *
+ * Every likelihood evaluation is an O(n^3) Cholesky, and the search makes a
+ * couple of thousand of them -- so this is where a rebuild spends most of its
+ * time, and the cost grows with the CUBE of the training set. Fitting at
+ * n = 1000 took 21 minutes.
+ *
+ * Hyperparameters do not need that many points. They are a handful of smooth
+ * scalars -- length scales, signal and noise amplitude -- and a few hundred
+ * well-spread samples pin them about as well as a thousand do. So the caller
+ * fits on a subset and then factorises the FULL training set once with the
+ * result, which is a single Cholesky rather than thousands.
+ *
+ * The trainer prints held-out metrics either way, so if a subset ever did cost
+ * accuracy it would show up there rather than passing unnoticed.
+ */
 export function fitHypers(
   X: Float64Array,
   Y: Float64Array[],

@@ -25,7 +25,7 @@ import {
   expandDesign,
 } from '../src/surrogate/features.ts';
 import type { RawDesign } from '../src/surrogate/features.ts';
-import { backSolve, cholesky, covariance, fitHypers, forwardSolve } from './gp.mts';
+import { backSolve, cholesky, covariance, fitHypers, forwardSolve, subsetRows } from './gp.mts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,6 +37,8 @@ const DATA = path.resolve(HERE, '..', arg('data', 'tools/data/samples.csv'));
 const N_TRAIN = parseInt(arg('train', '900'), 10);
 const N_CALIB = parseInt(arg('calib', '700'), 10);
 const SEED = parseInt(arg('seed', '7'), 10);
+/** Points used to FIT hyperparameters; the model still carries --train. */
+const N_HYPER = parseInt(arg('hyper', '350'), 10);
 const OUT = path.resolve(HERE, '..', arg('out', 'src/surrogate/model.json'));
 
 // --- load ------------------------------------------------------------------
@@ -209,9 +211,16 @@ for (let t = 0; t < T; t++) {
 
 // --- fit -------------------------------------------------------------------
 
-console.log(`\nfitting ARD kernel over ${D} inputs, ${T} shared outputs, N=${N}...`);
+// Hyperparameters are fitted on a subset -- each likelihood evaluation is an
+// O(n^3) Cholesky and the search makes thousands, so this is where a rebuild
+// spends its time. See the note on fitHypers.
+const hyperSet = subsetRows(Xtrain, Ytrain, N, D, N_HYPER);
+console.log(
+  `\nfitting ARD kernel over ${D} inputs, ${T} shared outputs, ` +
+    `on ${hyperSet.n} of ${N} training points...`
+);
 const t0 = Date.now();
-const { hypers, nll } = fitHypers(Xtrain, Ytrain, N, D, mulberry32(SEED + 1), {
+const { hypers, nll } = fitHypers(hyperSet.X, hyperSet.Y, hyperSet.n, D, mulberry32(SEED + 1), {
   restarts: 3,
   sweeps: 14,
   log: (s) => console.log(s),

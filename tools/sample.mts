@@ -24,7 +24,9 @@
 
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { fork } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {
   ACCEPTANCE,
@@ -57,6 +59,24 @@ function arg(name: string, fallback: string): string {
 const N = parseInt(arg('n', '12000'), 10);
 const SEED = parseInt(arg('seed', '1'), 10);
 const OUT = path.resolve(HERE, '..', arg('out', 'tools/data/samples.csv'));
+
+/*
+ * Sharding.
+ *
+ * Every draw is an independent RK4 burn, so the sweep is embarrassingly
+ * parallel -- and it was taking 13 minutes on one core while eleven sat idle.
+ * With --shards N the parent forks N children, each of which regenerates the
+ * SAME deterministic Latin Hypercube and evaluates only the rows where
+ * `index % shards === shard`.
+ *
+ * Regenerating the cube in each child rather than sending slices is what keeps
+ * the result identical to a serial run: the sample SET does not depend on how
+ * many cores happen to be available, so a dataset stays reproducible from its
+ * seed alone.
+ */
+const SHARDS = parseInt(arg('shards', String(Math.max(1, os.cpus().length - 1))), 10);
+const SHARD = parseInt(arg('shard', '-1'), 10);
+const IS_CHILD = SHARD >= 0;
 
 interface Row {
   grain_kind: GrainKind;
@@ -193,37 +213,105 @@ function runOne(kind: GrainKind, u: number[]): Row | Rejection {
 
 // --- sweep -----------------------------------------------------------------
 
-console.log(`burn-core ${core.version()} | LHS n=${N} seed=${SEED} over ${SAMPLED_KINDS.length} geometries`);
-const rand = mulberry32(SEED);
 const perKind = Math.ceil(N / SAMPLED_KINDS.length);
 const DIMS = 7 + MAX_SHAPE_DIMS;
 
-const rows: Row[] = [];
-const rejects = new Map<string, number>();
-const acceptedByKind = new Map<GrainKind, number>();
-const t0 = Date.now();
-
-for (const kind of SAMPLED_KINDS) {
-  // A fresh Latin Hypercube per geometry, so each gets full stratified coverage
-  // of its own shape axes rather than a slice of one shared cube.
-  const cube = latinHypercube(perKind, DIMS, rand);
-  for (let i = 0; i < perKind; i++) {
-    const res = runOne(kind, cube[i]);
-    if ('reason' in res) {
-      const reason = String((res as Rejection).reason);
-      rejects.set(reason, (rejects.get(reason) ?? 0) + 1);
-    } else {
-      rows.push(res);
-      acceptedByKind.set(kind, (acceptedByKind.get(kind) ?? 0) + 1);
+/** Evaluate this process's share of the sweep. */
+function runShard(shard: number, shards: number) {
+  const rand = mulberry32(SEED);
+  const rows: Row[] = [];
+  const rejects = new Map<string, number>();
+  for (const kind of SAMPLED_KINDS) {
+    // A fresh Latin Hypercube per geometry, so each gets full stratified
+    // coverage of its own shape axes rather than a slice of one shared cube.
+    // Regenerated identically in every shard; only the stride differs.
+    const cube = latinHypercube(perKind, DIMS, rand);
+    for (let i = shard; i < perKind; i += shards) {
+      const res = runOne(kind, cube[i]);
+      if ('reason' in res) {
+        const reason = String((res as Rejection).reason);
+        rejects.set(reason, (rejects.get(reason) ?? 0) + 1);
+      } else {
+        rows.push(res);
+      }
     }
   }
-  process.stdout.write(
-    `  ${kind.padEnd(11)} ${String(acceptedByKind.get(kind) ?? 0).padStart(5)}/${perKind} accepted\n`
-  );
+  return { rows, rejects };
+}
+
+function csvLines(rows: Row[]): string[] {
+  return rows.map((r) => {
+    const numeric = [
+      r.length,
+      r.outer_radius,
+      r.throat_diameter,
+      r.expansion_ratio,
+      r.a,
+      r.n,
+      r.density,
+      ...TARGETS.map((t) => r[t]),
+    ].map((v) => v.toPrecision(10));
+    // The grain spec is quoted JSON: it reconstructs the geometry exactly,
+    // which matters for Custom DXF whose tables no few columns could summarise.
+    const json = JSON.stringify(r.grain).replace(/"/g, '""');
+    return `${r.grain_kind},${numeric.join(',')},"${json}"`;
+  });
+}
+
+// --- child: evaluate a stride, hand the rows back, exit --------------------
+
+if (IS_CHILD) {
+  const { rows, rejects } = runShard(SHARD, SHARDS);
+  process.send!({ lines: csvLines(rows), rejects: [...rejects], count: rows.length });
+  process.exit(0);
+}
+
+// --- parent ----------------------------------------------------------------
+
+console.log(
+  `burn-core ${core.version()} | LHS n=${N} seed=${SEED} over ` +
+    `${SAMPLED_KINDS.length} geometries, ${SHARDS} shard${SHARDS === 1 ? '' : 's'}`
+);
+const t0 = Date.now();
+
+const rows: Row[] = [];
+const rejects = new Map<string, number>();
+let childLines: string[] = [];
+
+if (SHARDS > 1) {
+  childLines = await new Promise<string[]>((resolve, reject) => {
+    const collected: string[][] = new Array(SHARDS).fill(null).map(() => []);
+    let done = 0;
+    for (let i = 0; i < SHARDS; i++) {
+      const child = fork(fileURLToPath(import.meta.url), [
+        ...process.argv.slice(2).filter((a, j, all) => a !== '--shard' && all[j - 1] !== '--shard'),
+        '--shard',
+        String(i),
+        '--shards',
+        String(SHARDS),
+      ]);
+      child.on('message', (m: { lines: string[]; rejects: Array<[string, number]>; count: number }) => {
+        collected[i] = m.lines;
+        for (const [reason, n] of m.rejects) rejects.set(reason, (rejects.get(reason) ?? 0) + n);
+        process.stdout.write(`  shard ${i + 1}/${SHARDS}: ${m.count} accepted\n`);
+      });
+      child.on('error', reject);
+      child.on('exit', (code) => {
+        if (code !== 0) return reject(new Error(`shard ${i} exited ${code}`));
+        if (++done === SHARDS) resolve(collected.flat());
+      });
+    }
+  });
+} else {
+  const r = runShard(0, 1);
+  rows.push(...r.rows);
+  for (const [reason, n] of r.rejects) rejects.set(reason, (rejects.get(reason) ?? 0) + n);
+  childLines = csvLines(rows);
 }
 const elapsed = (Date.now() - t0) / 1000;
+const accepted = childLines.length;
 
-console.log(`\n${rows.length}/${N} accepted (${((100 * rows.length) / N).toFixed(1)}%) in ${elapsed.toFixed(1)}s`);
+console.log(`\n${accepted}/${N} accepted (${((100 * accepted) / N).toFixed(1)}%) in ${elapsed.toFixed(1)}s`);
 if (rejects.size) {
   console.log('rejections:');
   for (const [reason, count] of [...rejects].sort((x, y) => y[1] - x[1]).slice(0, 12)) {
@@ -231,17 +319,21 @@ if (rejects.size) {
   }
 }
 
-if (!rows.length) {
+if (!accepted) {
   console.error('No accepted samples -- check the ranges in tools/designSpace.mts.');
   process.exit(1);
 }
 
-console.log('\ntarget ranges (all geometries):');
-for (const t of TARGETS) {
-  const vals = rows.map((r) => r[t]);
-  console.log(
-    `  ${t.padEnd(16)} [${Math.min(...vals).toPrecision(4)}, ${Math.max(...vals).toPrecision(4)}]`
-  );
+// Counts per geometry come from the assembled rows, since shards each hold a
+// stride of every kind rather than a kind apiece.
+const byKind = new Map<string, number>();
+for (const line of childLines) {
+  const kind = line.slice(0, line.indexOf(','));
+  byKind.set(kind, (byKind.get(kind) ?? 0) + 1);
+}
+console.log('accepted by geometry:');
+for (const kind of SAMPLED_KINDS) {
+  console.log(`  ${kind.padEnd(11)} ${String(byKind.get(kind) ?? 0).padStart(5)}`);
 }
 
 // --- write -----------------------------------------------------------------
@@ -258,23 +350,6 @@ const header = [
   ...TARGETS,
   'grain_json',
 ];
-const lines = [header.join(',')];
-for (const r of rows) {
-  const numeric = [
-    r.length,
-    r.outer_radius,
-    r.throat_diameter,
-    r.expansion_ratio,
-    r.a,
-    r.n,
-    r.density,
-    ...TARGETS.map((t) => r[t]),
-  ].map((v) => v.toPrecision(10));
-  // The grain spec is quoted JSON: it reconstructs the geometry exactly, which
-  // matters for Custom DXF whose tables cannot be summarised by a few columns.
-  const json = JSON.stringify(r.grain).replace(/"/g, '""');
-  lines.push(`${r.grain_kind},${numeric.join(',')},"${json}"`);
-}
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
-fs.writeFileSync(OUT, lines.join('\n') + '\n');
-console.log(`\nwrote ${rows.length} rows -> ${path.relative(process.cwd(), OUT)}`);
+fs.writeFileSync(OUT, [header.join(','), ...childLines].join('\n') + '\n');
+console.log(`\nwrote ${accepted} rows -> ${path.relative(process.cwd(), OUT)}`);

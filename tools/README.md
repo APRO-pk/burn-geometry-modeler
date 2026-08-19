@@ -23,10 +23,28 @@ That is sampling plus training. The two halves can be run separately:
 
 ```bash
 npm run surrogate:sample -- --n 10500 --seed 1 --out tools/data/samples.csv
-npm run surrogate:train  -- --data tools/data/samples.csv --train 1000 --calib 900
+npm run surrogate:train  -- --data tools/data/samples.csv --train 700 --calib 900 --hyper 500
 ```
 
-Sampling ~10,500 draws takes about 15 minutes; the fit takes a few minutes more.
+A full rebuild is about **two minutes** on a 12-core machine: ~60 s sampling,
+~60 s fitting. It used to be 35 minutes (13 min sampling, 21 min fitting), and both
+halves were fixed by noticing what the work actually is.
+
+**Sampling is embarrassingly parallel** -- every draw is an independent burn --
+so it shards across cores with `--shards N` (default: cores - 1). Each child
+regenerates the *same* deterministic Latin Hypercube and evaluates only the rows
+where `index % shards === shard`. Regenerating rather than distributing slices
+is what keeps the output identical to a serial run: the sample set does not
+depend on how many cores happen to be available, so a dataset stays reproducible
+from its seed alone. Verified by diffing a sharded run against `--shards 1`.
+
+**Hyperparameters do not need the whole training set.** Every likelihood
+evaluation is an O(n^3) Cholesky and the search makes thousands of them, so the
+fit cost grows with the CUBE of the training size -- 21 minutes at n = 1000. But
+the hyperparameters are a handful of smooth scalars, and a few hundred
+well-spread points pin them about as well as a thousand. `--hyper 500` fits on
+a subset and then factorises the full set once, which is a single Cholesky
+instead of thousands: 21 min -> 60 s, for about 0.1 pp of MAPE.
 
 **Rebuild whenever the 0-D physics changes.** The surrogate is fitted to a
 specific version of `burn-core`; if the solver's answers move, the surrogate is
@@ -158,9 +176,19 @@ by luck — and because the model is geometry-agnostic, that shows up as a quiet
 accuracy hole rather than an obvious failure.
 
 **Artifact size is why the training set is a subset.** Exact GP prediction needs
-the Cholesky factor at inference time to produce variance, and that is O(N²). The
-held-out remainder measures what the subsetting cost, which is how to choose N
-honestly.
+the Cholesky factor at inference time to produce variance, and that factor is
+O(N^2) -- it is **93% of the shipped file**, while the means need only `X` and
+`alphas` (0.18 MB). So N is chosen against a size/accuracy curve, measured:
+
+| N | artifact | peak Pc R^2 | peak Pc MAPE |
+| --- | --- | --- | --- |
+| 600 | 1.08 MB | 0.9945 | 2.00% |
+| **700** | **1.44 MB** | **0.9964** | **1.81%** |
+| 1000 | 2.87 MB | 0.9978 | 1.45% |
+
+700 is the knee. Going to 600 gives back only 0.36 MB and costs noticeably more;
+going to 1000 doubles the file for 0.36 pp. The held-out remainder is what makes
+that a measured tradeoff rather than a guess.
 
 ---
 
