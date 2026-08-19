@@ -14,3 +14,7 @@ target/
 # Surrogate training data: regenerable from the seed with `npm run surrogate:sample`.
 # The trained model (src/surrogate/model.json) IS committed -- the app needs it.
 tools/data/
+
+# Claude Code: launch.json is shared project config (dev server for previews);
+# settings.local.json is per-machine (permission allowlists, absolute paths).
+.claude/settings.local.json
