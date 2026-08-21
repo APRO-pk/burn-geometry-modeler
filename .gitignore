@@ -13,7 +13,10 @@ target/
 
 # Surrogate training data: regenerable from the seed with `npm run surrogate:sample`.
 # The trained model (src/surrogate/model.json) IS committed -- the app needs it.
-tools/data/
+tools/data/*
+# ...except the certified-motor fixture, which src/validation.test.ts needs to
+# run offline and deterministically. It is real measured data, not generated.
+!tools/data/thrustcurve-motors.json
 
 # Claude Code: launch.json is shared project config (dev server for previews);
 # settings.local.json is per-machine (permission allowlists, absolute paths).

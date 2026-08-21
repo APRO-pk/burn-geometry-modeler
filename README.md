@@ -34,6 +34,47 @@ and `src/surrogate.test.ts` validates the shipped surrogate against fresh solves
 from the *current* core — so a stale surrogate fails CI rather than quietly
 misleading someone.
 
+## Validation against real motors
+
+Most of the test suite checks the code against itself — the Rust core against
+the TypeScript reference, the surrogate against the core, burn-back against
+ClipperLib. That proves internal consistency, not correctness.
+
+`src/validation.test.ts` checks the model against **790 motors certified by
+NAR, TRA and CAR**, fetched from ThrustCurve.org and committed as a fixture so
+the suite runs offline (`npm run validation:fetch` to refresh).
+
+| Quantity | This model | 758 real composite motors |
+| --- | --- | --- |
+| Delivered Isp, shipped APCP at ε=6 | 222.9 s | p05 142 · median 190 · p95 227 |
+| Delivered Isp, shipped KNDX | 135.3 s | sugar sits below composites ✓ |
+| Isp with no efficiency losses | 240.6 s | above p95 — correctly unattainable |
+| **Peak/average thrust, median** | **1.37** | **1.37** (p05 1.13, p95 2.47) |
+
+The peak-to-average thrust ratio is the load-bearing one. It is dimensionless
+and set by how *progressive* the grain burns, so matching the real distribution
+means the burn-back model produces traces shaped like real hardware — the only
+place certified data constrains the geometry side of the model.
+
+### What this does not validate
+
+A certification stand measures outputs: total impulse, burn time, thrust,
+propellant mass. It does **not** publish the solver’s inputs — grain geometry,
+St. Robert coefficients, throat diameter, expansion ratio. Those are trade
+secrets, so **a predicted pressure trace cannot be compared against a certified
+motor**, and nothing here pretends otherwise. A test asserts that the fixture
+still lacks those fields, so if ThrustCurve ever publishes them the suite fails
+and asks for the stronger validation to be written.
+
+These are distribution checks, not point comparisons. They will not catch a 5%
+error. They will catch a model that is wrong in kind.
+
+### One finding worth knowing
+
+The shipped `APCP (Typical)` default delivers 222.9 s against a real 95th
+percentile of 226.5 s — a *good* motor, not an impossible one, but close enough
+to the ceiling that the default should not be read as conservative.
+
 ## Getting started
 
 Prerequisites: Node.js. No API keys, no backend, no accounts — it runs entirely
@@ -55,6 +96,7 @@ a normal checkout builds and tests without a Rust toolchain.
 | `npm run lint` | `tsc --noEmit` |
 | `npm run wasm:build` | Rebuild the Rust core — **see below** |
 | `npm run surrogate:rebuild` | Re-sample and retrain the surrogate |
+| `npm run validation:fetch` | Refresh the certified-motor fixture |
 
 ## Rebuilding the Rust core
 
