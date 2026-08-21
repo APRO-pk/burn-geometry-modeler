@@ -20,11 +20,37 @@ export type { GrainUiParams, DxfTables };
 
 // --- configuration (matches Config in crates/burn-core/src/lib.rs) ---------
 
-export interface BurnPropellantConfig {
-  density: number;
-  /** St. Robert coefficient in SI: r_b = a * Pc^n, Pc in Pa, r_b in m/s. */
+/**
+ * One pressure band of a piecewise burn-rate law.
+ *
+ * Real propellants do not always follow a single Saint-Robert law. Nakka's
+ * strand-burner data for the sugar propellants is non-monotonic in pressure,
+ * which `r = a*Pc^n` with n > 0 cannot express at any coefficients. Bands
+ * recover roughly four percentage points of accuracy against those
+ * measurements; see src/burnRate.validation.test.ts.
+ */
+export interface BurnRateRegime {
+  /** Lower bound, Pa absolute, inclusive. */
+  from_pressure: number;
+  /** Upper bound, Pa absolute, inclusive. */
+  to_pressure: number;
   a: number;
   n: number;
+}
+
+export interface BurnPropellantConfig {
+  density: number;
+  /**
+   * St. Robert coefficient in SI: r_b = a * Pc^n, Pc in Pa, r_b in m/s.
+   *
+   * Still required when `burn_rate_regimes` is given: it is the fallback
+   * outside the banded range and the single representative pair the surrogate
+   * reads.
+   */
+  a: number;
+  n: number;
+  /** Optional piecewise law. Omitted or empty means the single a/n is used. */
+  burn_rate_regimes?: BurnRateRegime[];
   flame_temp: number;
   gamma: number;
   molecular_weight: number;

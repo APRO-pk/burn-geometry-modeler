@@ -188,7 +188,7 @@ pub fn march(
 
         // ---- burn rate from the LOCAL upstream pressure ----
         let p_for_burn = p_upstream.max(crate::sim::PC_FLOOR);
-        let r_b_base = prop.a * p_for_burn.powf(prop.n) * inp.temp_corr;
+        let r_b_base = prop.base_burn_rate(p_for_burn) * inp.temp_corr;
 
         // Provisional mass flux using the base rate, so the erosive term has a
         // flux to work with; the flux is then recomputed with the augmented rate.

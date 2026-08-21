@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Settings, Plus, Trash2, Check, X } from 'lucide-react';
+import type { BurnRateRegime } from './wasmCore';
 
 export interface PropellantData {
   id: string;
@@ -14,6 +15,13 @@ export interface PropellantData {
   gamma: number;
   T_ref?: number;
   sigma_p?: number;
+  /**
+   * Optional measured piecewise burn-rate law. When present it governs burn
+   * rate inside its pressure range and `a`/`n` above are only the fallback
+   * outside it, so the editor says so rather than letting the a/n fields look
+   * like they are in charge.
+   */
+  burnRateRegimes?: BurnRateRegime[];
 }
 
 interface PropellantEditorProps {

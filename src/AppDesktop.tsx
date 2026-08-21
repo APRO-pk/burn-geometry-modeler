@@ -9,7 +9,7 @@ import {
 import { runMotor, warmUpMotorCore } from './wasmClient';
 import { analyzeStructure, initStructural, requiredWallThickness } from './structuralClient';
 import { grainConfigFromUi } from './wasmCore';
-import type { BurnConfig, SolverModelType, StationProfiles } from './wasmCore';
+import type { BurnConfig, BurnRateRegime, SolverModelType, StationProfiles } from './wasmCore';
 import {
   LineChart,
   Line,
@@ -164,8 +164,40 @@ export default function AppDesktop() {
     // matching the engine. Published St. Robert coefficients are usually quoted for
     // Pc in MPa; convert with a_SI = a_MPa / 10^(6n) before entering them here.
     { id: '1', name: 'APCP (Typical)', density: 1528, a: 8.40e-5, n: 0.3, molWeight: 0.024, kErosive: 0.001, gThreshold: 500, flameTemp: 2700, gamma: 1.18 },
-    { id: '2', name: 'KNSB (Sorbitol)', density: 1800, a: 6.01e-5, n: 0.32, molWeight: 0.040, kErosive: 0.0005, gThreshold: 400, flameTemp: 1600, gamma: 1.13 },
-    { id: '3', name: 'KNDX (Dextrose)', density: 1878, a: 4.77e-5, n: 0.35, molWeight: 0.042, kErosive: 0.0006, gThreshold: 450, flameTemp: 1700, gamma: 1.14 }
+    /*
+     * The two sugar propellants carry Nakka's measured burn-rate law.
+     *
+     * a/n are the best single power law over his strand-burner measurements
+     * above 1 MPa; burnRateRegimes are his five published bands. Both are
+     * DERIVED from tools/data/nakka-strand-burner.json by
+     * tools/emitPropellantRegimes.mts rather than typed, and validated in
+     * src/burnRate.validation.test.ts.
+     *
+     * KNSB's previous a=6.01e-5, n=0.32 under-predicted burn rate at every
+     * measured point above 0.75 MPa, worst -28.5%, mean 13.8%. That bias runs
+     * the unsafe way for a pressure vessel: burn rate too slow means chamber
+     * pressure predicted too LOW.
+     *
+     *   propellant   single law   piecewise
+     *   KNSB         5.4%         1.8%
+     *   KNDX         6.1%         1.2%
+     */
+    { id: '2', name: 'KNSB (Sorbitol)', density: 1800, a: 3.628e-4, n: 0.2117, molWeight: 0.040, kErosive: 0.0005, gThreshold: 400, flameTemp: 1600, gamma: 1.13,
+      burnRateRegimes: [
+        { from_pressure: 103000, to_pressure: 807000, a: 1.9045e-6, n: 0.625 },
+        { from_pressure: 807000, to_pressure: 1500000, a: 6.7089e-1, n: -0.314 },
+        { from_pressure: 1500000, to_pressure: 3790000, a: 9.3968e-3, n: -0.013 },
+        { from_pressure: 3790000, to_pressure: 7030000, a: 2.4090e-6, n: 0.535 },
+        { from_pressure: 7030000, to_pressure: 10670000, a: 3.9871e-3, n: 0.064 },
+      ] },
+    { id: '3', name: 'KNDX (Dextrose)', density: 1878, a: 8.377e-5, n: 0.3157, molWeight: 0.042, kErosive: 0.0006, gThreshold: 450, flameTemp: 1700, gamma: 1.14,
+      burnRateRegimes: [
+        { from_pressure: 103000, to_pressure: 779000, a: 1.7156e-6, n: 0.619 },
+        { from_pressure: 779000, to_pressure: 2570000, a: 8.5496e-3, n: -0.009 },
+        { from_pressure: 2570000, to_pressure: 5930000, a: 2.8598e-7, n: 0.688 },
+        { from_pressure: 5930000, to_pressure: 8500000, a: 1.3290e-1, n: -0.148 },
+        { from_pressure: 8500000, to_pressure: 11200000, a: 1.0652e-5, n: 0.442 },
+      ] }
   ];
 
   const [propellants, setPropellants] = useState<PropellantData[]>(DEFAULT_PROPELLANTS);
@@ -181,6 +213,29 @@ export default function AppDesktop() {
   const [gThreshold, setGThreshold] = useState<number>(500.0);
   const [T_ref, setTRef] = useState<number>(294.0);
   const [sigma_p, setSigmaP] = useState<number>(0.001);
+  /**
+   * Piecewise burn-rate bands for the selected propellant, if it has any.
+   * Empty means the single a/n law, which is what a custom propellant gets.
+   */
+  const [burnRateRegimes, setBurnRateRegimes] = useState<BurnRateRegime[]>([]);
+
+  /*
+   * Editing a or n by hand drops any piecewise law.
+   *
+   * The bands take priority over a/n inside their pressure range, so if they
+   * survived the edit the user could retype the burn coefficient and watch
+   * nothing change from 0.1 to 10.7 MPa. Reverting to a plain power law is the
+   * honest reading of "I am setting the coefficient myself"; the log line makes
+   * the trade visible, and re-applying the propellant restores the bands.
+   */
+  const dropRegimesOnManualEdit = () => {
+    if (burnRateRegimes.length) {
+      setBurnRateRegimes([]);
+      addLog('Manual burn coefficient: measured piecewise law dropped, now r = a*Pc^n');
+    }
+  };
+  const setBurnCoeffA = (v: number) => { setA(v); dropRegimesOnManualEdit(); };
+  const setBurnExponentN = (v: number) => { setN(v); dropRegimesOnManualEdit(); };
   const [T_init, setTInit] = useState<number>(294.0);
 
   // Grain inputs
@@ -360,6 +415,8 @@ export default function AppDesktop() {
       g_threshold: gThreshold,
       t_ref: T_ref,
       sigma_p,
+      // Empty array is the same as absent: the core falls back to a/n.
+      ...(burnRateRegimes.length ? { burn_rate_regimes: burnRateRegimes } : {}),
     },
     grain: grainConfigFromUi(grainUiParams(), dxfData),
     nozzle: {
@@ -1585,6 +1642,9 @@ export default function AppDesktop() {
             setDensity(p.density);
             setA(p.a);
             setN(p.n);
+            // Always assign, so switching to a single-law propellant clears the
+            // previous one's bands rather than leaving them applied.
+            setBurnRateRegimes(p.burnRateRegimes ?? []);
             setMolWeight(p.molWeight);
             setKErosive(p.kErosive);
             setGThreshold(p.gThreshold);
@@ -1768,8 +1828,16 @@ export default function AppDesktop() {
               </div>
               <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
                 <InputBox label="Density" value={density} onChange={setDensity} suffix="kg/m³" unitCat="Density" />
-                <InputBox label="Burn Coeff (a)" value={a} onChange={setA} suffix="" />
-                <InputBox label="Pressure Exp (n)" value={n} onChange={setN} suffix="" />
+                <InputBox label="Burn Coeff (a)" value={a} onChange={setBurnCoeffA} suffix="" />
+                <InputBox label="Pressure Exp (n)" value={n} onChange={setBurnExponentN} suffix="" />
+                {burnRateRegimes.length > 0 && (
+                  <div className="col-span-2 text-[10px] text-[#00ffaa] leading-snug -mt-0.5 mb-0.5">
+                    Measured {burnRateRegimes.length}-band burn law active
+                    ({(burnRateRegimes[0].from_pressure / 1e6).toFixed(2)}–
+                    {(burnRateRegimes[burnRateRegimes.length - 1].to_pressure / 1e6).toFixed(2)} MPa).
+                    a/n above apply only outside that range; editing either drops the bands.
+                  </div>
+                )}
                 <InputBox label="Mol Wt" value={molWeight} onChange={setMolWeight} suffix="kg/mol" />
                 <InputBox label="T_ref" value={T_ref} onChange={setTRef} suffix="K" unitCat="Temperature" />
                 <InputBox label="σ_p" value={sigma_p} onChange={setSigmaP} suffix="1/K" />
@@ -2904,6 +2972,7 @@ export default function AppDesktop() {
                     design={surrogateDesign}
                     onApplyDesign={applySurrogateDesign}
                     addLog={addLog}
+                    burnRateRegimes={burnRateRegimes}
                   />
                 )}
               </div>

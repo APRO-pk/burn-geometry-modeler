@@ -372,7 +372,9 @@ impl Simulation {
         let ab = self.grain.burning_area(y);
         let a_port = self.grain.port_area(y);
 
-        let r_b_base = self.prop.a * pc_eff.powf(self.prop.n);
+        // Goes through Propellant so a piecewise law is honoured here and in
+        // port.rs alike; identical to a * pc^n when no regimes are configured.
+        let r_b_base = self.prop.base_burn_rate(pc_eff);
         let mut r_b = r_b_base * self.temp_corr;
 
         let m_dot_ideal = self.prop.density * ab * r_b;

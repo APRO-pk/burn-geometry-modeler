@@ -72,41 +72,58 @@ points, which constrains the most important *input*:
 
 `src/burnRate.validation.test.ts` checks the shipped propellant library against
 those 27 measured points. The fixture is *parsed* from the source by
-`tools/extractNakkaBurnRate.mts`, never hand-typed.
+`tools/extractNakkaBurnRate.mts`, never hand-typed, and the shipped coefficients
+are *parsed back out of* `DEFAULT_PROPELLANTS` so the tests cannot drift from
+what the app actually uses.
 
-| Propellant | Shipped coefficients | Mean error ≥1 MPa | Best a single power law can do |
-| --- | --- | --- | --- |
-| KNDX | a=4.77e-5, n=0.35 | **6.2%** | 6.1% |
-| KNSB | a=6.01e-5, n=0.32 | **13.8%** | 5.4% |
-
-**KNDX is calibrated about as well as the model form allows** — within a
-percentage point of the optimal single power law. Nothing to gain by re-fitting.
-
-**KNSB systematically under-predicts.** Every measured point above 0.75 MPa comes
-out low, worst −28.5%. The bias has a direction: burn rate too slow means burn
-time too long and chamber pressure too **low** — the unsafe direction for sizing
-a pressure vessel. Re-fitting to this data (a=3.63e-4, n=0.212) would roughly
-halve the error. Not changed here: Nakka’s data is one formulation at 65/35, and
-swapping shipped coefficients is a judgement call for the project owner.
-
-### A structural limit, not a calibration error
+#### A single power law cannot fit this data
 
 Measured burn rate for both sugar propellants is **non-monotonic in pressure**.
 KN-Sorbitol rises to 9.37 mm/s at 0.81 MPa, falls to 7.65 at 3.79, then climbs
 to 11.29 at 10.67. Nakka’s own fits carry **negative pressure exponents** over
-two of five regimes each.
+two of five bands each.
 
-The solver uses a single Saint-Robert law, `r = a·Pc^n`. With n > 0 that is
-monotonic by construction, so it cannot reproduce this shape at *any*
-coefficients. Measured cost:
+Saint-Robert, `r = a·Pc^n`, is monotonic for n > 0, so it cannot reproduce that
+shape at *any* coefficients. Roughly 4 percentage points of accuracy are lost to
+the model form itself — not to calibration.
 
-| | KN-Dextrose | KN-Sorbitol |
-| --- | --- | --- |
-| Best single power law | 6.1% mean | 5.4% mean |
-| Nakka’s 5-regime piecewise | **1.2% mean** | **1.8% mean** |
+#### What the solver now does
 
-So roughly 4 percentage points are lost to the model form itself. Supporting
-piecewise coefficients would recover them.
+The core accepts an optional **piecewise burn-rate law**: a list of pressure
+bands, each with its own `a` and `n`. Both sugar propellants ship with Nakka’s
+five measured bands, and the single `a`/`n` pair remains the fallback outside the
+banded range. Mean error against measurement, over points at or above 1 MPa:
+
+| Propellant | Previously shipped | Best single power law | **Now shipped: 5 measured bands** |
+| --- | --- | --- | --- |
+| KNDX | 6.2% (a=4.77e-5, n=0.35) | 6.1% | **1.2%** |
+| KNSB | 13.8% (a=6.01e-5, n=0.32) | 5.4% | **1.8%** |
+
+Over the full pressure range a representative KNDX BATES motor sweeps through,
+ignition to burnout, mean burn-rate error falls from **13.0% to 1.1%**, and
+predicted burn time shifts by 5.7%.
+
+The old KNSB coefficients were the more serious of the two: they read low at
+essentially *every* measured point above 0.75 MPa, worst −28.5%. That bias has a
+direction — burn rate too slow means chamber pressure predicted too **low**,
+which is the unsafe direction when the number sizes a pressure vessel. Both
+propellants’ fallback pairs are now least-squares fits to this data.
+
+Caveats worth knowing:
+
+- Nakka’s data is **one formulation at 65/35** with a specific preparation. It is
+  not a universal KNSB/KNDX calibration.
+- Piecewise fits **do not join up**. The largest step is 3.3% for KNSB at 3.79
+  MPa; the solver integrates through it, and a test pins that no future edit
+  introduces a larger cliff.
+- Piecewise is better **on average**, not at every pressure. At one motor’s 7.98
+  MPa operating point the single law happened to land marginally closer.
+- Propellants with no bands configured behave **exactly** as before — asserted
+  bit-for-bit, not approximately.
+- The **surrogate** is trained on single-law solves and reads `log_a`/`n` as
+  features, so it cannot represent a banded law. Its tab warns when one is
+  active; Verify and the Monte Carlo confirmation run the real core with the
+  bands applied.
 
 ### What this does not validate
 

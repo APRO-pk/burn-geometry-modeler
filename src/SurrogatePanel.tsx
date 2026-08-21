@@ -16,7 +16,7 @@ import { GRAIN_SHAPE_PARAMS, shapeFromGrain } from './surrogate/shape';
 import { dispersionSweep, histogram, inverseDesign } from './surrogate/optimize';
 import type { Candidate } from './surrogate/optimize';
 import { runMotor } from './wasmClient';
-import type { BurnConfig } from './wasmCore';
+import type { BurnConfig, BurnRateRegime } from './wasmCore';
 
 /*
  * The surrogate UI.
@@ -59,6 +59,17 @@ export interface SurrogatePanelProps {
   /** Apply a design found by inverse search back into the main editor. */
   onApplyDesign: (d: RawDesign) => void;
   addLog: (msg: string) => void;
+  /**
+   * The live propellant's piecewise burn-rate bands, empty for a plain power
+   * law.
+   *
+   * The surrogate reads `log_a` and `n` as two of its features and was trained
+   * on single-law solves, so when bands are active its inputs no longer describe
+   * the burn law actually being integrated. The panel has to say so; silently
+   * predicting a different motor than the Run button simulates is the one
+   * failure mode a surrogate must not have.
+   */
+  burnRateRegimes?: BurnRateRegime[];
 }
 
 /** A one-line summary of a grain's shape, for the candidate table. */
@@ -81,13 +92,25 @@ function describeShape(g: SurrogateGrain): string {
   }
 }
 
-/** Ground truth for one design, via the same worker the Run button uses. */
-async function solveTruth(d: RawDesign): Promise<Record<SurrogateTarget, number>> {
+/**
+ * Ground truth for one design, via the same worker the Run button uses.
+ *
+ * `regimes` is passed separately rather than living on RawDesign because
+ * RawDesign is the surrogate's FEATURE domain, and the feature vector
+ * deliberately does not describe a piecewise law. Keeping it out of that type
+ * stops a future reader assuming the model accounts for it. Ground truth is a
+ * real solve, so it can and must honour the bands.
+ */
+async function solveTruth(
+  d: RawDesign,
+  regimes: BurnRateRegime[] = []
+): Promise<Record<SurrogateTarget, number>> {
   const config: BurnConfig = {
     propellant: {
       density: d.density,
       a: d.a,
       n: d.n,
+      ...(regimes.length ? { burn_rate_regimes: regimes } : {}),
       flame_temp: 1720,
       gamma: 1.13,
       molecular_weight: 0.042,
@@ -152,7 +175,12 @@ function EnvelopeWarning({ design }: { design: RawDesign }) {
   );
 }
 
-export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanelProps) {
+export function SurrogatePanel({
+  design,
+  onApplyDesign,
+  addLog,
+  burnRateRegimes = [],
+}: SurrogatePanelProps) {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -189,7 +217,7 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
     setVerifying(true);
     const t0 = performance.now();
     try {
-      const truth = await solveTruth(design);
+      const truth = await solveTruth(design, burnRateRegimes);
       setVerify({ truth, predicted: prediction.mean, ms: performance.now() - t0 });
       addLog(
         `Surrogate verified against full solve: peak Pc ${(truth.peak_pc / 1e6).toFixed(2)} MPa ` +
@@ -201,7 +229,7 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
     } finally {
       setVerifying(false);
     }
-  }, [design, prediction, addLog]);
+  }, [design, prediction, addLog, burnRateRegimes]);
 
   useEffect(() => {
     setVerify(null);
@@ -247,7 +275,7 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
     // number that gets built.
     if (found.length) {
       try {
-        const truth = await solveTruth(found[0].design);
+        const truth = await solveTruth(found[0].design, burnRateRegimes);
         setCandidateTruth(truth);
         addLog(
           `Inverse design (${kind}): best candidate verified — impulse ` +
@@ -306,12 +334,21 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
     try {
       for (let i = 0; i < N; i++) {
         const sig = mcSigma / 100;
-        const truth = await solveTruth({
-          ...design,
-          a: design.a * (1 + sig * gauss()),
-          throat_diameter: design.throat_diameter * (1 + sig * gauss()),
-          density: design.density * (1 + sig * gauss()),
-        });
+        // One draw for the burn coefficient, applied to whichever law governs.
+        // With bands active, perturbing d.a alone would do NOTHING inside their
+        // pressure range, and the sweep would silently under-report dispersion.
+        // Batch-to-batch variation scales the whole curve, so every band moves
+        // together by the same factor.
+        const aScale = 1 + sig * gauss();
+        const truth = await solveTruth(
+          {
+            ...design,
+            a: design.a * aScale,
+            throat_diameter: design.throat_diameter * (1 + sig * gauss()),
+            density: design.density * (1 + sig * gauss()),
+          },
+          burnRateRegimes.map((r) => ({ ...r, a: r.a * aScale }))
+        );
         values.push(truth[mcTarget]);
       }
       setMcConfirm({ n: N, values, ms: performance.now() - t0 });
@@ -366,6 +403,21 @@ export function SurrogatePanel({ design, onApplyDesign, addLog }: SurrogatePanel
           )}
         </div>
       </div>
+
+      {burnRateRegimes.length > 0 && (
+        <div className="bg-[#2a1a00] border border-[#886600] rounded p-3 text-[10px] text-[#ffcc66] leading-snug">
+          <span className="font-bold">PIECEWISE BURN LAW — predictions below are approximate.</span>
+          <div className="mt-1 text-[#ddbb88]">
+            This propellant uses a measured {burnRateRegimes.length}-band burn-rate law, but the
+            surrogate is trained on single power-law solves and takes a={design.a.toExponential(3)},
+            n={design.n.toFixed(4)} as its inputs. Those are the propellant's fallback coefficients,
+            not the law the solver integrates, so everything on this tab — prediction, inverse
+            design and Monte Carlo — describes a slightly different motor. Press{' '}
+            <span className="text-[#00ffaa]">Verify</span> against the real core, or run the full
+            simulation, for a number you can size hardware from.
+          </div>
+        </div>
+      )}
 
       <EnvelopeWarning design={design} />
 

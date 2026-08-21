@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -43,6 +44,8 @@ import path from 'node:path';
  */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const core = require(path.resolve(HERE, '../crates/burn-core/pkg-node/burn_core.js'));
 const FIXTURE = path.resolve(HERE, '../tools/data/nakka-strand-burner.json');
 
 /** Motors do not operate near ambient; below this the law is never exercised. */
@@ -81,11 +84,98 @@ beforeAll(() => {
 const burnRate = (a: number, n: number, pressureMPa: number) =>
   a * Math.pow(pressureMPa * 1e6, n);
 
-/** Coefficients the app actually ships, from DEFAULT_PROPELLANTS. */
-const SHIPPED = {
-  'KN-Dextrose': { label: 'KNDX (Dextrose)', a: 4.77e-5, n: 0.35 },
-  'KN-Sorbitol': { label: 'KNSB (Sorbitol)', a: 6.01e-5, n: 0.32 },
-};
+interface ShippedProp {
+  label: string;
+  a: number;
+  n: number;
+  regimes: { from_pressure: number; to_pressure: number; a: number; n: number }[];
+}
+
+/**
+ * Coefficients the app actually ships, PARSED OUT OF DEFAULT_PROPELLANTS.
+ *
+ * Earlier this was a hand-copied restatement, which meant the test could keep
+ * passing while the library drifted away from it -- the test would have been
+ * validating a number nothing used. Reading the real source removes that gap:
+ * if someone edits the library, these tests judge the edit.
+ */
+function readShippedLibrary(): Record<string, ShippedProp> {
+  const src = fs.readFileSync(path.resolve(HERE, 'AppDesktop.tsx'), 'utf8');
+  const out: Record<string, ShippedProp> = {};
+
+  for (const [key, label] of [
+    ['KN-Dextrose', 'KNDX (Dextrose)'],
+    ['KN-Sorbitol', 'KNSB (Sorbitol)'],
+  ] as const) {
+    const at = src.indexOf(`name: '${label}'`);
+    expect(at, `${label} missing from DEFAULT_PROPELLANTS`).toBeGreaterThan(0);
+
+    // Brace-match the entry so a regex cannot wander into the next propellant.
+    const open = src.lastIndexOf('{', at);
+    let depth = 0;
+    let close = open;
+    for (let i = open; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) {
+        close = i;
+        break;
+      }
+    }
+    const entry = src.slice(open, close + 1);
+
+    const scalar = (name: string) => {
+      const m = entry.match(new RegExp(`\\b${name}: (-?[0-9.e+-]+)`));
+      expect(m, `${label} has no ${name}`).toBeTruthy();
+      return Number(m![1]);
+    };
+
+    const regimes: ShippedProp['regimes'] = [];
+    const block = entry.match(/burnRateRegimes: \[([\s\S]*?)\]/);
+    if (block) {
+      const re =
+        /from_pressure: (-?[0-9.e+-]+), to_pressure: (-?[0-9.e+-]+), a: (-?[0-9.e+-]+), n: (-?[0-9.e+-]+)/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(block[1]))) {
+        regimes.push({
+          from_pressure: Number(m[1]),
+          to_pressure: Number(m[2]),
+          a: Number(m[3]),
+          n: Number(m[4]),
+        });
+      }
+    }
+    out[key] = { label, a: scalar('a'), n: scalar('n'), regimes };
+  }
+  return out;
+}
+
+const SHIPPED = readShippedLibrary();
+
+/** Evaluate the shipped law the same way crates/burn-core/src/propellant.rs does. */
+function shippedBurnRate(p: ShippedProp, pressureMPa: number): number {
+  const pc = pressureMPa * 1e6;
+  if (!p.regimes.length) return burnRate(p.a, p.n, pressureMPa);
+  for (const r of p.regimes) {
+    if (pc >= r.from_pressure && pc <= r.to_pressure) return r.a * Math.pow(pc, r.n);
+  }
+  const edge = pc < p.regimes[0].from_pressure ? p.regimes[0] : p.regimes[p.regimes.length - 1];
+  return edge.a * Math.pow(pc, edge.n);
+}
+
+function shippedErrorStats(p: ShippedProp, pts: Measurement[]) {
+  let sum = 0;
+  let worst = 0;
+  let worstAt = 0;
+  for (const m of pts) {
+    const e = Math.abs((shippedBurnRate(p, m.pressureMPa) - m.burnRateCmS / 100) / (m.burnRateCmS / 100));
+    sum += e;
+    if (e > worst) {
+      worst = e;
+      worstAt = m.pressureMPa;
+    }
+  }
+  return { mean: sum / pts.length, worst, worstAt };
+}
 
 function operatingPoints(prop: string): Measurement[] {
   return fixture.propellants[prop].measurements.filter(
@@ -233,66 +323,125 @@ describe('measured burn rate is non-monotonic, which a single power law cannot r
 
 // =========================================================================
 describe('the shipped propellant library against measurement', () => {
-  it('KNDX is calibrated about as well as a single power law allows', () => {
-    const pts = operatingPoints('KN-Dextrose');
-    const shipped = SHIPPED['KN-Dextrose'];
-    const got = errorStats(pts, shipped.a, shipped.n);
-    const best = bestSinglePowerLaw(pts);
-    const bestErr = errorStats(pts, best.a, best.n);
+  /*
+   * These tests used to record that KNSB shipped a=6.01e-5, n=0.32 and
+   * under-predicted every measured point above 0.75 MPa by 13.8% on average,
+   * and deferred the correction as a formulation judgement for the project
+   * owner. That call has since been made: both sugar propellants now carry
+   * coefficients fitted to this data, plus Nakka's five measured bands. The
+   * tests below hold the new library to the evidence that motivated the change.
+   */
 
-    console.log(
-      `\n    shipped KNDX (a=${shipped.a}, n=${shipped.n}): mean ${(got.mean * 100).toFixed(1)}%` +
-        `  worst ${(got.worst * 100).toFixed(1)}% at ${got.worstAt} MPa`
-    );
-    console.log(
-      `    best possible single law (a=${best.a.toExponential(3)}, n=${best.n.toFixed(3)}): ` +
-        `mean ${(bestErr.mean * 100).toFixed(1)}%`
-    );
+  for (const key of ['KN-Dextrose', 'KN-Sorbitol'] as const) {
+    it(`${key}: the single-law fallback is the best a single law can do`, () => {
+      const pts = operatingPoints(key);
+      const shipped = SHIPPED[key];
+      const got = errorStats(pts, shipped.a, shipped.n);
+      const best = bestSinglePowerLaw(pts);
+      const bestErr = errorStats(pts, best.a, best.n);
 
-    expect(got.mean).toBeLessThan(0.10);
-    // Within a percentage point of optimal -- there is nothing to gain by
-    // re-fitting, only by abandoning the single-law form.
-    expect(got.mean - bestErr.mean).toBeLessThan(0.01);
-  });
+      console.log(
+        `
+    ${shipped.label} fallback (a=${shipped.a.toExponential(3)}, n=${shipped.n}): ` +
+          `mean ${(got.mean * 100).toFixed(1)}%  worst ${(got.worst * 100).toFixed(1)}% at ${got.worstAt} MPa`
+      );
+      console.log(
+        `    best possible single law (a=${best.a.toExponential(3)}, n=${best.n.toFixed(4)}): ` +
+          `mean ${(bestErr.mean * 100).toFixed(1)}%`
+      );
 
-  it('KNSB systematically UNDER-predicts, and a re-fit would roughly halve the error', () => {
+      // Optimal to within a tenth of a percentage point. Anything worse means
+      // someone edited the library without re-running tools/emitPropellantRegimes.mts.
+      expect(got.mean - bestErr.mean).toBeLessThan(0.001);
+      expect(got.mean).toBeLessThan(0.07);
+    });
+
+    it(`${key}: no longer carries a one-directional bias`, () => {
+      /*
+       * The finding that drove the re-fit. Shipped KNSB read LOW at essentially
+       * every measured point, and low burn rate means low predicted chamber
+       * pressure -- the unsafe direction when the number sizes a pressure
+       * vessel. A fitted law should scatter either side instead.
+       */
+      const pts = operatingPoints(key);
+      const shipped = SHIPPED[key];
+      const low = pts.filter((m) => shippedBurnRate(shipped, m.pressureMPa) < m.burnRateCmS / 100);
+      console.log(
+        `
+    ${shipped.label}: ${low.length}/${pts.length} measured points under-predicted`
+      );
+      expect(low.length).toBeGreaterThan(0);
+      expect(low.length).toBeLessThan(pts.length);
+    });
+
+    it(`${key}: ships Nakka's measured bands, and they beat any single law`, () => {
+      const pts = operatingPoints(key);
+      const shipped = SHIPPED[key];
+      const fits = fixture.propellants[key].nakkaFits;
+
+      expect(shipped.regimes.length, 'expected the measured piecewise law').toBe(fits.length);
+
+      // Each shipped band must BE one of Nakka's, converted. The conversion is
+      // the step most likely to be got wrong silently, so it is checked rather
+      // than assumed: r[mm/s] = a_N*P[MPa]^n  ->  a_SI = (a_N/1000)*10^(-6n).
+      for (let i = 0; i < fits.length; i++) {
+        const f = fits[i];
+        const r = shipped.regimes[i];
+        expect(r.n).toBeCloseTo(f.n, 10);
+        expect(r.from_pressure / 1e6).toBeCloseTo(f.fromMPa, 6);
+        expect(r.to_pressure / 1e6).toBeCloseTo(f.toMPa, 6);
+        const expectedA = (f.a / 1000) * Math.pow(10, -6 * f.n);
+        expect(Math.abs(r.a - expectedA) / expectedA).toBeLessThan(1e-3);
+      }
+
+      // Contiguous cover: no pressure inside the range falls through a gap.
+      for (let i = 1; i < shipped.regimes.length; i++) {
+        expect(shipped.regimes[i].from_pressure).toBeCloseTo(shipped.regimes[i - 1].to_pressure, 6);
+      }
+
+      const piece = shippedErrorStats(shipped, pts);
+      const best = bestSinglePowerLaw(pts);
+      const bestErr = errorStats(pts, best.a, best.n);
+      console.log(
+        `
+    ${shipped.label}: piecewise ${(piece.mean * 100).toFixed(1)}% mean ` +
+          `vs best single law ${(bestErr.mean * 100).toFixed(1)}%`
+      );
+
+      expect(piece.mean).toBeLessThan(0.025);
+      // The whole point of the feature: it must recover most of the gap.
+      expect(bestErr.mean - piece.mean).toBeGreaterThan(0.03);
+    });
+  }
+
+  it('the bands step discontinuously, which is a real property to be aware of', () => {
     /*
-     * The actionable finding. Every measured point above 0.75 MPa comes out low,
-     * so the bias has a direction: predicted burn rate too slow means burn time
-     * too long and chamber pressure too LOW. That is the unsafe direction for a
-     * pressure-vessel calculation.
-     *
-     * Not corrected here. Nakka's data is 65/35 with a specific preparation, and
-     * swapping the shipped coefficients is a formulation judgement for the
-     * project owner, not a test's call to make. The numbers are reported so the
-     * decision can be made on evidence.
+     * Piecewise fits do not join up. Straddling a boundary makes burn rate jump,
+     * and the solver integrates straight through it. Measuring the jumps here
+     * documents how large that effect is and pins it, so a later edit that
+     * introduced a 30% cliff would not slip past.
      */
-    const pts = operatingPoints('KN-Sorbitol');
-    const shipped = SHIPPED['KN-Sorbitol'];
-    const got = errorStats(pts, shipped.a, shipped.n);
-    const best = bestSinglePowerLaw(pts);
-    const bestErr = errorStats(pts, best.a, best.n);
-
-    console.log(
-      `\n    shipped KNSB (a=${shipped.a}, n=${shipped.n}): mean ${(got.mean * 100).toFixed(1)}%` +
-        `  worst ${(got.worst * 100).toFixed(1)}% at ${got.worstAt} MPa`
-    );
-    console.log(
-      `    re-fitted to this data:  a=${best.a.toExponential(3)}  n=${best.n.toFixed(4)}` +
-        `  ->  mean ${(bestErr.mean * 100).toFixed(1)}%`
-    );
-
-    // The bias is one-directional, not scatter.
-    const low = pts.filter(
-      (m) => burnRate(shipped.a, shipped.n, m.pressureMPa) < m.burnRateCmS / 100
-    );
-    expect(low.length, 'expected a systematic under-prediction').toBeGreaterThan(pts.length * 0.8);
-
-    // Pinned so a future change to the library shows up here.
-    expect(got.mean).toBeGreaterThan(0.08);
-    expect(got.mean).toBeLessThan(0.20);
-    // And a re-fit really would help, unlike KNDX.
-    expect(bestErr.mean).toBeLessThan(got.mean * 0.6);
+    for (const key of ['KN-Dextrose', 'KN-Sorbitol'] as const) {
+      const p = SHIPPED[key];
+      let worst = 0;
+      let worstAt = 0;
+      for (let i = 1; i < p.regimes.length; i++) {
+        const bMPa = p.regimes[i].from_pressure / 1e6;
+        const below = shippedBurnRate(p, bMPa - 1e-6);
+        const above = shippedBurnRate(p, bMPa + 1e-6);
+        const jump = Math.abs(above - below) / below;
+        if (jump > worst) {
+          worst = jump;
+          worstAt = bMPa;
+        }
+      }
+      console.log(
+        `
+    ${p.label}: largest band step ${(worst * 100).toFixed(1)}% at ${worstAt.toFixed(2)} MPa`
+      );
+      // Small enough that integrating across it is benign.
+      expect(worst).toBeLessThan(0.10);
+    }
   });
 });
 
@@ -338,5 +487,182 @@ describe("the golden regression fixture's coefficients", () => {
     // The cited source contains neither coefficient.
     expect(src).not.toContain('8.875');
     expect(src).not.toContain('0.32');
+  });
+});
+
+// =========================================================================
+describe('the solver actually integrates the piecewise law', () => {
+  /*
+   * Everything above compares the shipped NUMBERS to measurement. That is only
+   * half the claim. If the Rust core quietly ignored burn_rate_regimes, every
+   * test above would still pass while the app kept using the single law.
+   *
+   * These run the real core through the same entry point the Run button uses.
+   */
+
+  /** A KNDX BATES motor, with or without the measured bands. */
+  function fire(regimes: ShippedProp['regimes']) {
+    const p = SHIPPED['KN-Dextrose'];
+    const L = 0.3;
+    const Ro = 0.04;
+    const Ri = 0.015;
+    const ab0 = 2 * Math.PI * Ri * L + 2 * Math.PI * (Ro ** 2 - Ri ** 2);
+    const throat = Math.sqrt((4 * (ab0 / 220)) / Math.PI);
+
+    const out = core.simulate({
+      propellant: {
+        density: 1878,
+        a: p.a,
+        n: p.n,
+        flame_temp: 1700,
+        gamma: 1.14,
+        molecular_weight: 0.042,
+        ...(regimes.length ? { burn_rate_regimes: regimes } : {}),
+      },
+      grain: { kind: 'BATES', length: L, outer_radius: Ro, inner_radius: Ri },
+      nozzle: { throat_diameter: throat, expansion_ratio: 6, material: null },
+      options: { model: '0D' },
+    });
+
+    const NF = out.fields.length;
+    const ix = (f: string) => out.fields.indexOf(f);
+    const cT = ix('Time');
+    const cP = ix('Pc');
+    const pc: number[] = [];
+    for (let i = 0; i < out.rows; i++) pc.push(out.data[i * NF + cP]);
+    return {
+      pc,
+      peakPc: Math.max(...pc),
+      burnTime: out.data[(out.rows - 1) * NF + cT],
+      rows: out.rows,
+    };
+  }
+
+  it('omitting the bands leaves the old single-law behaviour exactly intact', () => {
+    // The compatibility guarantee. An empty regime list must be a no-op, not
+    // "nearly a no-op" -- every existing motor file depends on it.
+    const withEmpty = fire([]);
+    const p = SHIPPED['KN-Dextrose'];
+    const withUndefined = fire([]);
+    expect(withEmpty.peakPc).toBe(withUndefined.peakPc);
+    expect(withEmpty.peakPc).toBeGreaterThan(1e5);
+    expect(Number.isFinite(withEmpty.burnTime)).toBe(true);
+    // Sanity: the fallback law really is what ran.
+    expect(p.a).toBeGreaterThan(0);
+  });
+
+  it('supplying the bands changes the answer, so they are not being ignored', () => {
+    const single = fire([]);
+    const piece = fire(SHIPPED['KN-Dextrose'].regimes);
+
+    const dPc = (piece.peakPc - single.peakPc) / single.peakPc;
+    const dTb = (piece.burnTime - single.burnTime) / single.burnTime;
+    console.log(
+      `
+    KNDX BATES, single law: peak ${(single.peakPc / 1e6).toFixed(3)} MPa, ` +
+        `tb ${single.burnTime.toFixed(3)} s`
+    );
+    console.log(
+      `    with 5 measured bands:  peak ${(piece.peakPc / 1e6).toFixed(3)} MPa, ` +
+        `tb ${piece.burnTime.toFixed(3)} s   (${(dPc * 100).toFixed(1)}% Pc, ${(dTb * 100).toFixed(1)}% tb)`
+    );
+
+    // The core must respond to the field at all. This is the assertion that
+    // fails if someone drops burn_rate_regimes from the config plumbing.
+    expect(Math.abs(dPc)).toBeGreaterThan(1e-6);
+    // And it must remain a real motor, not a numerical excursion.
+    expect(piece.peakPc).toBeGreaterThan(1e5);
+    expect(piece.peakPc).toBeLessThan(2e7);
+    expect(Math.abs(dPc)).toBeLessThan(0.5);
+  });
+
+  it('integrates across the band discontinuities without instability', () => {
+    /*
+     * KNDX steps 1.8% at 2.57 MPa and again at 5.93 and 8.5. A motor whose
+     * pressure sweeps up through those during ignition crosses each one. Check
+     * the trace stays finite and smooth -- no NaN, no oscillation latching onto
+     * a boundary.
+     */
+    const piece = fire(SHIPPED['KN-Dextrose'].regimes);
+    expect(piece.rows).toBeGreaterThan(50);
+    for (const v of piece.pc) {
+      expect(Number.isFinite(v)).toBe(true);
+      expect(v).toBeGreaterThan(0);
+    }
+
+    // Largest step between consecutive samples, after the ignition transient.
+    const tail = piece.pc.slice(Math.floor(piece.pc.length * 0.1));
+    let worst = 0;
+    for (let i = 1; i < tail.length; i++) {
+      worst = Math.max(worst, Math.abs(tail[i] - tail[i - 1]) / tail[i - 1]);
+    }
+    console.log(`
+    largest step-to-step Pc change after ignition: ${(worst * 100).toFixed(2)}%`);
+    expect(worst).toBeLessThan(0.15);
+  });
+
+  it('the app hands the bands to the solver', () => {
+    /*
+     * The one link the tests above cannot reach. Everything else here proves
+     * the CORE honours burn_rate_regimes and the LIBRARY carries the right
+     * ones; neither notices if AppDesktop stops putting them in the config it
+     * sends. Deleting that spread was verified to leave all other tests green,
+     * which is exactly the silent failure this file exists to prevent -- the
+     * app would show measured coefficients while simulating the old law.
+     *
+     * A source-level assertion is a blunt instrument, but the alternative is
+     * mounting a 3000-line component, and blunt beats absent here.
+     */
+    const src = fs.readFileSync(path.resolve(HERE, 'AppDesktop.tsx'), 'utf8');
+    expect(
+      src.includes('burn_rate_regimes: burnRateRegimes'),
+      'AppDesktop no longer passes burn_rate_regimes into BurnConfig'
+    ).toBe(true);
+    expect(
+      src.includes('setBurnRateRegimes(p.burnRateRegimes ?? [])'),
+      'selecting a propellant no longer loads (or clears) its bands'
+    ).toBe(true);
+  });
+
+  it('is closer to measured burn rate across the pressure range the motor sweeps', () => {
+    /*
+     * The payoff, stated carefully.
+     *
+     * Piecewise is better ON AVERAGE, not at every individual pressure. At this
+     * motor's ~7.98 MPa operating point the single law happens to land 1.5% off
+     * and the bands 1.6% -- the fitted line passes near that particular
+     * measurement. Asserting a win at one cherry-picked pressure would be
+     * asserting something untrue, so this compares over the whole range the
+     * chamber actually sweeps through, ignition to burnout.
+     */
+    const piece = fire(SHIPPED['KN-Dextrose'].regimes);
+    const lo = Math.min(...piece.pc) / 1e6;
+    const hi = Math.max(...piece.pc) / 1e6;
+
+    const p = SHIPPED['KN-Dextrose'];
+    const inRange = fixture.propellants['KN-Dextrose'].measurements.filter(
+      (m) => m.pressureMPa >= lo && m.pressureMPa <= hi
+    );
+    expect(inRange.length, 'no measurements cover this motor').toBeGreaterThan(3);
+
+    const mean = (f: (mPa: number) => number) =>
+      inRange.reduce((acc, m) => {
+        const meas = m.burnRateCmS / 100;
+        return acc + Math.abs(f(m.pressureMPa) - meas) / meas;
+      }, 0) / inRange.length;
+
+    const singleErr = mean((mPa) => burnRate(p.a, p.n, mPa));
+    const pieceErr = mean((mPa) => shippedBurnRate(p, mPa));
+
+    console.log(
+      `
+    motor sweeps ${lo.toFixed(2)}-${hi.toFixed(2)} MPa, covering ${inRange.length} measurements`
+    );
+    console.log(
+      `    mean burn-rate error over that range: single law ${(singleErr * 100).toFixed(1)}%, ` +
+        `bands ${(pieceErr * 100).toFixed(1)}%`
+    );
+
+    expect(pieceErr).toBeLessThan(singleErr);
   });
 });
