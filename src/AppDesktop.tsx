@@ -22,7 +22,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { File, Save, Play, Terminal, Download, FolderUp, FolderDown, Calculator, BookOpen, Settings, Upload, Undo, Redo, Zap } from 'lucide-react';
+import { Save, Play, Terminal, Download, FolderUp, FolderDown, Calculator, Settings, Upload, Undo, Redo, Zap } from 'lucide-react';
 import { processDXF, DXFRegressionResults } from './dxfProcessor';
 import { PropellantEditor, PropellantData } from './PropellantEditor';
 import { GrainEditor } from './GrainEditor';
@@ -312,7 +312,6 @@ export default function AppDesktop() {
   const [numBolts, setNumBolts] = useState<number>(6);
   const [boltDiameter, setBoltDiameter] = useState<number>(0.005);
   const [boltYieldStress, setBoltYieldStress] = useState<number>(400); // MPa
-  const [flangeThickness, setFlangeThickness] = useState<number>(0.010);
 
   const CASING_ALLOYS = {
     'Al 6061-T6': { y: 276, m: 69 },
@@ -1208,7 +1207,6 @@ export default function AppDesktop() {
     const step = Math.max(1, Math.floor(results.length / 200));
     const maxMass = results[results.length - 1].PropellantMassGen;
     const initialAt = Math.PI * Math.pow(throatDiameter / 2, 2);
-    const gamma = 1.2; // approx, could use propellant.gamma if exposed
     
     // We also need propVol for volume loading, assuming same calculation:
     let totalPropVol = 0;
@@ -1236,7 +1234,6 @@ export default function AppDesktop() {
     } else {
       totalPropVol = Math.PI * (Math.pow(outerRadius, 2) - Math.pow(innerRadius, 2)) * length * (grainType === 'BATES' ? numSegments : 1);
     }
-    const maxVolLoad = (totalPropVol / totalMotorVolume) * 100;
     
     return results.filter((_, i) => i % step === 0).map(r => {
       const propVolBurned = r.PropellantMassGen / density;
@@ -1271,7 +1268,10 @@ export default function AppDesktop() {
         CoreMachNumber: CoreMachNumber
       };
     });
-  }, [results, throatDiameter, outerRadius, innerRadius, valleyRadius, length, numSegments, grainType, density, expansionRatio, rodRadius, offset]);
+  }, [results, throatDiameter, outerRadius, innerRadius, valleyRadius, length, numSegments, grainType, density, expansionRatio, rodRadius,
+      // Fin geometry and the traced profile feed the same grain the rows are
+      // computed from; without them the table did not refresh when they changed.
+      finDepth, finWidth, numPoints, dxfData]);
 
   const burnRateData = useMemo(() => {
     const data = [];
@@ -1347,7 +1347,7 @@ export default function AppDesktop() {
               } else {
                 addLog(`Error: Type mismatch. Expected ${type} material.`);
               }
-            } catch (err) {
+            } catch {
               addLog('Error parsing material file.');
             } finally {
               setIsSimulating(false);
@@ -1376,7 +1376,11 @@ export default function AppDesktop() {
       grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
       throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
       igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
-      casingMaterial, casingYieldStress, casingYoungsModulus
+      casingMaterial, casingYieldStress, casingYoungsModulus,
+      // Returned by this callback, so they belong here. Omitting them meant
+      // undo/redo restored whatever temperature settings were current when the
+      // callback was last rebuilt, rather than the ones being captured.
+      T_ref, sigma_p, T_init
   ]);
 
   const applyDesignState = (config: any) => {
@@ -1476,7 +1480,7 @@ export default function AppDesktop() {
           applyDesignState(parsed);
           pushHistory();
           addLog('Loaded configuration from Burnsim file.');
-        } catch (err) {
+        } catch {
           addLog('Failed to import Burnsim file.');
         }
         setIsSimulating(false);
@@ -1591,7 +1595,7 @@ export default function AppDesktop() {
           if (config.boltDiameter) setBoltDiameter(config.boltDiameter);
           if (config.boltYieldStress) setBoltYieldStress(config.boltYieldStress);
           addLog('Configuration loaded successfully.');
-        } catch (err) {
+        } catch {
           addLog('Error parsing config file.');
         } finally {
           setIsSimulating(false);

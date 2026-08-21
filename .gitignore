@@ -22,3 +22,7 @@ tools/data/*
 # Claude Code: launch.json is shared project config (dev server for previews);
 # settings.local.json is per-machine (permission allowlists, absolute paths).
 .claude/settings.local.json
+
+# Copied in by scripts/build-wasm.sh so wasm-pack stops warning; the real one
+# is at the repository root.
+crates/burn-core/LICENSE

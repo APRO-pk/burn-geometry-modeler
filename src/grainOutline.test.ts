@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { basePortOutline, outlineAt } from './grainOutline';
+import { outlineAt } from './grainOutline';
 import { grainFromConfig, burnoutWeb } from './surrogate/features';
 import type { SurrogateGrain } from './surrogate/features';
 

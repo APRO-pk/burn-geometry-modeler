@@ -440,7 +440,7 @@ describe('throat erosion and the exit-pressure ratio (old-engine inconsistency)'
     outer_radius: 0.025,
     inner_radius: 0.01,
   };
-  const BATES_DT = 0.010049880048721369;
+  const BATES_DT = 0.01004988004872137;
 
   const eroding = run(BATES, BATES_DT, { expansionRatio: 4, material: GRAPHITE });
 
@@ -515,7 +515,7 @@ describe('quasi-1-D physical invariants', () => {
     ['short fat, JPL', run(SHORT_FAT, SHORT_FAT_DT, { model: 'quasi1D', erosive: 'JPL' })],
     ['BATES (has burning end faces)', run(
       { kind: 'BATES', length: 0.2, outer_radius: 0.025, inner_radius: 0.01 },
-      0.010049880048721369,
+      0.01004988004872137,
       { model: 'quasi1D' }
     )],
   ];

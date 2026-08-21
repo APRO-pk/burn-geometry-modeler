@@ -28,16 +28,10 @@
  * IS the discretisation floor, and every other number is read against it.
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { outlineAt } from '../src/grainOutline.ts';
-import type { SurrogateGrain } from '../src/surrogate/features.ts';
-import { grainFromUi } from '../src/engine.ts';
-import type { GrainUiParams } from '../src/engine.ts';
-
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.resolve(HERE, '../src/modelUncertainty.data.json');
+import { outlineAt } from './grainOutline';
+import type { SurrogateGrain } from './surrogate/features';
+import { grainFromUi } from './engine';
+import type { GrainUiParams } from './engine';
 
 /** How many web fractions to sample between ignition and burnout. */
 const SAMPLES = 200;

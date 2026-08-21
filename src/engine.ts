@@ -676,7 +676,7 @@ export class MotorSimulation {
       if (pc_eq > 30e6) {
         warnings.push(`Warning: Predicted equilibrium pressure (${(pc_eq / 1e6).toFixed(1)} MPa) exceeds 30 MPa. Highly unrealistic/dangerous.`);
       }
-    } catch (e) {
+    } catch {
       warnings.push("Warning: Could not calculate equilibrium pressure. Possible numeric instability.");
     }
 
@@ -714,9 +714,17 @@ export class MotorSimulation {
       
       if (this.erosive_model === 'Lenoir-Robillard' && G > 0) {
         // Lenoir-Robillard formulation
-        const alpha = 0.00003; // empirical constant
-        const beta = 50; // empirical constant
-        const D_port = 2 * Math.sqrt(A_port / Math.PI);
+        /*
+         * A THIRD copy of the Lenoir-Robillard constants, and deliberately so.
+         *
+         * crates/burn-core/src/erosive.rs holds the single definition the two
+         * Rust solvers share. This class is the frozen TypeScript REFERENCE
+         * that src/wasm.parity.test.ts checks the Rust core against, so its
+         * numbers must not move when the shared ones are tuned -- that is the
+         * whole point of a reference. Do not "unify" these.
+         */
+        const alpha = 0.00003;
+        const beta = 50;
         const L_eff = this.grain.length / 2; 
         const log_term = -beta * r_b * this.propellant.density / G;
         // Limit log_term to prevent underflow/overflow

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Settings, Check, X } from 'lucide-react';
+import { Settings, Check } from 'lucide-react';
 import { grainFromUi } from './engine';
 import { DXFRegressionResults } from './dxfProcessor';
 
@@ -42,7 +42,7 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
   const grain = useMemo(() => {
     try {
       return grainFromUi(params, dxfData);
-    } catch(e) {
+    } catch {
       return null;
     }
   }, [params, dxfData]);

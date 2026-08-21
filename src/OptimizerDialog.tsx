@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Check, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play } from 'lucide-react';
 import { runMotor } from './wasmClient';
 import { grainConfigFromUi } from './wasmCore';
 
@@ -62,7 +62,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
           const initialKn = simRes[0].Ab / simRes[0].ThroatArea;
           sweepResults.push({ val, maxPc, maxThrust, initialKn, warnings: simWarnings });
         }
-      } catch (e) { /* ignore fails */ }
+      } catch { /* ignore fails */ }
     }
 
     setResults(sweepResults);

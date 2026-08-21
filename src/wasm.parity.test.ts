@@ -133,7 +133,7 @@ const KNDX_PROP = {
 };
 const KNDX_GRAIN = { length: 0.2, outerRadius: 0.025, innerRadius: 0.01 };
 /** Throat sized for an initial Kn of 200 (see engine.test.ts). */
-const KNDX_D_T = 0.010049880048721369;
+const KNDX_D_T = 0.01004988004872137;
 
 const GRAPHITE: NozzleMaterialProps = {
   type: 'Graphite',

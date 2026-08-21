@@ -59,12 +59,12 @@ export function processDXF(dxfText: string, maxRadius: number, dx: number): DXFR
   }
 
   // Unite all paths initially to form the core geometry
-  let subj: ClipperLib.Paths = [];
+  const subj: ClipperLib.Paths = [];
   paths.forEach(p => subj.push(p));
   
   const c = new ClipperLib.Clipper();
   c.AddPaths(subj, ClipperLib.PolyType.ptSubject, true);
-  let initialPort: ClipperLib.Paths = [];
+  const initialPort: ClipperLib.Paths = [];
   c.Execute(ClipperLib.ClipType.ctUnion, initialPort, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
 
   const perimTable: number[] = [];
@@ -75,7 +75,7 @@ export function processDXF(dxfText: string, maxRadius: number, dx: number): DXFR
   while (currentY < maxRadius) {
      const co = new ClipperLib.ClipperOffset();
      co.AddPaths(initialPort, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
-     let offsetPaths: ClipperLib.Paths = [];
+     const offsetPaths: ClipperLib.Paths = [];
      co.Execute(offsetPaths, currentY * SCALE);
 
      // clip against outer radius
@@ -88,7 +88,7 @@ export function processDXF(dxfText: string, maxRadius: number, dx: number): DXFR
      const c2 = new ClipperLib.Clipper();
      c2.AddPaths(offsetPaths, ClipperLib.PolyType.ptSubject, true);
      c2.AddPath(outerCircle, ClipperLib.PolyType.ptClip, true);
-     let finalPaths: ClipperLib.Paths = [];
+     const finalPaths: ClipperLib.Paths = [];
      c2.Execute(ClipperLib.ClipType.ctIntersection, finalPaths, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
 
      if (finalPaths.length === 0) {

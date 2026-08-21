@@ -48,6 +48,12 @@ echo "==> wasm-pack $(wasm-pack --version)"
 
 cd "$CRATE_DIR"
 
+# wasm-pack warns on every build when Cargo.toml declares a license but the
+# crate directory has no LICENSE file. Copy the repo one in rather than keeping
+# a second copy under version control, where the two could drift apart.
+# .gitignore excludes the copy.
+cp -f "$REPO_ROOT/LICENSE" "$CRATE_DIR/LICENSE"
+
 # Building straight onto /mnt/c is slow (9p filesystem) and can trip permission
 # oddities, so build into a Linux-native target dir and only write the finished
 # package back to the repo.

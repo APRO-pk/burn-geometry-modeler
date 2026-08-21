@@ -12,7 +12,7 @@ import {
 import type { SurrogateTarget } from './surrogate/predict';
 import { describeGrain } from './surrogate/features';
 import type { RawDesign, SurrogateGrain } from './surrogate/features';
-import { GRAIN_SHAPE_PARAMS, shapeFromGrain } from './surrogate/shape';
+import { GRAIN_SHAPE_PARAMS } from './surrogate/shape';
 import { dispersionSweep, histogram, inverseDesign } from './surrogate/optimize';
 import type { Candidate } from './surrogate/optimize';
 import { runMotor } from './wasmClient';
@@ -287,7 +287,7 @@ export function SurrogatePanel({
       }
     }
     setSearching(false);
-  }, [ready, targetImpulse, targetMaxPc, design, kind, addLog]);
+  }, [ready, targetImpulse, targetMaxPc, design, kind, addLog, burnRateRegimes]);
 
   // --- c. real-time Monte Carlo -------------------------------------------
 
@@ -359,7 +359,7 @@ export function SurrogatePanel({
     } finally {
       setConfirming(false);
     }
-  }, [design, mcSigma, mcTarget, addLog]);
+  }, [design, mcSigma, mcTarget, addLog, burnRateRegimes]);
 
   // --- render -------------------------------------------------------------
 

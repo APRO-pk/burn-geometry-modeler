@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Trash2, Check, X } from 'lucide-react';
+import { Settings, Plus, Trash2, Check } from 'lucide-react';
 import type { BurnRateRegime } from './wasmCore';
 
 export interface PropellantData {
