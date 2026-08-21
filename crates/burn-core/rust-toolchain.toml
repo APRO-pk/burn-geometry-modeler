@@ -1,0 +1,22 @@
+# Pinned so the compiled WASM is byte-reproducible.
+#
+# crates/burn-core/pkg-node and pkg-web are COMMITTED, which is what lets the
+# app build and test without a Rust toolchain. The hazard that creates is a
+# stale artifact: edit the Rust, forget to rebuild, and the committed binary
+# keeps shipping the old physics while the source says otherwise. Tests would
+# not notice, because they load the committed binary.
+#
+# CI closes that by rebuilding and diffing the result against what is committed
+# (.github/workflows/ci.yml). That check is only meaningful if the compiler is
+# the same everywhere -- a different rustc can emit different bytes from
+# identical source and would fail the diff for no reason.
+#
+# Verified: rebuilding with this toolchain reproduces the committed .wasm files
+# byte for byte.
+#
+# Bumping this version is expected to change the artifacts. Rebuild with
+# `npm run wasm:build` and commit them in the same change.
+[toolchain]
+channel = "1.97.1"
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

@@ -1,5 +1,8 @@
 # APRO Burn & Geometry Modeler
 
+[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+<!-- Replace OWNER/REPO once a git remote exists; there is none yet. -->
+
 Solid rocket motor internal ballistics, grain geometry, and case structural
 analysis, in the browser.
 
@@ -132,6 +135,37 @@ error bars become fiction.
 See [`tools/README.md`](tools/README.md) for the sampling design, the model, the
 current held-out metrics, and why the design space is parameterised the way it
 is.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs three jobs on every push and pull request.
+
+**Types, tests, build** — runs against the *committed* WASM, which is what the
+app ships and what a contributor without a Rust toolchain will be running.
+
+**Committed WASM matches Rust source** — the check this repository specifically
+needs. Because `pkg-node` and `pkg-web` are committed, editing the Rust and
+forgetting to rebuild leaves the binary shipping the old physics while the
+source claims otherwise, and *no test would notice* — they all load the
+committed binary. CI rebuilds and diffs.
+
+That diff is only trustworthy because `crates/burn-core/rust-toolchain.toml`
+pins the compiler: a different rustc can emit different bytes from identical
+source. Verified that the pinned toolchain reproduces the committed artifacts
+byte for byte, and that changing a single constant in the Rust makes the check
+fail.
+
+**Surrogate matches the current physics** — the surrogate is fitted to one
+version of the core; if the core moves and the model is not retrained, its
+uncertainty bands become fiction.
+
+### Line endings
+
+The repository is developed on Windows with `core.autocrlf=true` but its build
+script runs under WSL. Without `.gitattributes`, git hands the working copy a
+CRLF `build-wasm.sh`, bash reads `set -euo pipefail\r` as an option named
+"pipefail\r", and the build fails with an error that mentions nothing about
+line endings. `npm run wasm:build` was broken this way and is now pinned to LF.
 
 ## Layout
 

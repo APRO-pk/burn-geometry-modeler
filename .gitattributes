@@ -1,0 +1,39 @@
+# Line-ending policy.
+#
+# This repository is developed on Windows (core.autocrlf=true) but its build
+# script runs under WSL/Linux. Without the rule below, git hands the working
+# copy a CRLF version of scripts/build-wasm.sh, bash reads `set -euo pipefail\r`
+# as an option named "pipefail\r", and the build dies with an error that says
+# nothing about line endings. `npm run wasm:build` was broken this way.
+#
+# Anything executed by a shell must be LF regardless of platform.
+
+* text=auto
+
+*.sh text eol=lf
+*.mts text eol=lf
+*.bash text eol=lf
+
+# Windows-native scripts, if any are ever added, need the opposite.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaries git should never try to normalise or diff as text. The .wasm files
+# are committed build artifacts and a single stray byte breaks them.
+*.wasm binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+
+# Generated, and large: keep it out of diffs where it only adds noise.
+src/surrogate/model.json -diff
+package-lock.json -diff
+
+# wasm-pack output: machine-generated, only ever read by tooling, and rewritten
+# in full on every build. Pinning to LF keeps rebuilds from showing as changes
+# purely because the working copy was checked out with CRLF.
+crates/burn-core/pkg-node/** text eol=lf
+crates/burn-core/pkg-web/** text eol=lf
+crates/burn-core/pkg-node/*.wasm binary
+crates/burn-core/pkg-web/*.wasm binary

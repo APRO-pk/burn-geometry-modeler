@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The fast gate. Runs on the COMMITTED wasm, which is what the app ships and
+  # what a contributor without a Rust toolchain will be running, so this is the
+  # check that reflects their experience.
+  # ---------------------------------------------------------------------------
+  check:
+    name: Types, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify the committed WASM is present
+        # The suite loads pkg-node directly. Without this the failure is a
+        # confusing MODULE_NOT_FOUND several hundred lines into the test log.
+        run: |
+          test -f crates/burn-core/pkg-node/burn_core_bg.wasm \
+            || { echo "::error::crates/burn-core/pkg-node is missing. Run 'npm run wasm:build' and commit it."; exit 1; }
+          test -f crates/burn-core/pkg-web/burn_core_bg.wasm \
+            || { echo "::error::crates/burn-core/pkg-web is missing. Run 'npm run wasm:build' and commit it."; exit 1; }
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Test
+        # Covers the physics parity suite, quasi-1-D, structural, the burn-back
+        # outline, the surrogate against live solves, and the validation suite
+        # against 790 certified motors.
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Catches the failure mode that committing build artifacts creates: Rust
+  # source edited, WASM not rebuilt, so the binary keeps shipping the old
+  # physics while the source claims otherwise. Nothing else would notice,
+  # because every test loads the committed binary.
+  #
+  # Byte-comparison is only sound because the toolchain is pinned in
+  # crates/burn-core/rust-toolchain.toml -- verified to reproduce the committed
+  # artifacts exactly.
+  # ---------------------------------------------------------------------------
+  wasm-current:
+    name: Committed WASM matches Rust source
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (version pinned by rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add wasm32-unknown-unknown
+        working-directory: crates/burn-core
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cache/burn-core-target
+          key: cargo-${{ runner.os }}-${{ hashFiles('crates/burn-core/Cargo.lock', 'crates/burn-core/rust-toolchain.toml') }}
+
+      - name: Install wasm-pack
+        # Pinned: wasm-pack chooses the wasm-bindgen and wasm-opt versions, and
+        # both affect the emitted bytes.
+        run: cargo install wasm-pack --version 0.13.1 --locked
+
+      - name: Rebuild the WASM
+        run: npm run wasm:build
+
+      - name: Fail if the committed artifacts are out of date
+        run: |
+          if ! git diff --quiet -- crates/burn-core/pkg-node crates/burn-core/pkg-web; then
+            echo "::error::The committed WASM does not match the Rust source."
+            echo "Run 'npm run wasm:build' and commit crates/burn-core/pkg-node and pkg-web."
+            git diff --stat -- crates/burn-core/pkg-node crates/burn-core/pkg-web
+            exit 1
+          fi
+          echo "Committed WASM reproduces byte for byte."
+
+      - name: Rust warnings
+        run: cargo clippy --release --all-targets -- -D warnings || cargo build --release
+        working-directory: crates/burn-core
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # The surrogate is fitted to a specific version of the physics core. If the
+  # core moves and the model is not retrained, its predictions drift and its
+  # uncertainty bands become fiction -- which is worse than having no surrogate,
+  # because the UI presents those bands as grounds for trust.
+  #
+  # src/surrogate.test.ts already compares the shipped model against fresh
+  # solves from the current core, so the `check` job covers this. This job
+  # exists to make the failure legible when it happens.
+  # ---------------------------------------------------------------------------
+  surrogate-fresh:
+    name: Surrogate matches the current physics
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate the shipped surrogate against live solves
+        run: npx vitest run src/surrogate.test.ts
+      - name: Explain a failure
+        if: failure()
+        run: |
+          echo "::error::The shipped surrogate no longer matches the physics core."
+          echo "If the 0-D solver changed, retrain: npm run surrogate:rebuild"
