@@ -14,6 +14,7 @@
 
 use serde::Deserialize;
 
+use crate::erosive;
 use crate::grain::Grain;
 use crate::igniter::Igniter;
 use crate::nozzle::NozzleThermal;
@@ -332,33 +333,17 @@ impl Simulation {
     fn apply_erosive(&self, r_b: f64, g: f64, _a_port: f64) -> f64 {
         match self.opts.erosive_model {
             ErosiveModel::LenoirRobillard if g > 0.0 => {
-                const ALPHA: f64 = 0.00003;
-                const BETA: f64 = 50.0;
-                let l_eff = self.grain.length() / 2.0;
-                let log_term = -BETA * r_b * self.prop.density / g;
-                let r_erosive = ALPHA * (g.powf(0.8) / l_eff.powf(0.2))
-                    * log_term.max(-50.0).exp();
-                r_b + r_erosive.max(0.0)
+                // Length scale is grain_length/2 here and the hydraulic diameter
+                // in port.rs; see the erosive module docs for why they differ.
+                erosive::lenoir_robillard(r_b, g, self.grain.length() / 2.0, self.prop.density)
             }
             ErosiveModel::Jpl if g > 0.0 => {
-                let k_jpl = if self.prop.k_erosive > 0.0 {
-                    self.prop.k_erosive
-                } else {
-                    0.001
-                };
-                if g > self.prop.g_threshold {
-                    r_b * (1.0 + k_jpl * (g - self.prop.g_threshold))
-                } else {
-                    r_b
-                }
+                erosive::jpl(r_b, g, self.prop.k_erosive, self.prop.g_threshold)
             }
             // Generic linear fallback, mirroring the final else-if in engine.ts.
             _ => {
-                if self.opts.erosive_model != ErosiveModel::None
-                    && g > self.prop.g_threshold
-                    && self.prop.k_erosive > 0.0
-                {
-                    r_b * (1.0 + self.prop.k_erosive * (g - self.prop.g_threshold))
+                if self.opts.erosive_model != ErosiveModel::None {
+                    erosive::linear(r_b, g, self.prop.k_erosive, self.prop.g_threshold)
                 } else {
                     r_b
                 }

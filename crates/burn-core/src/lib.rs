@@ -31,6 +31,7 @@
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
+pub mod erosive;
 pub mod grain;
 pub mod igniter;
 pub mod nozzle;

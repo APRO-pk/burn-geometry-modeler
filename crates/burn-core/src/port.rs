@@ -120,10 +120,6 @@ pub struct MarchResult {
 /// Floor on hydraulic diameter (m), so a burned-out cell cannot divide by zero.
 const D_H_FLOOR: f64 = 1e-6;
 
-/// Per-station Lenoir-Robillard constants, as in the 0-D path.
-const LR_ALPHA: f64 = 0.00003;
-const LR_BETA: f64 = 50.0;
-
 /// Inputs that do not change during a march.
 pub struct MarchInputs<'a> {
     pub grain: &'a Grain,
@@ -315,19 +311,12 @@ fn apply_erosive(
     match model {
         ErosiveModel::None => r_b,
         ErosiveModel::LenoirRobillard => {
-            // r_e = alpha * G^0.8 / D^0.2 * exp(-beta * rho_p * r_b / G)
-            let log_term = -LR_BETA * r_b * prop_density / g;
-            let r_erosive =
-                LR_ALPHA * (g.powf(0.8) / d_h.powf(0.2)) * log_term.max(-50.0).exp();
-            r_b + r_erosive.max(0.0)
+            // The local hydraulic diameter is the length scale the correlation
+            // is actually written against, unlike the 0-D path's grain_length/2.
+            crate::erosive::lenoir_robillard(r_b, g, d_h, prop_density)
         }
         ErosiveModel::Jpl => {
-            let k = if k_erosive > 0.0 { k_erosive } else { 0.001 };
-            if g > g_threshold {
-                r_b * (1.0 + k * (g - g_threshold))
-            } else {
-                r_b
-            }
+            crate::erosive::jpl(r_b, g, k_erosive, g_threshold)
         }
     }
 }

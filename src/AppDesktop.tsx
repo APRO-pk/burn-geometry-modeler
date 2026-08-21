@@ -29,6 +29,9 @@ import { GrainEditor } from './GrainEditor';
 import { exportBurnsimXML, parseBurnsimXML } from './BurnsimHandler';
 import { OptimizerDialog } from './OptimizerDialog';
 import { SurrogatePanel } from './SurrogatePanel';
+import { ModelUncertaintyPanel } from './ModelUncertaintyPanel';
+import type { MotorMetrics } from './motorMetrics';
+import { peakErosiveFraction } from './burnLaw';
 // three.js is ~150 kB gzipped and only this tab needs it, so it is code-split
 // rather than carried by everyone who opens the app.
 const GrainBurn3D = React.lazy(() => import('./GrainBurn3D'));
@@ -218,6 +221,13 @@ export default function AppDesktop() {
    * Empty means the single a/n law, which is what a custom propellant gets.
    */
   const [burnRateRegimes, setBurnRateRegimes] = useState<BurnRateRegime[]>([]);
+  /**
+   * Name of the propellant currently loaded from the library.
+   *
+   * Only used to report model uncertainty, which differs sharply between a
+   * propellant measured against strand-burner data and one that never has been.
+   */
+  const [propellantName, setPropellantName] = useState<string>(DEFAULT_PROPELLANTS[0].name);
 
   /*
    * Editing a or n by hand drops any piecewise law.
@@ -334,7 +344,40 @@ export default function AppDesktop() {
   /** Axial station profiles from the last run. Undefined after a 0-D run. */
   const [stations, setStations] = useState<StationProfiles | undefined>(undefined);
   const [stabilityWarnings, setStabilityWarnings] = useState<string[]>([]);
-  const [metrics, setMetrics] = useState<any>(null);
+  /**
+   * Summary numbers every tab reads.
+   *
+   * This was `any`, which is how a removed field could disappear from the core
+   * and leave the UI rendering `undefined` with tsc still green -- exactly what
+   * happened when calculate_discontinuity_stress went away. Typed now, so the
+   * compiler is the thing that notices.
+   */
+  const [metrics, setMetrics] = useState<MotorMetrics | null>(null);
+
+  /**
+   * How much of the peak burn rate came from erosive burning, recovered from
+   * the trace the solver just produced.
+   *
+   * Lets the uncertainty panel scale the (uncalibrated) erosive model's
+   * contribution to how much erosion THIS motor actually has. Without it the
+   * panel applied a blanket figure and reported +-75% on peak pressure for a
+   * motor whose erosion was a couple of percent, which teaches users to ignore
+   * the number.
+   *
+   * Derived from dy/dt against the pressure-only law rather than by recomputing
+   * the erosive correlation, so nothing about that correlation is duplicated
+   * here. src/burnLaw.parity.test.ts pins the law against the Rust core.
+   */
+  const erosiveFraction = useMemo(() => {
+    if (!results.length) return undefined;
+    return peakErosiveFraction(
+      results.map((r) => ({ time: r.Time, web: r.y, pc: r.Pc })),
+      a,
+      n,
+      burnRateRegimes,
+      1 + sigma_p * (T_init - T_ref)
+    );
+  }, [results, a, n, burnRateRegimes, sigma_p, T_init, T_ref]);
   const [visualizerIndex, setVisualizerIndex] = useState<number>(0);
   const [statusMsg, setStatusMsg] = useState<string>('System Ready');
   const [activeTab, setActiveTab] = useState<'ballistics' | 'extended_graphs' | 'geometry' | 'thermo' | 'montecarlo' | 'structural' | 'materials' | 'statistics' | 'surrogate' | 'burn3d'>('ballistics');
@@ -1645,6 +1688,7 @@ export default function AppDesktop() {
             // Always assign, so switching to a single-law propellant clears the
             // previous one's bands rather than leaving them applied.
             setBurnRateRegimes(p.burnRateRegimes ?? []);
+            setPropellantName(p.name);
             setMolWeight(p.molWeight);
             setKErosive(p.kErosive);
             setGThreshold(p.gThreshold);
@@ -3046,6 +3090,23 @@ export default function AppDesktop() {
                         </div>
                       </div>
                     </div>
+
+                    {/*
+                      * Every number above is printed to several significant
+                      * figures. This says how many of them mean anything.
+                      */}
+                    <ModelUncertaintyPanel
+                      grainKind={grainType}
+                      n={n}
+                      hasBurnRateRegimes={burnRateRegimes.length > 0}
+                      propellantName={propellantName}
+                      erosiveModel={erosiveModel}
+                      erosiveFraction={erosiveFraction}
+                      hasNozzleMaterial={!!nozzleMaterial}
+                      peakPressurePa={metrics.maxPc}
+                      totalImpulseNs={metrics.totalImpulse}
+                      burnTimeS={metrics.actionTime}
+                    />
                   </div>
                 ) : (
                   <div className="text-[#666] italic font-mono text-xs">Run a simulation to view motor statistics.</div>
