@@ -1,7 +1,8 @@
 # APRO Burn & Geometry Modeler
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
-<!-- Replace OWNER/REPO once a git remote exists; there is none yet. -->
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+<!-- Relative on purpose: resolves against whatever repo this ends up in,
+     so it survives a rename, transfer or fork with no edit. -->
 
 Solid rocket motor internal ballistics, grain geometry, and case structural
 analysis, in the browser.
