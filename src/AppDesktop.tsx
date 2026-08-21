@@ -9,7 +9,7 @@ import {
 import { runMotor, warmUpMotorCore } from './wasmClient';
 import { analyzeStructure, initStructural, requiredWallThickness } from './structuralClient';
 import { grainConfigFromUi } from './wasmCore';
-import type { BurnConfig, BurnRateRegime, SolverModelType, StationProfiles } from './wasmCore';
+import type { BurnConfig, SolverModelType, StationProfiles } from './wasmCore';
 import {
   LineChart,
   Line,
@@ -23,7 +23,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { Save, Play, Terminal, Download, FolderUp, FolderDown, Calculator, Settings, Upload, Undo, Redo, Zap } from 'lucide-react';
-import { processDXF, DXFRegressionResults } from './dxfProcessor';
+import { processDXF } from './dxfProcessor';
 import { PropellantEditor, PropellantData } from './PropellantEditor';
 import { GrainEditor } from './GrainEditor';
 import { exportBurnsimXML, parseBurnsimXML } from './BurnsimHandler';
@@ -32,6 +32,10 @@ import { SurrogatePanel } from './SurrogatePanel';
 import { ModelUncertaintyPanel } from './ModelUncertaintyPanel';
 import type { MotorMetrics } from './motorMetrics';
 import { peakErosiveFraction } from './burnLaw';
+import { useMotorConfig, CASING_ALLOYS, GRAIN_TYPES, NOZZLE_MATERIALS, CASING_MATERIALS } from './useMotorConfig';
+import { ErrorBoundary } from './ErrorBoundary';
+import { useDesignHistory, applyNumber, applyEnum, type DesignSnapshot } from './useDesignHistory';
+import { validateDesign, errorsOnly, byField, type ValidationIssue } from './designValidation';
 // three.js is ~150 kB gzipped and only this tab needs it, so it is code-split
 // rather than carried by everyone who opens the app.
 const GrainBurn3D = React.lazy(() => import('./GrainBurn3D'));
@@ -73,9 +77,48 @@ const IMPERIAL_OPTIONS: Record<string, string[]> = {
   Area: ['in²']
 };
 
-const InputBox = ({ label, value, onChange, suffix, step = "any", type = "number", unitCat = null }: any) => {
+/**
+ * A labelled numeric input with unit conversion and inline validation.
+ *
+ * Three things were wrong with the previous version and are fixed here:
+ *
+ *   Props were typed `any`, so nothing checked that callers passed a real
+ *   onChange or a sensible unit category.
+ *
+ *   The label was not associated with its input. Screen readers announced an
+ *   unlabelled text box, and clicking the label did not focus the field.
+ *
+ *   There was nowhere to show a validation message, so problems could only be
+ *   reported by an alert() at run time -- long after the value was typed, and
+ *   only for the first problem found.
+ */
+interface InputBoxProps {
+  label: string;
+  value: number | string;
+  onChange: (v: never) => void;
+  suffix?: string;
+  step?: string | number;
+  type?: string;
+  /** Key into UNIT_FACTORS, enabling the unit dropdown. */
+  unitCat?: string | null;
+  /** Validation issues for this field, rendered underneath. */
+  issues?: ValidationIssue[];
+}
+
+const InputBox = ({
+  label,
+  value,
+  onChange,
+  suffix,
+  step = 'any',
+  type = 'number',
+  unitCat = null,
+  issues = [],
+}: InputBoxProps) => {
   const settings = React.useContext(SettingsContext);
-  
+  const inputId = React.useId();
+  const issueId = `${inputId}-issues`;
+
   const defaultLocalUnit = React.useMemo(() => {
     if (!unitCat || !UNIT_FACTORS[unitCat]) return suffix || '';
     if (settings) {
@@ -107,35 +150,58 @@ const InputBox = ({ label, value, onChange, suffix, step = "any", type = "number
   }, [value, unitCat, localUnit, type]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let raw = e.target.value;
-    if (type !== 'number') return onChange(raw);
+    const raw = e.target.value;
+    if (type !== 'number') return onChange(raw as never);
     const num = parseFloat(raw);
-    if (isNaN(num)) return onChange(0);
+    /*
+     * An unparseable entry used to become 0, which is worse than it looks: a
+     * half-typed "-" or "1e" silently set the field to zero, and zero is a
+     * legal-looking radius that produces a confusing failure much later. Leave
+     * the previous value alone instead and let validation speak.
+     */
+    if (isNaN(num)) return;
 
     if (unitCat && UNIT_FACTORS[unitCat] && UNIT_FACTORS[unitCat][localUnit]) {
       const factor = UNIT_FACTORS[unitCat][localUnit];
       // Input is local unit. Convert TO SI base.
-      onChange(num * factor);
+      onChange((num * factor) as never);
     } else {
-      onChange(num);
+      onChange(num as never);
     }
   };
 
+  const errors = issues.filter((i) => i.severity === 'error');
+  const warnings = issues.filter((i) => i.severity === 'warning');
+  const borderClass = errors.length
+    ? 'border-red-500'
+    : warnings.length
+      ? 'border-amber-500'
+      : 'border-[#bbb]';
+
   return (
     <>
-      <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs">{label}</label>
-      <div className="relative flex items-center bg-white border border-[#bbb] rounded overflow-hidden focus-within:border-blue-500">
-        <input 
-          type={type} 
-          step={step} 
-          value={displayVal} 
-          onChange={handleChange} 
-          className="pl-1 pr-1 py-0.5 w-full bg-transparent outline-none text-right font-mono text-xs" 
+      <label
+        htmlFor={inputId}
+        className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs"
+      >
+        {label}
+      </label>
+      <div className={`relative flex items-center bg-white border ${borderClass} rounded overflow-hidden focus-within:border-blue-500`}>
+        <input
+          id={inputId}
+          type={type}
+          step={step}
+          value={displayVal}
+          onChange={handleChange}
+          aria-invalid={errors.length > 0 || undefined}
+          aria-describedby={issues.length ? issueId : undefined}
+          className="pl-1 pr-1 py-0.5 w-full bg-transparent outline-none text-right font-mono text-xs"
         />
         {unitCat && UNIT_FACTORS[unitCat] ? (
-          <select 
-            value={localUnit} 
-            onChange={e => setLocalUnit(e.target.value)} 
+          <select
+            value={localUnit}
+            onChange={e => setLocalUnit(e.target.value)}
+            aria-label={`Unit for ${label}`}
             className="bg-[#f0f0f0] text-[#555] text-[10px] font-bold border-l border-[#ccc] px-1 py-0.5 outline-none cursor-pointer"
           >
             {Object.keys(UNIT_FACTORS[unitCat]).map(u => <option key={u} value={u}>{u}</option>)}
@@ -146,6 +212,21 @@ const InputBox = ({ label, value, onChange, suffix, step = "any", type = "number
           </span>
         )}
       </div>
+      {issues.length > 0 && (
+        <div id={issueId} className="col-span-2 -mt-0.5 mb-0.5 space-y-0.5">
+          {issues.map((i, idx) => (
+            <p
+              key={idx}
+              // Errors are announced immediately; warnings wait for a pause, so
+              // typing a value that is briefly invalid is not read out mid-edit.
+              role={i.severity === 'error' ? 'alert' : undefined}
+              className={`text-[10px] leading-snug ${i.severity === 'error' ? 'text-red-600' : 'text-amber-700'}`}
+            >
+              {i.message}
+            </p>
+          ))}
+        </div>
+      )}
     </>
   );
 };
@@ -207,27 +288,81 @@ export default function AppDesktop() {
   const [showPropellantEditor, setShowPropellantEditor] = useState(false);
   const [showGrainEditor, setShowGrainEditor] = useState(false);
 
-  // Propellant inputs (Current applied configuration)
-  const [density, setDensity] = useState<number>(1528);
-  const [a, setA] = useState<number>(8.40e-5); // SI (Pc in Pa); matches APCP default above
-  const [n, setN] = useState<number>(0.3);
-  const [molWeight, setMolWeight] = useState<number>(0.024);
-  const [kErosive, setKErosive] = useState<number>(0.001);
-  const [gThreshold, setGThreshold] = useState<number>(500.0);
-  const [T_ref, setTRef] = useState<number>(294.0);
-  const [sigma_p, setSigmaP] = useState<number>(0.001);
-  /**
-   * Piecewise burn-rate bands for the selected propellant, if it has any.
-   * Empty means the single a/n law, which is what a custom propellant gets.
-   */
-  const [burnRateRegimes, setBurnRateRegimes] = useState<BurnRateRegime[]>([]);
-  /**
-   * Name of the propellant currently loaded from the library.
+  /*
+   * Every design input, extracted into src/useMotorConfig.ts.
    *
-   * Only used to report model uncertainty, which differs sharply between a
-   * propellant measured against strand-burner data and one that never has been.
+   * Destructured back into the same identifiers this component has always used,
+   * so the several hundred call sites below are untouched. The point of the move
+   * is that the state is now reachable -- and testable -- without rendering the
+   * whole application, which it was not while it lived here as forty-odd
+   * useState calls.
    */
-  const [propellantName, setPropellantName] = useState<string>(DEFAULT_PROPELLANTS[0].name);
+  const {
+    density, setDensity,
+    a, setA,
+    n, setN,
+    molWeight, setMolWeight,
+    kErosive, setKErosive,
+    gThreshold, setGThreshold,
+    T_ref, setTRef,
+    sigma_p, setSigmaP,
+    T_init, setTInit,
+    burnRateRegimes, setBurnRateRegimes,
+    propellantName, setPropellantName,
+    grainType, setGrainType,
+    length, setLength,
+    outerRadius, setOuterRadius,
+    innerRadius, setInnerRadius,
+    valleyRadius, setValleyRadius,
+    tipRadius, setTipRadius,
+    numPoints, setNumPoints,
+    numSegments, setNumSegments,
+    offset, setOffset,
+    rodRadius, setRodRadius,
+    finDepth, setFinDepth,
+    finWidth, setFinWidth,
+    dxfData, setDxfData,
+    dxfFilename, setDxfFilename,
+    throatDiameter, setThroatDiameter,
+    expansionRatio, setExpansionRatio,
+    gamma, setGamma,
+    flameTemp, setFlameTemp,
+    nozzleMaterial, setNozzleMaterial,
+    cStarEff, setCStarEff,
+    cfEff, setCfEff,
+    erosiveModel, setErosiveModel,
+    solverModel, setSolverModel,
+    stationCount, setStationCount,
+    nozzleDensity, setNozzleDensity,
+    nozzleHeatOfAblation, setNozzleHeatOfAblation,
+    nozzleOxidationTemp, setNozzleOxidationTemp,
+    nozzleThermalShock, setNozzleThermalShock,
+    nozzleThermalConductivity, setNozzleThermalConductivity,
+    nozzleSpecificHeat, setNozzleSpecificHeat,
+    nozzleKTempCoeff, setNozzleKTempCoeff,
+    nozzleCpTempCoeff, setNozzleCpTempCoeff,
+    igniterMass, setIgniterMass,
+    igniterSurfaceArea, setIgniterSurfaceArea,
+    igniterDensity, setIgniterDensity,
+    igniterA, setIgniterA,
+    igniterN, setIgniterN,
+    caseWallThickness, setCaseWallThickness,
+    caseBoltEdgeDistance, setCaseBoltEdgeDistance,
+    casingMaterial, setCasingMaterial,
+    casingYieldStress, setCasingYieldStress,
+    casingYoungsModulus, setCasingYoungsModulus,
+    numBolts, setNumBolts,
+    boltDiameter, setBoltDiameter,
+    boltYieldStress, setBoltYieldStress,
+  } = useMotorConfig({
+    propellantName: DEFAULT_PROPELLANTS[0].name,
+    density: DEFAULT_PROPELLANTS[0].density,
+    a: DEFAULT_PROPELLANTS[0].a,
+    n: DEFAULT_PROPELLANTS[0].n,
+    molWeight: DEFAULT_PROPELLANTS[0].molWeight,
+  });
+
+  const dxfFileInputRef = React.useRef<HTMLInputElement>(null);
 
   /*
    * Editing a or n by hand drops any piecewise law.
@@ -246,78 +381,113 @@ export default function AppDesktop() {
   };
   const setBurnCoeffA = (v: number) => { setA(v); dropRegimesOnManualEdit(); };
   const setBurnExponentN = (v: number) => { setN(v); dropRegimesOnManualEdit(); };
-  const [T_init, setTInit] = useState<number>(294.0);
 
-  // Grain inputs
-  const [grainType, setGrainType] = useState<'Star' | 'BATES' | 'Tubular' | 'RodAndTube' | 'MoonBurner' | 'Finocyl' | 'CustomDXF'>('Star');
-  const [length, setLength] = useState<number>(0.5);
-  const [outerRadius, setOuterRadius] = useState<number>(0.05);
-  const [innerRadius, setInnerRadius] = useState<number>(0.02); // for BATES/Tubular/RodAndTube/MoonBurner/Finocyl core
-  const [valleyRadius, setValleyRadius] = useState<number>(0.03); // for Star
-  const [tipRadius, setTipRadius] = useState<number>(0.01); // for Star
-  const [numPoints, setNumPoints] = useState<number>(5); // for Star/Finocyl
-  const [numSegments, setNumSegments] = useState<number>(1); // for BATES
-  const [offset, setOffset] = useState<number>(0.01); // for MoonBurner
-  const [rodRadius, setRodRadius] = useState<number>(0.01); // for RodAndTube
-  const [finDepth, setFinDepth] = useState<number>(0.035); // for Finocyl
-  const [finWidth, setFinWidth] = useState<number>(0.01); // for Finocyl
-  
-  // Custom DXF state
-  const [dxfData, setDxfData] = useState<DXFRegressionResults | null>(null);
-  const [dxfFilename, setDxfFilename] = useState<string>('');
-  const dxfFileInputRef = React.useRef<HTMLInputElement>(null);
+  /*
+   * Live validation of the current design.
+   *
+   * The same rules that gate the Run button, evaluated on every change so the
+   * user sees a problem beside the field that caused it rather than in a modal
+   * after pressing Run. Pure and tested; see src/designValidation.ts.
+   */
+  const validationIssues = useMemo(
+    () =>
+      validateDesign({
+        grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius,
+        numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
+        hasDxf: !!dxfData,
+        density, a, n, throatDiameter, expansionRatio, flameTemp, gamma,
+      }),
+    [
+      grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius,
+      numPoints, numSegments, offset, rodRadius, finDepth, finWidth, dxfData,
+      density, a, n, throatDiameter, expansionRatio, flameTemp, gamma,
+    ]
+  );
+  const issuesFor = useMemo(() => byField(validationIssues), [validationIssues]);
+  const blockingIssues = useMemo(() => errorsOnly(validationIssues), [validationIssues]);
 
-  // Nozzle & Thermo inputs
-  const [throatDiameter, setThroatDiameter] = useState<number>(0.015);
-  const [expansionRatio, setExpansionRatio] = useState<number>(7.0);
-  const [gamma, setGamma] = useState<number>(1.2);
-  const [flameTemp, setFlameTemp] = useState<number>(3000);
-  const [nozzleMaterial, setNozzleMaterial] = useState<'Graphite' | 'Phenolic' | 'Custom'>('Graphite');
-  const [cStarEff, setCStarEff] = useState<number>(0.95);
-  const [cfEff, setCfEff] = useState<number>(0.98);
-  const [erosiveModel, setErosiveModel] = useState<'None' | 'Lenoir-Robillard' | 'JPL'>('Lenoir-Robillard');
+  /*
+   * Design snapshots for undo/redo.
+   *
+   * These live HIGH in the component on purpose. They used to sit several
+   * hundred lines further down, below callbacks that call them, which meant a
+   * correct dependency array would have referenced them before their const was
+   * initialised -- a temporal-dead-zone error at render. Declared here, every
+   * consumer below can depend on them honestly.
+   */
+  const captureDesignState = useCallback(() => ({
+      density, a, n, molWeight, kErosive, gThreshold, T_ref, sigma_p, T_init,
+      grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
+      throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
+      igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
+      casingMaterial, casingYieldStress, casingYoungsModulus
+  }), [
+      density, a, n, molWeight, kErosive, gThreshold,
+      grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
+      throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
+      igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
+      casingMaterial, casingYieldStress, casingYoungsModulus,
+      // Returned by this callback, so they belong here. Omitting them meant
+      // undo/redo restored whatever temperature settings were current when the
+      // callback was last rebuilt, rather than the ones being captured.
+      T_ref, sigma_p, T_init
+  ]);
 
-  // Solver model. 0-D is the default: it is the fast path, and for the short,
-  // fat grains most hobby motors use it is within a fraction of a percent of the
-  // axially resolved answer anyway.
-  const [solverModel, setSolverModel] = useState<SolverModelType>('0D');
-  const [stationCount, setStationCount] = useState<number>(20);
-  
-  // Custom Nozzle Thermo
-  const [nozzleDensity, setNozzleDensity] = useState<number>(1800);
-  const [nozzleHeatOfAblation, setNozzleHeatOfAblation] = useState<number>(25e6);
-  const [nozzleOxidationTemp, setNozzleOxidationTemp] = useState<number>(1500);
-  const [nozzleThermalShock, setNozzleThermalShock] = useState<number>(0.1);
-  const [nozzleThermalConductivity, setNozzleThermalConductivity] = useState<number>(100);
-  const [nozzleSpecificHeat, setNozzleSpecificHeat] = useState<number>(710);
-  const [nozzleKTempCoeff, setNozzleKTempCoeff] = useState<number>(-0.0001);
-  const [nozzleCpTempCoeff, setNozzleCpTempCoeff] = useState<number>(0.0002);
+  const applyDesignState = useCallback((config: DesignSnapshot) => {
+      applyNumber(config.density, setDensity);
+      applyNumber(config.a, setA);
+      applyNumber(config.n, setN);
+      applyNumber(config.molWeight, setMolWeight);
+      applyNumber(config.kErosive, setKErosive);
+      applyNumber(config.gThreshold, setGThreshold);
+      applyNumber(config.T_ref, setTRef);
+      applyNumber(config.sigma_p, setSigmaP);
+      applyNumber(config.T_init, setTInit);
+      applyEnum(config.grainType, GRAIN_TYPES, setGrainType);
+      applyNumber(config.length, setLength);
+      applyNumber(config.outerRadius, setOuterRadius);
+      applyNumber(config.innerRadius, setInnerRadius);
+      applyNumber(config.valleyRadius, setValleyRadius);
+      applyNumber(config.tipRadius, setTipRadius);
+      applyNumber(config.numPoints, setNumPoints);
+      applyNumber(config.numSegments, setNumSegments);
+      applyNumber(config.offset, setOffset);
+      applyNumber(config.rodRadius, setRodRadius);
+      applyNumber(config.finDepth, setFinDepth);
+      applyNumber(config.finWidth, setFinWidth);
+      applyNumber(config.throatDiameter, setThroatDiameter);
+      applyNumber(config.expansionRatio, setExpansionRatio);
+      applyNumber(config.gamma, setGamma);
+      applyNumber(config.flameTemp, setFlameTemp);
+      applyEnum(config.nozzleMaterial, NOZZLE_MATERIALS, setNozzleMaterial);
+      applyNumber(config.igniterMass, setIgniterMass);
+      applyNumber(config.igniterSurfaceArea, setIgniterSurfaceArea);
+      applyNumber(config.igniterDensity, setIgniterDensity);
+      applyNumber(config.igniterA, setIgniterA);
+      applyNumber(config.igniterN, setIgniterN);
+      applyEnum(config.casingMaterial, CASING_MATERIALS, setCasingMaterial);
+      applyNumber(config.casingYieldStress, setCasingYieldStress);
+      applyNumber(config.casingYoungsModulus, setCasingYoungsModulus);
+    /*
+     * The setters. They come from useMotorConfig rather than a useState call in
+     * this component, so ESLint cannot see that React guarantees their identity
+     * is stable and asks for them by name. Listing them is truthful and costs
+     * nothing at runtime -- and if one is ever replaced by a non-stable
+     * function, this memo will correctly start invalidating.
+     */
+  }, [setA, setCasingMaterial, setCasingYieldStress, setCasingYoungsModulus, setDensity,
+    setExpansionRatio, setFinDepth, setFinWidth, setFlameTemp, setGThreshold, setGamma,
+    setGrainType, setIgniterA, setIgniterDensity, setIgniterMass, setIgniterN,
+    setIgniterSurfaceArea, setInnerRadius, setKErosive, setLength, setMolWeight, setN,
+    setNozzleMaterial, setNumPoints, setNumSegments, setOffset, setOuterRadius, setRodRadius,
+    setSigmaP, setTInit, setTRef, setThroatDiameter, setTipRadius, setValleyRadius,
+  ]);
 
-  // Igniter & Casing inputs
-  const [igniterMass, setIgniterMass] = useState<number>(0.05);
-  const [igniterSurfaceArea, setIgniterSurfaceArea] = useState<number>(0.01);
-  const [igniterDensity, setIgniterDensity] = useState<number>(1900);
-  const [igniterA, setIgniterA] = useState<number>(1e-4);
-  const [igniterN, setIgniterN] = useState<number>(0.4);
-  // Actual wall to analyse. The thin-wall sizing rule gives a starting point
-  // (metrics.requiredThickness) but the real stress state depends on the wall
-  // you actually build, so it is an input rather than a derived value.
-  const [caseWallThickness, setCaseWallThickness] = useState<number>(0.003);
-  const [caseBoltEdgeDistance, setCaseBoltEdgeDistance] = useState<number>(0.0075);
-  const [casingMaterial, setCasingMaterial] = useState<'Al 6061-T6' | 'Steel 4130' | 'Carbon Composite' | 'Custom'>('Al 6061-T6');
-  const [casingYieldStress, setCasingYieldStress] = useState<number>(276); // MPa
-  const [casingYoungsModulus, setCasingYoungsModulus] = useState<number>(69); // GPa
+  const designHistory = useDesignHistory(captureDesignState, applyDesignState);
+  const pushHistory = designHistory.push;
+  const handleUndo = designHistory.undo;
+  const handleRedo = designHistory.redo;
 
-  // Bolted Closure
-  const [numBolts, setNumBolts] = useState<number>(6);
-  const [boltDiameter, setBoltDiameter] = useState<number>(0.005);
-  const [boltYieldStress, setBoltYieldStress] = useState<number>(400); // MPa
-
-  const CASING_ALLOYS = {
-    'Al 6061-T6': { y: 276, m: 69 },
-    'Steel 4130': { y: 435, m: 205 },
-    'Carbon Composite': { y: 800, m: 150 }
-  };
 
   const handleCasingChange = (val: string) => {
     setCasingMaterial(val as any);
@@ -486,44 +656,19 @@ export default function AppDesktop() {
   const runSimulation = () => {
     pushHistory();
     addLog('Validating parameters...');
-    if (outerRadius <= 0 || innerRadius < 0 || length <= 0) {
-      addLog('Error: Invalid geometry dimensions.');
-      alert('Invalid Geometry: Dimensions must be greater than zero.');
-      return;
-    }
-    if ((grainType === 'BATES' || grainType === 'Tubular' || grainType === 'MoonBurner' || grainType === 'Finocyl') && innerRadius >= outerRadius) {
-      addLog('Error: Inner radius cannot be larger than or equal to outer radius.');
-      alert('Invalid Geometry: Inner radius must be smaller than outer radius.');
-      return;
-    }
-    if (grainType === 'Finocyl' && (innerRadius + finDepth >= outerRadius || finDepth <= 0)) {
-      addLog('Error: Finocyl fin dimensions overlap casing or core incorrectly.');
-      alert('Invalid Geometry: Finocyl fin must be bounded between core and casing correctly.');
-      return;
-    }
-    if (grainType === 'MoonBurner' && innerRadius + offset > outerRadius) {
-      addLog('Error: MoonBurner core port intersects casing initially.');
-      alert('Invalid Geometry: MoonBurner core port cannot intersect casing initially.');
-      return;
-    }
-    if (grainType === 'RodAndTube' && (rodRadius >= innerRadius || innerRadius >= outerRadius)) {
-      addLog('Error: RodAndTube dimensions invalid.');
-      alert('Invalid Geometry: Rod radius must be < inner radius < outer radius.');
-      return;
-    }
-    if (grainType === 'Star' && (valleyRadius >= outerRadius || tipRadius >= valleyRadius)) {
-      addLog('Error: Invalid Star dimensions.');
-      alert('Invalid Geometry: Check Star valley and tip radii combinations.');
-      return;
-    }
-    if (grainType === 'CustomDXF' && !dxfData) {
-      addLog('Error: No DXF file loaded.');
-      alert('Invalid Geometry: Please load a DXF file first.');
-      return;
-    }
-    if (density <= 0 || a <= 0 || throatDiameter <= 0) {
-      addLog('Error: Density, a, and throat diameter must be > 0.');
-      alert('Invalid Parameters: Density, a, and Throat Diameter must be > 0.');
+
+    /*
+     * One gate, shared with the inline field errors.
+     *
+     * This used to be nine separate checks, each ending in an alert() and a
+     * return -- so the user was told about one problem at a time, by a modal,
+     * only after pressing Run. Now the same rules have already been shown
+     * beside the offending fields, and this just refuses to start.
+     */
+    if (blockingIssues.length > 0) {
+      addLog(`Cannot run: ${blockingIssues.length} problem${blockingIssues.length > 1 ? 's' : ''} with the design.`);
+      for (const issue of blockingIssues) addLog(`  - ${issue.message}`);
+      setStatusMsg('Fix the highlighted inputs before running.');
       return;
     }
 
@@ -1186,7 +1331,14 @@ export default function AppDesktop() {
     }
     setThroatDiameter(d.throat_diameter);
     setExpansionRatio(d.expansion_ratio);
-  }, []);
+    // pushHistory is now declared above this callback (it moved into
+    // useDesignHistory), so depending on it here is finally possible -- it used
+    // to be a temporal-dead-zone error. Setters are listed for the reason given
+    // on applyDesignState above.
+  }, [pushHistory, setExpansionRatio, setFinDepth, setFinWidth, setInnerRadius, setLength,
+    setNumPoints, setOffset, setOuterRadius, setRodRadius, setThroatDiameter, setTipRadius,
+    setValleyRadius,
+  ]);
 
   /** Station profiles reshaped for the axial chart. Empty after a 0-D run. */
   const axialData = useMemo(() => {
@@ -1361,97 +1513,9 @@ export default function AppDesktop() {
   };
 
   const [showOptimizer, setShowOptimizer] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const burnsimFileInputRef = useRef<HTMLInputElement>(null);
 
-  const captureDesignState = useCallback(() => ({
-      density, a, n, molWeight, kErosive, gThreshold, T_ref, sigma_p, T_init,
-      grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
-      throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
-      igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
-      casingMaterial, casingYieldStress, casingYoungsModulus
-  }), [
-      density, a, n, molWeight, kErosive, gThreshold,
-      grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
-      throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
-      igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
-      casingMaterial, casingYieldStress, casingYoungsModulus,
-      // Returned by this callback, so they belong here. Omitting them meant
-      // undo/redo restored whatever temperature settings were current when the
-      // callback was last rebuilt, rather than the ones being captured.
-      T_ref, sigma_p, T_init
-  ]);
 
-  const applyDesignState = (config: any) => {
-      if (config.density !== undefined) setDensity(config.density);
-      if (config.a !== undefined) setA(config.a);
-      if (config.n !== undefined) setN(config.n);
-      if (config.molWeight !== undefined) setMolWeight(config.molWeight);
-      if (config.kErosive !== undefined) setKErosive(config.kErosive);
-      if (config.gThreshold !== undefined) setGThreshold(config.gThreshold);
-      if (config.T_ref !== undefined) setTRef(config.T_ref);
-      if (config.sigma_p !== undefined) setSigmaP(config.sigma_p);
-      if (config.T_init !== undefined) setTInit(config.T_init);
-      if (config.grainType !== undefined) setGrainType(config.grainType);
-      if (config.length !== undefined) setLength(config.length);
-      if (config.outerRadius !== undefined) setOuterRadius(config.outerRadius);
-      if (config.innerRadius !== undefined) setInnerRadius(config.innerRadius);
-      if (config.valleyRadius !== undefined) setValleyRadius(config.valleyRadius);
-      if (config.tipRadius !== undefined) setTipRadius(config.tipRadius);
-      if (config.numPoints !== undefined) setNumPoints(config.numPoints);
-      if (config.numSegments !== undefined) setNumSegments(config.numSegments);
-      if (config.offset !== undefined) setOffset(config.offset);
-      if (config.rodRadius !== undefined) setRodRadius(config.rodRadius);
-      if (config.finDepth !== undefined) setFinDepth(config.finDepth);
-      if (config.finWidth !== undefined) setFinWidth(config.finWidth);
-      if (config.throatDiameter !== undefined) setThroatDiameter(config.throatDiameter);
-      if (config.expansionRatio !== undefined) setExpansionRatio(config.expansionRatio);
-      if (config.gamma !== undefined) setGamma(config.gamma);
-      if (config.flameTemp !== undefined) setFlameTemp(config.flameTemp);
-      if (config.nozzleMaterial !== undefined) setNozzleMaterial(config.nozzleMaterial);
-      if (config.igniterMass !== undefined) setIgniterMass(config.igniterMass);
-      if (config.igniterSurfaceArea !== undefined) setIgniterSurfaceArea(config.igniterSurfaceArea);
-      if (config.igniterDensity !== undefined) setIgniterDensity(config.igniterDensity);
-      if (config.igniterA !== undefined) setIgniterA(config.igniterA);
-      if (config.igniterN !== undefined) setIgniterN(config.igniterN);
-      if (config.casingMaterial !== undefined) setCasingMaterial(config.casingMaterial);
-      if (config.casingYieldStress !== undefined) setCasingYieldStress(config.casingYieldStress);
-      if (config.casingYoungsModulus !== undefined) setCasingYoungsModulus(config.casingYoungsModulus);
-  };
-
-  useEffect(() => {
-     if (history.length === 0) {
-        setHistory([captureDesignState()]);
-        setHistoryIndex(0);
-     }
-  }, [history.length, captureDesignState]);
-
-  const pushHistory = useCallback(() => {
-    setHistory(prev => {
-        const snap = captureDesignState();
-        const nextHist = prev.slice(0, historyIndex + 1);
-        nextHist.push(snap);
-        return nextHist;
-    });
-    setHistoryIndex(i => i + 1);
-  }, [captureDesignState, historyIndex]);
-
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      const idx = historyIndex - 1;
-      setHistoryIndex(idx);
-      applyDesignState(history[idx]);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const idx = historyIndex + 1;
-      setHistoryIndex(idx);
-      applyDesignState(history[idx]);
-    }
-  };
 
   const handleSaveBurnsim = () => {
     const xml = exportBurnsimXML(captureDesignState());
@@ -1835,10 +1899,10 @@ export default function AppDesktop() {
         </button>
         <div className="w-px h-5 bg-[#ccc] mx-1"></div>
         
-        <button onClick={handleUndo} disabled={historyIndex <= 0} className={`p-1.5 border hover:bg-[#e0e0e0] rounded flex items-center text-xs ${historyIndex <= 0 ? 'opacity-50 cursor-not-allowed border-transparent' : 'border-transparent hover:border-[#ccc]'}`}>
+        <button onClick={handleUndo} disabled={!designHistory.canUndo} className={`p-1.5 border hover:bg-[#e0e0e0] rounded flex items-center text-xs ${!designHistory.canUndo ? 'opacity-50 cursor-not-allowed border-transparent' : 'border-transparent hover:border-[#ccc]'}`}>
           <Undo size={14} className="mr-1 text-[#555]" /> Undo
         </button>
-        <button onClick={handleRedo} disabled={historyIndex >= history.length - 1} className={`p-1.5 border hover:bg-[#e0e0e0] rounded flex items-center text-xs ${historyIndex >= history.length - 1 ? 'opacity-50 cursor-not-allowed border-transparent' : 'border-transparent hover:border-[#ccc]'}`}>
+        <button onClick={handleRedo} disabled={!designHistory.canRedo} className={`p-1.5 border hover:bg-[#e0e0e0] rounded flex items-center text-xs ${!designHistory.canRedo ? 'opacity-50 cursor-not-allowed border-transparent' : 'border-transparent hover:border-[#ccc]'}`}>
           <Redo size={14} className="mr-1 text-[#555]" /> Redo
         </button>
         <div className="w-px h-5 bg-[#ccc] mx-1"></div>
@@ -1875,9 +1939,9 @@ export default function AppDesktop() {
                 <button onClick={() => setShowPropellantEditor(true)} className="text-[#0056b3] hover:underline decoration-[#0056b3] lowercase font-normal">(library)</button>
               </div>
               <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
-                <InputBox label="Density" value={density} onChange={setDensity} suffix="kg/m³" unitCat="Density" />
-                <InputBox label="Burn Coeff (a)" value={a} onChange={setBurnCoeffA} suffix="" />
-                <InputBox label="Pressure Exp (n)" value={n} onChange={setBurnExponentN} suffix="" />
+                <InputBox label="Density" value={density} onChange={setDensity} suffix="kg/m³" unitCat="Density" issues={issuesFor.get('density')} />
+                <InputBox label="Burn Coeff (a)" value={a} onChange={setBurnCoeffA} suffix="" issues={issuesFor.get('a')} />
+                <InputBox label="Pressure Exp (n)" value={n} onChange={setBurnExponentN} suffix="" issues={issuesFor.get('n')} />
                 {burnRateRegimes.length > 0 && (
                   <div className="col-span-2 text-[10px] text-[#00ffaa] leading-snug -mt-0.5 mb-0.5">
                     Measured {burnRateRegimes.length}-band burn law active
@@ -1955,8 +2019,8 @@ export default function AppDesktop() {
                   <option value="CustomDXF">Custom DXF Profile</option>
                 </select>
                 
-                <InputBox label="Length" value={length} onChange={setLength} suffix="mm" unitCat="Length" />
-                <InputBox label="Outer Rad" value={outerRadius} onChange={setOuterRadius} suffix="mm" unitCat="Length" />
+                <InputBox label="Length" value={length} onChange={setLength} suffix="mm" unitCat="Length" issues={issuesFor.get('length')} />
+                <InputBox label="Outer Rad" value={outerRadius} onChange={setOuterRadius} suffix="mm" unitCat="Length" issues={issuesFor.get('outerRadius')} />
                 
                 {grainType === 'CustomDXF' && (
                   <div className="col-span-2 pt-1 border-t border-[#eee] mt-1 space-y-1">
@@ -1973,28 +2037,28 @@ export default function AppDesktop() {
                 
                 {grainType === 'Star' && (
                   <>
-                    <InputBox label="Valley Rad" value={valleyRadius} onChange={setValleyRadius} suffix="mm" unitCat="Length" />
-                    <InputBox label="Tip Rad" value={tipRadius} onChange={setTipRadius} suffix="mm" unitCat="Length" />
-                    <InputBox label="Points" value={numPoints} onChange={setNumPoints} suffix="" />
+                    <InputBox label="Valley Rad" value={valleyRadius} onChange={setValleyRadius} suffix="mm" unitCat="Length" issues={issuesFor.get('valleyRadius')} />
+                    <InputBox label="Tip Rad" value={tipRadius} onChange={setTipRadius} suffix="mm" unitCat="Length" issues={issuesFor.get('tipRadius')} />
+                    <InputBox label="Points" value={numPoints} onChange={setNumPoints} suffix="" issues={issuesFor.get('numPoints')} />
                   </>
                 )}
                 {(grainType === 'BATES' || grainType === 'Tubular' || grainType === 'RodAndTube' || grainType === 'MoonBurner' || grainType === 'Finocyl') && (
-                  <InputBox label={grainType === 'RodAndTube' ? "Tube Inner Rad" : grainType === 'MoonBurner' ? "Core Radius" : grainType === 'Finocyl' ? "Core Radius" : "Inner Rad"} value={innerRadius} onChange={setInnerRadius} suffix="mm" unitCat="Length" />
+                  <InputBox label={grainType === 'RodAndTube' ? "Tube Inner Rad" : grainType === 'MoonBurner' ? "Core Radius" : grainType === 'Finocyl' ? "Core Radius" : "Inner Rad"} value={innerRadius} onChange={setInnerRadius} suffix="mm" unitCat="Length" issues={issuesFor.get('innerRadius')} />
                 )}
                 {grainType === 'BATES' && (
-                  <InputBox label="Segments" value={numSegments} onChange={setNumSegments} suffix="" />
+                  <InputBox label="Segments" value={numSegments} onChange={setNumSegments} suffix="" issues={issuesFor.get('numSegments')} />
                 )}
                 {grainType === 'RodAndTube' && (
-                  <InputBox label="Rod Radius" value={rodRadius} onChange={setRodRadius} suffix="mm" unitCat="Length" />
+                  <InputBox label="Rod Radius" value={rodRadius} onChange={setRodRadius} suffix="mm" unitCat="Length" issues={issuesFor.get('rodRadius')} />
                 )}
                 {grainType === 'MoonBurner' && (
-                  <InputBox label="Offset" value={offset} onChange={setOffset} suffix="mm" unitCat="Length" />
+                  <InputBox label="Offset" value={offset} onChange={setOffset} suffix="mm" unitCat="Length" issues={issuesFor.get('offset')} />
                 )}
                 {grainType === 'Finocyl' && (
                   <>
-                    <InputBox label="Fin Depth" value={finDepth} onChange={setFinDepth} suffix="mm" unitCat="Length" />
-                    <InputBox label="Fin Width" value={finWidth} onChange={setFinWidth} suffix="mm" unitCat="Length" />
-                    <InputBox label="Fins" value={numPoints} onChange={setNumPoints} suffix="" />
+                    <InputBox label="Fin Depth" value={finDepth} onChange={setFinDepth} suffix="mm" unitCat="Length" issues={issuesFor.get('finDepth')} />
+                    <InputBox label="Fin Width" value={finWidth} onChange={setFinWidth} suffix="mm" unitCat="Length" issues={issuesFor.get('finWidth')} />
+                    <InputBox label="Fins" value={numPoints} onChange={setNumPoints} suffix="" issues={issuesFor.get('numPoints')} />
                   </>
                 )}
                 
@@ -2011,10 +2075,10 @@ export default function AppDesktop() {
             <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-3 bg-[#fafafa]">
               <span className="absolute -top-2.5 left-2 bg-[#fafafa] px-1 text-[10px] font-bold text-[#666] uppercase">Nozzle & Thermo</span>
               <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
-                <InputBox label="Throat Diam" value={throatDiameter} onChange={setThroatDiameter} suffix="mm" unitCat="Length" />
-                <InputBox label="Exp Ratio" value={expansionRatio} onChange={setExpansionRatio} suffix="" />
-                <InputBox label="Gamma (γ)" value={gamma} onChange={setGamma} suffix="" />
-                <InputBox label="Flame Temp" value={flameTemp} onChange={setFlameTemp} suffix="K" unitCat="Temperature" />
+                <InputBox label="Throat Diam" value={throatDiameter} onChange={setThroatDiameter} suffix="mm" unitCat="Length" issues={issuesFor.get('throatDiameter')} />
+                <InputBox label="Exp Ratio" value={expansionRatio} onChange={setExpansionRatio} suffix="" issues={issuesFor.get('expansionRatio')} />
+                <InputBox label="Gamma (γ)" value={gamma} onChange={setGamma} suffix="" issues={issuesFor.get('gamma')} />
+                <InputBox label="Flame Temp" value={flameTemp} onChange={setFlameTemp} suffix="K" unitCat="Temperature" issues={issuesFor.get('flameTemp')} />
                 <InputBox label="Init Temp" value={T_init} onChange={setTInit} suffix="K" unitCat="Temperature" />
                 
                 <InputBox label="C* Efficiency" value={cStarEff} onChange={setCStarEff} step={0.01} suffix="" />
@@ -2166,6 +2230,20 @@ export default function AppDesktop() {
               </div>
             )}
 
+            {/*
+              * One boundary around the tab content, keyed on the active tab.
+              *
+              * There were no error boundaries anywhere, so a single bad value
+              * reaching one chart -- a NaN axis domain, an undefined field on
+              * a results row -- unmounted the whole tree and took the user's
+              * unsaved design with it.
+              *
+              * Keyed rather than ten separate boundaries: a key change
+              * remounts, so switching tabs clears a failed one automatically
+              * and the user is never stuck on a broken panel with no way back.
+              * The toolbar, sidebar and console live outside it and survive.
+              */}
+            <ErrorBoundary label={`The ${activeTab} tab`} onError={addLog} key={activeTab}>
             {/* TAB: BALLISTICS */}
             {activeTab === 'ballistics' && (
               <div className="flex-1 flex flex-col space-y-1">
@@ -3118,6 +3196,7 @@ export default function AppDesktop() {
               </div>
             )}
             
+            </ErrorBoundary>
           </div>
         </div>
       </div>

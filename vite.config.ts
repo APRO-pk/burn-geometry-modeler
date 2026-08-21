@@ -13,6 +13,14 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    test: {
+      // jsdom only for the React hook tests. Everything else -- the physics
+      // parity suite, the surrogate, the validation fixtures -- is plain Node
+      // and would only be slowed down by a DOM, so the environment is chosen
+      // per file with a /** @vitest-environment jsdom */ docblock rather than
+      // globally.
+      environment: "node",
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
