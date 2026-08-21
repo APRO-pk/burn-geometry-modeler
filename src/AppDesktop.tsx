@@ -29,6 +29,9 @@ import { GrainEditor } from './GrainEditor';
 import { exportBurnsimXML, parseBurnsimXML } from './BurnsimHandler';
 import { OptimizerDialog } from './OptimizerDialog';
 import { SurrogatePanel } from './SurrogatePanel';
+// three.js is ~150 kB gzipped and only this tab needs it, so it is code-split
+// rather than carried by everyone who opens the app.
+const GrainBurn3D = React.lazy(() => import('./GrainBurn3D'));
 import type { SurrogateGrain } from './surrogate/features';
 
 // Unit Conversion Factors mapping to base SI units
@@ -279,7 +282,7 @@ export default function AppDesktop() {
   const [metrics, setMetrics] = useState<any>(null);
   const [visualizerIndex, setVisualizerIndex] = useState<number>(0);
   const [statusMsg, setStatusMsg] = useState<string>('System Ready');
-  const [activeTab, setActiveTab] = useState<'ballistics' | 'extended_graphs' | 'geometry' | 'thermo' | 'montecarlo' | 'structural' | 'materials' | 'statistics' | 'surrogate'>('ballistics');
+  const [activeTab, setActiveTab] = useState<'ballistics' | 'extended_graphs' | 'geometry' | 'thermo' | 'montecarlo' | 'structural' | 'materials' | 'statistics' | 'surrogate' | 'burn3d'>('ballistics');
 
   // Monte Carlo State
   const [mcRuns, setMcRuns] = useState<number>(50);
@@ -1005,6 +1008,21 @@ export default function AppDesktop() {
    * panel's prediction effect only re-fires when a value the model actually
    * consumes changes, not on every unrelated render.
    */
+  /**
+   * The grain alone, for the 3-D view. Built through the same
+   * grainConfigFromUi the solver and the surrogate use, so the shape on screen
+   * is the shape being simulated rather than a second interpretation of the
+   * same inputs.
+   */
+  const burn3dGrain = useMemo(
+    () => grainConfigFromUi(grainUiParams(), dxfData) as SurrogateGrain,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius,
+      numPoints, rodRadius, offset, finWidth, finDepth, dxfData,
+    ]
+  );
+
   const surrogateDesign = useMemo(
     () => ({
       // The surrogate takes the grain itself, not a flat parameter list: it
@@ -1995,7 +2013,8 @@ export default function AppDesktop() {
               { id: 'materials', label: 'Material Properties' },
               { id: 'montecarlo', label: 'Monte Carlo' },
               { id: 'structural', label: 'Structural Analysis' },
-              { id: 'surrogate', label: 'Surrogate (fast)' }
+              { id: 'surrogate', label: 'Surrogate (fast)' },
+              { id: 'burn3d', label: '3D Burn' }
             ].map(tab => (
               <button 
                 key={tab.id}
@@ -2849,6 +2868,26 @@ export default function AppDesktop() {
             )}
 
             {/* TAB: STATISTICS */}
+            {/* TAB: 3D BURN */}
+            {activeTab === 'burn3d' && (
+              <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
+                <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">
+                  Live Grain Burn-Back
+                </div>
+                {grainType === 'CustomDXF' && !dxfData ? (
+                  <div className="text-[#666] italic font-mono text-xs mt-6">
+                    Load a DXF profile to view its burn-back.
+                  </div>
+                ) : (
+                  <React.Suspense
+                    fallback={<div className="text-[#666] italic font-mono text-xs mt-6">Loading 3D view…</div>}
+                  >
+                    <GrainBurn3D grain={burn3dGrain} results={results} />
+                  </React.Suspense>
+                )}
+              </div>
+            )}
+
             {/* TAB: SURROGATE */}
             {activeTab === 'surrogate' && (
               <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">

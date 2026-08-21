@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
+    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^5.0.4",
     "clipper-lib": "^6.4.2",
     "dxf-parser": "^1.1.2",
@@ -26,6 +27,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
+    "three": "^0.185.1",
     "vite": "^6.2.0"
   },
   "devDependencies": {

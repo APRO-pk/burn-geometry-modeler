@@ -6,6 +6,15 @@ export interface DXFRegressionResults {
   perimTable: number[];
   areaTable: number[];
   outerRadius: number;
+  /**
+   * The traced port profile itself, in metres.
+   *
+   * The regression tables above are all the SOLVER needs, but drawing the grain
+   * needs the shape they were computed from -- and it cannot be recovered from
+   * areas and perimeters. Kept so src/grainOutline.ts can burn a Custom DXF
+   * profile back like any other geometry.
+   */
+  basePolygon: Array<Array<{ x: number; y: number }>>;
 }
 
 const SCALE = 1000000.0;
@@ -118,5 +127,8 @@ export function processDXF(dxfText: string, maxRadius: number, dx: number): DXFR
   perimTable.push(0);
   areaTable.push(Math.PI * maxRadius * maxRadius);
 
-  return { dx, perimTable, areaTable, outerRadius: maxRadius };
+  const basePolygon = initialPort.map((path) =>
+    path.map((pt) => ({ x: pt.X / SCALE, y: pt.Y / SCALE }))
+  );
+  return { dx, perimTable, areaTable, outerRadius: maxRadius, basePolygon };
 }

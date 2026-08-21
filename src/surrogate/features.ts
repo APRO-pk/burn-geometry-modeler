@@ -140,6 +140,8 @@ export type SurrogateGrain =
       dx: number;
       perim_table: number[];
       area_table: number[];
+      /** Traced profile, for drawing. Not used by the solver or the surrogate. */
+      base_polygon?: Array<Array<{ x: number; y: number }>>;
     };
 
 export type GrainKind = SurrogateGrain['kind'];
