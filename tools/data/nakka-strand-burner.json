@@ -1,0 +1,206 @@
+{
+ "source": {
+  "title": "Effect of Chamber Pressure on Burning Rate for the Potassium Nitrate - Dextrose and Potassium Nitrate - Sorbitol Rocket Propellants",
+  "author": "Richard Nakka",
+  "date": "1999-06",
+  "issue": 1,
+  "site": "https://www.nakka-rocketry.net/",
+  "file": "ds_burn.txt",
+  "tables": "Tables 2 and 3 (measurements), Tables 4 and 5 (piecewise fits)"
+ },
+ "method": {
+  "apparatus": "Strand burner",
+  "oxidiserFuelRatio": "65/35",
+  "note": "Strand burner, not motor firings. These are burn RATES at controlled vessel pressure, so they validate the burn-rate law directly but carry no grain geometry, thrust, or motor pressure trace.",
+  "erosiveBurning": "Nakka notes these results exclude erosive burning, which he reports as insignificant above a port-to-throat area ratio of about 6."
+ },
+ "units": {
+  "pressure": "MPa absolute",
+  "burnRate": "cm/s",
+  "fitA": "mm/s at 1 MPa",
+  "fitN": "dimensionless"
+ },
+ "extractedAt": "2026-08-21T21:13:52.638Z",
+ "propellants": {
+  "KN-Dextrose": {
+   "measurements": [
+    {
+     "pressureMPa": 0.101,
+     "burnRateCmS": 0.215
+    },
+    {
+     "pressureMPa": 0.777,
+     "burnRateCmS": 0.759
+    },
+    {
+     "pressureMPa": 1.12,
+     "burnRateCmS": 0.751
+    },
+    {
+     "pressureMPa": 1.64,
+     "burnRateCmS": 0.754
+    },
+    {
+     "pressureMPa": 2.34,
+     "burnRateCmS": 0.798
+    },
+    {
+     "pressureMPa": 3.03,
+     "burnRateCmS": 0.83
+    },
+    {
+     "pressureMPa": 3.7,
+     "burnRateCmS": 0.932
+    },
+    {
+     "pressureMPa": 4.59,
+     "burnRateCmS": 1.1
+    },
+    {
+     "pressureMPa": 5.93,
+     "burnRateCmS": 1.308
+    },
+    {
+     "pressureMPa": 6.67,
+     "burnRateCmS": 1.314
+    },
+    {
+     "pressureMPa": 7.99,
+     "burnRateCmS": 1.285
+    },
+    {
+     "pressureMPa": 8.5,
+     "burnRateCmS": 1.232
+    },
+    {
+     "pressureMPa": 9.79,
+     "burnRateCmS": 1.3
+    },
+    {
+     "pressureMPa": 11.2,
+     "burnRateCmS": 1.392
+    }
+   ],
+   "nakkaFits": [
+    {
+     "fromMPa": 0.103,
+     "toMPa": 0.779,
+     "a": 8.88,
+     "n": 0.619
+    },
+    {
+     "fromMPa": 0.779,
+     "toMPa": 2.57,
+     "a": 7.55,
+     "n": -0.009
+    },
+    {
+     "fromMPa": 2.57,
+     "toMPa": 5.93,
+     "a": 3.84,
+     "n": 0.688
+    },
+    {
+     "fromMPa": 5.93,
+     "toMPa": 8.5,
+     "a": 17.2,
+     "n": -0.148
+    },
+    {
+     "fromMPa": 8.5,
+     "toMPa": 11.2,
+     "a": 4.78,
+     "n": 0.442
+    }
+   ]
+  },
+  "KN-Sorbitol": {
+   "measurements": [
+    {
+     "pressureMPa": 0.101,
+     "burnRateCmS": 0.256
+    },
+    {
+     "pressureMPa": 0.756,
+     "burnRateCmS": 0.898
+    },
+    {
+     "pressureMPa": 0.808,
+     "burnRateCmS": 0.937
+    },
+    {
+     "pressureMPa": 1.43,
+     "burnRateCmS": 0.784
+    },
+    {
+     "pressureMPa": 1.5,
+     "burnRateCmS": 0.781
+    },
+    {
+     "pressureMPa": 2.18,
+     "burnRateCmS": 0.765
+    },
+    {
+     "pressureMPa": 2.87,
+     "burnRateCmS": 0.792
+    },
+    {
+     "pressureMPa": 3.79,
+     "burnRateCmS": 0.765
+    },
+    {
+     "pressureMPa": 4.65,
+     "burnRateCmS": 0.952
+    },
+    {
+     "pressureMPa": 5.83,
+     "burnRateCmS": 0.977
+    },
+    {
+     "pressureMPa": 7.03,
+     "burnRateCmS": 1.102
+    },
+    {
+     "pressureMPa": 8.33,
+     "burnRateCmS": 1.091
+    },
+    {
+     "pressureMPa": 10.67,
+     "burnRateCmS": 1.129
+    }
+   ],
+   "nakkaFits": [
+    {
+     "fromMPa": 0.103,
+     "toMPa": 0.807,
+     "a": 10.71,
+     "n": 0.625
+    },
+    {
+     "fromMPa": 0.807,
+     "toMPa": 1.5,
+     "a": 8.763,
+     "n": -0.314
+    },
+    {
+     "fromMPa": 1.5,
+     "toMPa": 3.79,
+     "a": 7.852,
+     "n": -0.013
+    },
+    {
+     "fromMPa": 3.79,
+     "toMPa": 7.03,
+     "a": 3.907,
+     "n": 0.535
+    },
+    {
+     "fromMPa": 7.03,
+     "toMPa": 10.67,
+     "a": 9.653,
+     "n": 0.064
+    }
+   ]
+  }
+ }
+}

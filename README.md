@@ -60,6 +60,54 @@ and set by how *progressive* the grain burns, so matching the real distribution
 means the burn-back model produces traces shaped like real hardware — the only
 place certified data constrains the geometry side of the model.
 
+### Burn rate against measured strand-burner data
+
+The certified-motor data above constrains model *outputs*. Richard Nakka
+measured burn rate directly against chamber pressure and published the raw
+points, which constrains the most important *input*:
+
+> "Effect of Chamber Pressure on Burning Rate for the Potassium Nitrate -
+> Dextrose and Potassium Nitrate - Sorbitol Rocket Propellants",
+> R. Nakka, June 1999, Tables 2–5. 65/35 O/F, strand burner.
+
+`src/burnRate.validation.test.ts` checks the shipped propellant library against
+those 27 measured points. The fixture is *parsed* from the source by
+`tools/extractNakkaBurnRate.mts`, never hand-typed.
+
+| Propellant | Shipped coefficients | Mean error ≥1 MPa | Best a single power law can do |
+| --- | --- | --- | --- |
+| KNDX | a=4.77e-5, n=0.35 | **6.2%** | 6.1% |
+| KNSB | a=6.01e-5, n=0.32 | **13.8%** | 5.4% |
+
+**KNDX is calibrated about as well as the model form allows** — within a
+percentage point of the optimal single power law. Nothing to gain by re-fitting.
+
+**KNSB systematically under-predicts.** Every measured point above 0.75 MPa comes
+out low, worst −28.5%. The bias has a direction: burn rate too slow means burn
+time too long and chamber pressure too **low** — the unsafe direction for sizing
+a pressure vessel. Re-fitting to this data (a=3.63e-4, n=0.212) would roughly
+halve the error. Not changed here: Nakka’s data is one formulation at 65/35, and
+swapping shipped coefficients is a judgement call for the project owner.
+
+### A structural limit, not a calibration error
+
+Measured burn rate for both sugar propellants is **non-monotonic in pressure**.
+KN-Sorbitol rises to 9.37 mm/s at 0.81 MPa, falls to 7.65 at 3.79, then climbs
+to 11.29 at 10.67. Nakka’s own fits carry **negative pressure exponents** over
+two of five regimes each.
+
+The solver uses a single Saint-Robert law, `r = a·Pc^n`. With n > 0 that is
+monotonic by construction, so it cannot reproduce this shape at *any*
+coefficients. Measured cost:
+
+| | KN-Dextrose | KN-Sorbitol |
+| --- | --- | --- |
+| Best single power law | 6.1% mean | 5.4% mean |
+| Nakka’s 5-regime piecewise | **1.2% mean** | **1.8% mean** |
+
+So roughly 4 percentage points are lost to the model form itself. Supporting
+piecewise coefficients would recover them.
+
 ### What this does not validate
 
 A certification stand measures outputs: total impulse, burn time, thrust,
