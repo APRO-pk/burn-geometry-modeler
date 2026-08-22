@@ -16,6 +16,13 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
   const [sweepMax, setSweepMax] = useState<number>(0.03);
   const [steps, setSteps] = useState<number>(10);
   const [results, setResults] = useState<any[]>([]);
+  /**
+   * Spatial model for the sweep. Defaults to whatever the main editor is set
+   * to, so the sweep and the Run button agree unless the user says otherwise.
+   */
+  const [sweepModel, setSweepModel] = useState<'0D' | 'quasi1D'>(
+    currentConfig?.solverModel === 'quasi1D' ? 'quasi1D' : '0D'
+  );
   const [isRunning, setIsRunning] = useState(false);
 
   const runSweep = async () => {
@@ -42,6 +49,17 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
             molecular_weight: config.molWeight,
             k_erosive: config.kErosive,
             g_threshold: config.gThreshold,
+            /*
+             * The measured piecewise law, if the propellant has one.
+             *
+             * Omitting it made the sweep evaluate a DIFFERENT propellant from
+             * the one the Run button simulates -- silently, since the fallback
+             * a/n are still plausible coefficients. A sweep whose optimum is
+             * computed under a different burn law is worse than no sweep.
+             */
+            ...(config.burnRateRegimes?.length
+              ? { burn_rate_regimes: config.burnRateRegimes }
+              : {}),
           },
           grain: grainConfigFromUi(config, dxfData),
           nozzle: {
@@ -52,8 +70,15 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
           },
           // No igniter: the sweep compares steady-state behaviour, not ignition.
           igniter: null,
-          // Fixed efficiencies for a quick sweep.
-          options: { c_star_eff: 0.95, cf_eff: 0.98 },
+          // Fixed efficiencies for a quick sweep. The spatial model follows
+          // the user's choice: a sweep that silently drops to 0-D would rank
+          // designs by a different physics from the one they are checking.
+          options: {
+            c_star_eff: 0.95,
+            cf_eff: 0.98,
+            model: sweepModel,
+            ...(sweepModel === 'quasi1D' ? { stations: config.stationCount ?? 20 } : {}),
+          },
         });
 
         if (simRes.length > 0) {
@@ -96,6 +121,18 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
           <div className="flex flex-col space-y-1 w-20">
             <label className="text-[#888]">Steps</label>
             <input type="number" value={steps} onChange={e => setSteps(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
+          </div>
+          <div className="flex flex-col space-y-1 w-36">
+            <label className="text-[#888]" htmlFor="sweep-model">Solver</label>
+            <select
+              id="sweep-model"
+              value={sweepModel}
+              onChange={e => setSweepModel(e.target.value as "0D" | "quasi1D")}
+              className="bg-[#222] border border-[#555] px-2 py-1"
+            >
+              <option value="0D">0-D lumped</option>
+              <option value="quasi1D">Quasi-1-D axial</option>
+            </select>
           </div>
           <button onClick={runSweep} disabled={isRunning} className="bg-[#ffaa00] text-black px-4 py-1 font-bold rounded flex items-center h-7 hover:bg-[#ffcc00] disabled:opacity-50">
             {isRunning ? 'Running...' : <><Play size={12} className="mr-1"/> Run</>}

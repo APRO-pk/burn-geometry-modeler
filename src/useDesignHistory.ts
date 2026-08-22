@@ -146,3 +146,44 @@ export function applyEnum<T extends string>(
   }
   return false;
 }
+
+/**
+ * Call `set` only if `value` is an array whose entries all pass `isItem`.
+ *
+ * Used for the piecewise burn-rate bands, which are structured data rather than
+ * a scalar. A partially valid array is rejected outright: half a burn law is
+ * more dangerous than none, because the missing bands fall back to
+ * extrapolating whichever neighbour survived.
+ */
+export function applyArray<T>(
+  value: unknown,
+  isItem: (v: unknown) => v is T,
+  set: (v: T[]) => void
+): boolean {
+  if (!Array.isArray(value)) return false;
+  if (!value.every(isItem)) return false;
+  set(value as T[]);
+  return true;
+}
+
+/** Shape check for one piecewise burn-rate band. */
+export function isBurnRateRegime(v: unknown): v is {
+  from_pressure: number;
+  to_pressure: number;
+  a: number;
+  n: number;
+} {
+  if (typeof v !== 'object' || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r.from_pressure === 'number' &&
+    typeof r.to_pressure === 'number' &&
+    typeof r.a === 'number' &&
+    typeof r.n === 'number' &&
+    Number.isFinite(r.from_pressure) &&
+    Number.isFinite(r.to_pressure) &&
+    Number.isFinite(r.a) &&
+    Number.isFinite(r.n) &&
+    r.to_pressure > r.from_pressure
+  );
+}

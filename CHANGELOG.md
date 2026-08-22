@@ -29,6 +29,22 @@ entries are grouped by date rather than version.
 - **ESLint**, covering what `tsc` cannot: hook dependency arrays, dead code, and
   accessibility. `npm run lint` now runs both.
 - `LICENSE` (MIT, matching `Cargo.toml`), `CONTRIBUTING.md`, this file.
+- **Autosave.** The working design is kept in browser storage and offered for
+  recovery on load. There was no persistence of any kind: closing the tab lost
+  everything unless you had remembered to export. Restore is offered rather than
+  applied, so starting deliberately from the defaults still works.
+- **Inline validation.** Every problem with a design is now shown beside the
+  field that caused it, as you type. The rules existed before but ran only on
+  Run, reported one problem at a time via a modal, and could not be tested.
+- **Quasi-1-D is reachable from Monte Carlo and the parameter sweep.** Both
+  hardcoded the 0-D solver, so there was no way to ask whether axial resolution
+  changes your dispersion. Both still default to 0-D for speed.
+- **Keyboard and screen-reader support for the tab bar.** Ten plain buttons
+  became a real ARIA tablist: arrow keys move between views, Home and End jump
+  to the ends, and one Tab press now leaves the bar instead of ten.
+- **Unit preference is remembered** across reloads, rather than resetting to
+  Metric every time.
+- Error boundaries per tab, so one failing chart no longer blanks the app.
 
 ### Changed
 
@@ -43,6 +59,11 @@ entries are grouped by date rather than version.
 
 ### Fixed
 
+- **Undo/redo silently dropped the piecewise burn law and the solver choice.**
+  They were not part of a design snapshot, so the design you got back after an
+  undo was not the design you had, and nothing said so. The parameter sweep had
+  the same gap, ranking designs under a different burn law from the one the Run
+  button uses.
 - **The Lenoir-Robillard constants were declared twice**, in `sim.rs` and
   `port.rs`. Tuning one and not the other would have made the 0-D and quasi-1-D
   solvers disagree about the same propellant, silently, with both still

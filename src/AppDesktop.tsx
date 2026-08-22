@@ -32,10 +32,19 @@ import { SurrogatePanel } from './SurrogatePanel';
 import { ModelUncertaintyPanel } from './ModelUncertaintyPanel';
 import type { MotorMetrics } from './motorMetrics';
 import { peakErosiveFraction } from './burnLaw';
-import { useMotorConfig, CASING_ALLOYS, GRAIN_TYPES, NOZZLE_MATERIALS, CASING_MATERIALS } from './useMotorConfig';
+import { useMotorConfig, CASING_ALLOYS, GRAIN_TYPES, NOZZLE_MATERIALS, CASING_MATERIALS, SOLVER_MODELS } from './useMotorConfig';
 import { ErrorBoundary } from './ErrorBoundary';
-import { useDesignHistory, applyNumber, applyEnum, type DesignSnapshot } from './useDesignHistory';
+import {
+  useDesignHistory,
+  applyNumber,
+  applyEnum,
+  applyArray,
+  isBurnRateRegime,
+  type DesignSnapshot,
+} from './useDesignHistory';
 import { validateDesign, errorsOnly, byField, type ValidationIssue } from './designValidation';
+import { useAutosave } from './useAutosave';
+import { usePersistentState, isOneOf, isStringRecord } from './usePersistentState';
 // three.js is ~150 kB gzipped and only this tab needs it, so it is code-split
 // rather than carried by everyone who opens the app.
 const GrainBurn3D = React.lazy(() => import('./GrainBurn3D'));
@@ -231,9 +240,47 @@ const InputBox = ({
   );
 };
 
+/**
+ * The analysis views, in tab order.
+ *
+ * At module scope because both the tab bar and its keyboard handler need the
+ * same ordering -- a second copy inline would be a list that could silently
+ * disagree with itself about which tab comes next.
+ */
+const TAB_DEFS = [
+  { id: 'ballistics', label: 'Internal Ballistics' },
+  { id: 'statistics', label: 'Motor Statistics' },
+  { id: 'extended_graphs', label: 'Custom Graph' },
+  { id: 'geometry', label: 'Grain Geometry' },
+  { id: 'thermo', label: 'Propellant Thermo' },
+  { id: 'materials', label: 'Material Properties' },
+  { id: 'montecarlo', label: 'Monte Carlo' },
+  { id: 'structural', label: 'Structural Analysis' },
+  { id: 'surrogate', label: 'Surrogate (fast)' },
+  { id: 'burn3d', label: '3D Burn' },
+] as const;
+
+export type TabId = (typeof TAB_DEFS)[number]['id'];
+
 export default function AppDesktop() {
-  const [unitSystem, setUnitSystem] = useState<'Metric' | 'Imperial'>('Metric');
-  const [imperialPrefs, setImperialPrefs] = useState<Record<string, string>>(DEFAULT_IMPERIAL_PREFS);
+  /*
+   * Display preferences, remembered across reloads.
+   *
+   * These used to reset to Metric on every load, so anyone working in inches
+   * had to set it again each time they opened the app. They are stored
+   * separately from the design autosave: preferences should be restored
+   * silently, whereas replacing someone's design has to be their choice.
+   */
+  const [unitSystem, setUnitSystem] = usePersistentState<'Metric' | 'Imperial'>(
+    'apro-burn-modeler:unitSystem:v1',
+    'Metric',
+    isOneOf(['Metric', 'Imperial'] as const)
+  );
+  const [imperialPrefs, setImperialPrefs] = usePersistentState<Record<string, string>>(
+    'apro-burn-modeler:imperialPrefs:v1',
+    DEFAULT_IMPERIAL_PREFS,
+    isStringRecord
+  );
   const [showPreferences, setShowPreferences] = useState(false);
 
   const settingsContextValue = React.useMemo(() => ({
@@ -420,7 +467,16 @@ export default function AppDesktop() {
       grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
       throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
       igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
-      casingMaterial, casingYieldStress, casingYoungsModulus
+      casingMaterial, casingYieldStress, casingYoungsModulus,
+      /*
+       * The piecewise burn law and the solver choice.
+       *
+       * Both were missing, which meant undo/redo silently reverted a propellant
+       * to its single power law -- the design you got back was not the design
+       * you had, and nothing said so. It also meant the optimizer swept with a
+       * different burn law from the one the Run button uses.
+       */
+      burnRateRegimes, propellantName, solverModel, stationCount
   }), [
       density, a, n, molWeight, kErosive, gThreshold,
       grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
@@ -430,7 +486,8 @@ export default function AppDesktop() {
       // Returned by this callback, so they belong here. Omitting them meant
       // undo/redo restored whatever temperature settings were current when the
       // callback was last rebuilt, rather than the ones being captured.
-      T_ref, sigma_p, T_init
+      T_ref, sigma_p, T_init,
+      burnRateRegimes, propellantName, solverModel, stationCount
   ]);
 
   const applyDesignState = useCallback((config: DesignSnapshot) => {
@@ -468,6 +525,10 @@ export default function AppDesktop() {
       applyEnum(config.casingMaterial, CASING_MATERIALS, setCasingMaterial);
       applyNumber(config.casingYieldStress, setCasingYieldStress);
       applyNumber(config.casingYoungsModulus, setCasingYoungsModulus);
+      applyArray(config.burnRateRegimes, isBurnRateRegime, setBurnRateRegimes);
+      if (typeof config.propellantName === 'string') setPropellantName(config.propellantName);
+      applyEnum(config.solverModel, SOLVER_MODELS, setSolverModel);
+      applyNumber(config.stationCount, setStationCount);
     /*
      * The setters. They come from useMotorConfig rather than a useState call in
      * this component, so ESLint cannot see that React guarantees their identity
@@ -475,12 +536,31 @@ export default function AppDesktop() {
      * nothing at runtime -- and if one is ever replaced by a non-stable
      * function, this memo will correctly start invalidating.
      */
-  }, [setA, setCasingMaterial, setCasingYieldStress, setCasingYoungsModulus, setDensity,
+  }, [setBurnRateRegimes, setPropellantName, setSolverModel, setStationCount,
+    setA, setCasingMaterial, setCasingYieldStress, setCasingYoungsModulus, setDensity,
     setExpansionRatio, setFinDepth, setFinWidth, setFlameTemp, setGThreshold, setGamma,
     setGrainType, setIgniterA, setIgniterDensity, setIgniterMass, setIgniterN,
     setIgniterSurfaceArea, setInnerRadius, setKErosive, setLength, setMolWeight, setN,
     setNozzleMaterial, setNumPoints, setNumSegments, setOffset, setOuterRadius, setRodRadius,
     setSigmaP, setTInit, setTRef, setThroatDiameter, setTipRadius, setValleyRadius,
+  ]);
+
+  /*
+   * Keep the working design in localStorage.
+   *
+   * There was no persistence at all: closing the tab lost everything unless the
+   * user had remembered to export. Restore is offered on load rather than
+   * applied, so starting deliberately from the defaults is still possible.
+   */
+  const autosave = useAutosave(captureDesignState, applyDesignState, [
+    density, a, n, molWeight, kErosive, gThreshold, T_ref, sigma_p, T_init,
+    burnRateRegimes, propellantName,
+    grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius,
+    numPoints, numSegments, offset, rodRadius, finDepth, finWidth,
+    throatDiameter, expansionRatio, gamma, flameTemp, nozzleMaterial,
+    solverModel, stationCount,
+    igniterMass, igniterSurfaceArea, igniterDensity, igniterA, igniterN,
+    casingMaterial, casingYieldStress, casingYoungsModulus,
   ]);
 
   const designHistory = useDesignHistory(captureDesignState, applyDesignState);
@@ -549,11 +629,24 @@ export default function AppDesktop() {
   }, [results, a, n, burnRateRegimes, sigma_p, T_init, T_ref]);
   const [visualizerIndex, setVisualizerIndex] = useState<number>(0);
   const [statusMsg, setStatusMsg] = useState<string>('System Ready');
-  const [activeTab, setActiveTab] = useState<'ballistics' | 'extended_graphs' | 'geometry' | 'thermo' | 'montecarlo' | 'structural' | 'materials' | 'statistics' | 'surrogate' | 'burn3d'>('ballistics');
+  // TabId is derived from TAB_DEFS, so the tab bar and this state cannot
+  // disagree about which views exist.
+  const [activeTab, setActiveTab] = useState<TabId>('ballistics');
 
   // Monte Carlo State
   const [mcRuns, setMcRuns] = useState<number>(50);
   const [mcVariance, setMcVariance] = useState<number>(5);
+  /**
+   * Spatial model for the Monte Carlo sweep, chosen separately from the main
+   * Run button.
+   *
+   * It was hardcoded to 0-D, which is a defensible default -- hundreds of
+   * solves at a few hundred stations each is slow -- but it left no way to ask
+   * "does my dispersion look different with axial resolution?", which is
+   * exactly the question a sweep exists to answer for a long grain where
+   * erosive burning matters. Still defaults to 0-D.
+   */
+  const [mcSolverModel, setMcSolverModel] = useState<SolverModelType>('0D');
   const [mcResults, setMcResults] = useState<any[]>([]);
 
   // Console Logs
@@ -1147,7 +1240,8 @@ export default function AppDesktop() {
     // instead of seconds -- and a dispersion study wants many samples of the
     // same model far more than it wants axial detail in each one.
     addLog(
-      `Starting Monte Carlo analysis (${mcRuns} runs, ${mcVariance}% variance, 0-D solver for speed)...`
+      `Starting Monte Carlo analysis (${mcRuns} runs, ${mcVariance}% variance, ` +
+        `${mcSolverModel === 'quasi1D' ? `quasi-1-D with ${stationCount} stations` : '0-D'} solver)...`
     );
     setIsSimulating(true);
     setMcResults([]);
@@ -1168,7 +1262,7 @@ export default function AppDesktop() {
             density: density * varFactor(),
             throatDiameter: throatDiameter * varFactor(),
             igniterMass: igniterMass * varFactor(),
-            model: '0D',
+            model: mcSolverModel,
           })
         );
 
@@ -2182,24 +2276,50 @@ export default function AppDesktop() {
         {/* Central Widget: Tabbed Layout (QTabWidget) */}
         <div className="flex-1 flex flex-col bg-[#a0a0a0] overflow-hidden">
           
-          {/* QTabBar */}
-          <div className="flex-none h-7 bg-[#d0d0d0] border-b border-[#888] flex items-end px-1 space-x-0.5 pt-1 overflow-x-auto">
-            {[
-              { id: 'ballistics', label: 'Internal Ballistics' },
-              { id: 'statistics', label: 'Motor Statistics' },
-              { id: 'extended_graphs', label: 'Custom Graph' },
-              { id: 'geometry', label: 'Grain Geometry' },
-              { id: 'thermo', label: 'Propellant Thermo' },
-              { id: 'materials', label: 'Material Properties' },
-              { id: 'montecarlo', label: 'Monte Carlo' },
-              { id: 'structural', label: 'Structural Analysis' },
-              { id: 'surrogate', label: 'Surrogate (fast)' },
-              { id: 'burn3d', label: '3D Burn' }
-            ].map(tab => (
-              <button 
+          {/*
+            * QTabBar, as a real ARIA tablist.
+            *
+            * These were plain buttons: a screen reader announced ten unrelated
+            * controls with no indication that they were tabs, which one was
+            * selected, or what they controlled. Keyboard users had to Tab
+            * through every one to reach the last.
+            *
+            * Now it follows the standard tabs pattern -- arrow keys move
+            * between tabs, Home and End jump to the ends, and only the active
+            * tab is in the Tab order, so one Tab press leaves the bar and
+            * reaches the content.
+            */}
+          <div
+            role="tablist"
+            aria-label="Analysis views"
+            className="flex-none h-7 bg-[#d0d0d0] border-b border-[#888] flex items-end px-1 space-x-0.5 pt-1 overflow-x-auto"
+            onKeyDown={(e) => {
+              const ids = TAB_DEFS.map((t) => t.id);
+              const current = ids.indexOf(activeTab);
+              let next = -1;
+              if (e.key === 'ArrowRight') next = (current + 1) % ids.length;
+              else if (e.key === 'ArrowLeft') next = (current - 1 + ids.length) % ids.length;
+              else if (e.key === 'Home') next = 0;
+              else if (e.key === 'End') next = ids.length - 1;
+              if (next < 0) return;
+              e.preventDefault();
+              setActiveTab(ids[next]);
+              // Move focus with the selection, or the next arrow press would
+              // continue from wherever focus was left behind.
+              document.getElementById(`tab-${ids[next]}`)?.focus();
+            }}
+          >
+            {TAB_DEFS.map(tab => (
+              <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-1 text-xs border border-[#888] border-b-0 rounded-t flex items-center whitespace-nowrap ${activeTab === tab.id ? 'bg-[#a0a0a0] font-bold text-black z-10 relative top-[1px] border-b-[#a0a0a0]' : 'bg-[#e0e0e0] text-[#555] hover:bg-[#d8d8d8]'}`}
+                id={`tab-${tab.id}`}
+                role="tab"
+                type="button"
+                aria-selected={activeTab === tab.id}
+                aria-controls="tab-panel"
+                tabIndex={activeTab === tab.id ? 0 : -1}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1 text-xs border border-[#888] border-b-0 rounded-t flex items-center whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:z-20 ${activeTab === tab.id ? 'bg-[#a0a0a0] font-bold text-black z-10 relative top-[1px] border-b-[#a0a0a0]' : 'bg-[#e0e0e0] text-[#555] hover:bg-[#d8d8d8]'}`}
               >
                 {tab.label}
               </button>
@@ -2207,7 +2327,13 @@ export default function AppDesktop() {
           </div>
 
           {/* Tab Content Area */}
-          <div className="flex-1 p-1 flex flex-col space-y-1 overflow-hidden bg-[#a0a0a0] relative">
+          <div
+            id="tab-panel"
+            role="tabpanel"
+            aria-labelledby={`tab-${activeTab}`}
+            tabIndex={0}
+            className="flex-1 p-1 flex flex-col space-y-1 overflow-hidden bg-[#a0a0a0] relative focus:outline-none"
+          >
             
             {isSimulating && (
               <div className="absolute inset-0 z-50 bg-[#111] bg-opacity-80 flex flex-col items-center justify-center font-mono">
@@ -2216,6 +2342,39 @@ export default function AppDesktop() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 <div className="text-[#00aaff] text-sm animate-pulse tracking-widest font-bold">SOLVING MESH & THERMO MODELS...</div>
+              </div>
+            )}
+
+            {autosave.recovered && (
+              <div
+                role="region"
+                aria-label="Recover unsaved design"
+                className="flex-none bg-[#d1ecf1] border border-[#bee5eb] p-2 rounded flex items-center justify-between mb-1"
+              >
+                <div className="text-[#0c5460] text-xs">
+                  <span className="font-bold">Unsaved design found.</span>{' '}
+                  Last edited {new Date(autosave.recovered.savedAt).toLocaleString()}. Restoring
+                  replaces what is currently in the editor.
+                </div>
+                <div className="flex items-center space-x-2 flex-none ml-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      autosave.acceptRecovery();
+                      addLog('Restored the autosaved design.');
+                    }}
+                    className="px-3 py-1 bg-[#0c5460] text-white text-xs font-bold rounded hover:bg-[#0a4650] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0c5460]"
+                  >
+                    Restore
+                  </button>
+                  <button
+                    type="button"
+                    onClick={autosave.dismissRecovery}
+                    className="px-3 py-1 border border-[#0c5460] text-[#0c5460] text-xs rounded hover:bg-[#c1e4ea] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0c5460]"
+                  >
+                    Discard
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2553,9 +2712,27 @@ export default function AppDesktop() {
                     <label className="text-xs text-[#444] font-bold">Variance (%):</label>
                     <input type="number" value={mcVariance} onChange={e => setMcVariance(Number(e.target.value))} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-16 text-xs" />
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <label htmlFor="mc-solver" className="text-xs text-[#444] font-bold">Solver:</label>
+                    <select
+                      id="mc-solver"
+                      value={mcSolverModel}
+                      onChange={e => setMcSolverModel(e.target.value as SolverModelType)}
+                      className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none text-xs"
+                    >
+                      <option value="0D">0-D lumped (fast)</option>
+                      <option value="quasi1D">Quasi-1-D axial</option>
+                    </select>
+                  </div>
                   <button onClick={runMonteCarlo} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded shadow-sm">
                     Run Analysis
                   </button>
+                  {mcSolverModel === 'quasi1D' && (
+                    <span className="text-[10px] text-[#856404] leading-snug max-w-xs">
+                      {mcRuns} axially resolved solves at {stationCount} stations each. Slower, but
+                      it is the only way to see whether axial resolution changes your dispersion.
+                    </span>
+                  )}
                 </div>
                 <div className="flex-1 bg-black border border-[#555] relative flex flex-col">
                   <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">Monte Carlo: Max Pressure vs Max Thrust</div>
@@ -3205,6 +3382,15 @@ export default function AppDesktop() {
       <div className="h-24 flex-none bg-[#f0f0f0] border-t border-[#ccc] flex flex-col z-10">
         <div className="bg-[#e4e4e4] px-2 py-1 border-b border-[#ccc] font-bold text-xs text-[#555] shadow-sm flex items-center">
           <Terminal size={12} className="mr-1" /> System Output Console
+          {/* Quiet confirmation that work is being kept. Silence would leave
+              the user unsure whether autosave is doing anything at all. */}
+          <span className="ml-auto font-normal text-[10px] text-[#888]">
+            {autosave.unavailable
+              ? 'Autosave unavailable (browser storage blocked)'
+              : autosave.lastSavedAt
+                ? `Autosaved ${new Date(autosave.lastSavedAt).toLocaleTimeString()}`
+                : 'Autosave pending'}
+          </span>
         </div>
         <div className="flex-1 bg-black text-[#00ff00] font-mono text-[11px] p-2 overflow-y-auto whitespace-pre-wrap leading-tight">
           {logs.map((log, i) => (

@@ -255,3 +255,5 @@ export const CASING_MATERIALS = [
   'Carbon Composite',
   'Custom',
 ] as const satisfies readonly CasingMaterialName[];
+
+export const SOLVER_MODELS = ['0D', 'quasi1D'] as const satisfies readonly SolverModelType[];
