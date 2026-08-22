@@ -267,15 +267,57 @@ npm run test
 post-transition burning-area model — when that model is fixed properly, the test
 will start failing and should become a normal passing test.
 
+## How much to trust the numbers
+
+Every model here is an approximation, and **[`MODEL_UNCERTAINTY.md`](MODEL_UNCERTAINTY.md)
+says how good each one is, in numbers, with the test that measures it.** The app
+shows the same budget live under **Motor Statistics → Model Uncertainty**,
+computed for the motor on screen.
+
+The short version:
+
+| Output | Typical band | Dominated by |
+| --- | --- | --- |
+| Total impulse | ±8% | Delivered Isp efficiency |
+| Burn time | ±5–15% | Burn-rate law |
+| Peak chamber pressure | ±3% to >3x | Erosive burning, if enabled |
+| Throat erosion | >7x | Simplified Bartz coefficient |
+
+Peak pressure spans two orders of magnitude of trustworthiness because it
+depends almost entirely on whether erosive burning is on — and the erosive
+coefficient is uncalibrated. Two things follow:
+
+- **These are a floor on the error, not a bound.** They are model-form
+  uncertainties. Real hardware also varies by propellant batch, casting quality,
+  grain cracks and machining, none of which a solver can see.
+- **Nothing here is a guess presented as data.** Where a model has never been
+  validated, the app says so in those words rather than quoting a flattering
+  number — APCP is reported as *less* certain than KNSB precisely because it has
+  never been measured in this repository.
+
 ## Scope and limits
 
 - Grain geometries: BATES, Star, Tubular, Rod & Tube, MoonBurner, Finocyl,
-  Custom DXF.
+  Custom DXF. Burning area is exact for BATES and Tubular, within ~0.5% for
+  Star, Moon Burner and Rod & Tube, and about 8% for Finocyl — measured against
+  polygon ground truth, not estimated.
 - The quasi-1-D model assumes subsonic, quasi-steady port flow; it warns when a
   port spends a meaningful fraction of the burn near choking.
 - Structural analysis is closed-form and static: no thermal stress, fatigue,
   stress concentrations or buckling. Composite cases are computed with isotropic
   relations and say so.
-- The surrogate covers BATES grains only, with fixed propellant
-  thermochemistry. The tab disables itself for other geometries; the full solver
-  handles all seven.
+- The surrogate covers **every** grain geometry, from one model built on the
+  burn-back curves rather than the shape parameters. It is trained on single
+  power-law solves, so it warns when the propellant carries a measured piecewise
+  burn law; Verify and the Monte Carlo confirmation run the real core.
+- Erosive burning and nozzle throat erosion are **uncalibrated** in this
+  repository. Use them to compare designs, never to size hardware.
+- Not modelled at all: ignition transient beyond a crude approximation,
+  two-phase flow losses, grain structural failure, nozzle submergence.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). The one rule that matters: **never
+invent a number.** Every empirical value in this repository is parsed from its
+source rather than transcribed, and every guard has been mutation-tested to
+confirm it can actually fail.
