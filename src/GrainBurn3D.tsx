@@ -109,6 +109,14 @@ export function GrainBurn3D({ grain, results }: Props) {
     grainMesh: THREE.Mesh | null;
     casing: THREE.Mesh;
     dispose: () => void;
+    /**
+     * Re-frame the camera around a motor of this radius and length.
+     *
+     * Declared here rather than cast on at the two call sites: it is assigned
+     * once the renderer exists, so it is genuinely optional, and saying so lets
+     * the optional-call operator do the checking instead of `as any`.
+     */
+    frame?: (r: number, len: number) => void;
   } | null>(null);
 
   const [playing, setPlaying] = useState(false);
@@ -278,7 +286,7 @@ export function GrainBurn3D({ grain, results }: Props) {
     };
 
     // Frame the motor: expose a setter the geometry effect can call.
-    (sceneRef.current as any).frame = (r: number, len: number) => {
+    sceneRef.current.frame = (r: number, len: number) => {
       radius0 = Math.max(r * 4.2, len * 1.9);
       radius = radius0;
       applyCamera();
@@ -323,7 +331,7 @@ export function GrainBurn3D({ grain, results }: Props) {
 
     s.casing.visible = showCasing;
     s.casing.scale.set(outline.outerRadius, grain.length, outline.outerRadius);
-    (s as any).frame?.(outline.outerRadius, grain.length);
+    s.frame?.(outline.outerRadius, grain.length);
   }, [outline, showCasing, grain.length]);
 
   // --- playback ---

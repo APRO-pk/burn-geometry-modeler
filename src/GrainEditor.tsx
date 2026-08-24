@@ -4,8 +4,8 @@ import { Settings, Check } from 'lucide-react';
 import { grainFromUi } from './engine';
 import { DXFRegressionResults } from './dxfProcessor';
 
-interface GrainEditorProps {
-  initialParams: {
+/** The geometry inputs this editor owns. */
+export interface GrainEditorParams {
     grainType: 'Star' | 'BATES' | 'Tubular' | 'RodAndTube' | 'MoonBurner' | 'Finocyl' | 'CustomDXF';
     length: number;
     outerRadius: number;
@@ -18,9 +18,12 @@ interface GrainEditorProps {
     rodRadius: number;
     finDepth: number;
     finWidth: number;
-  };
+}
+
+interface GrainEditorProps {
+  initialParams: GrainEditorParams;
   dxfData: DXFRegressionResults | null;
-  onApply: (params: any) => void;
+  onApply: (params: GrainEditorParams) => void;
   onClose: () => void;
 }
 
@@ -29,7 +32,16 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
   const [params, setParams] = useState(initialParams);
   const [currentY, setCurrentY] = useState(0);
 
-  const updateParam = (key: keyof typeof params, value: any) => {
+  /*
+   * value is a union rather than `any` because grainType is a string and every
+   * other field is a number -- `any` here would have let a string reach a
+   * numeric dimension without complaint, which is the same class of bug the
+   * BurnSim import path had.
+   */
+  const updateParam = <K extends keyof GrainEditorParams>(
+    key: K,
+    value: GrainEditorParams[K]
+  ) => {
     setParams(prev => ({ ...prev, [key]: value }));
   };
 
@@ -83,7 +95,7 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
              
              <div className="space-y-1">
                <label className="text-[#888]" htmlFor={fieldId('type')}>Type</label>
-               <select id={fieldId('type')} value={params.grainType} onChange={e => updateParam('grainType', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white">
+               <select id={fieldId('type')} value={params.grainType} onChange={e => updateParam('grainType', e.target.value as GrainEditorParams['grainType'])} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white">
                   <option value="BATES">BATES</option>
                   <option value="Tubular">Tubular</option>
                   <option value="Star">Star</option>

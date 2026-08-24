@@ -14,6 +14,22 @@ export default defineConfig(() => {
       },
     },
     test: {
+      /*
+       * 30s, not vitest's 5s default.
+       *
+       * These are not unit tests. Several run real WASM physics in sweeps --
+       * 27 motor solves to constrain a distribution, or a 10/20/40/80-station
+       * grid-convergence study -- and take a second or two alone. Under the
+       * parallel file execution the suite uses, on a loaded machine, they
+       * crossed 5s and failed.
+       *
+       * That produced the worst kind of failure: load-dependent, so re-running
+       * turned it green and taught everyone to ignore it. The sweeps are the
+       * point of those tests -- a single design would not constrain anything --
+       * so the honest fix is a timeout matched to what they actually do. A
+       * genuinely hung test still fails, just at 30s.
+       */
+      testTimeout: 30_000,
       // jsdom only for the React hook tests. Everything else -- the physics
       // parity suite, the surrogate, the validation fixtures -- is plain Node
       // and would only be slowed down by a DOM, so the environment is chosen

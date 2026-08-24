@@ -3,21 +3,47 @@ import { useFieldIds } from './useFieldIds';
 import { Play } from 'lucide-react';
 import { runMotor } from './wasmClient';
 import { grainConfigFromUi } from './wasmCore';
+import type { DesignSnapshot } from './useDesignHistory';
+import type { DXFRegressionResults } from './dxfProcessor';
+import type { GrainUiParams } from './engine';
+import type { BurnRateRegime } from './wasmCore';
+
+/** Which design input the sweep varies. */
+type SweepParam = 'throatDiameter' | 'length';
+
+/** One evaluated point of the sweep. */
+interface SweepPoint {
+  /** Value of the swept parameter, SI. */
+  val: number;
+  /** Peak chamber pressure, MPa. */
+  maxPc: number;
+  /** Peak thrust, kN. */
+  maxThrust: number;
+  initialKn: number;
+  warnings: string[];
+}
 
 interface OptimizerProps {
-  currentConfig: any;
-  onApply: (newConfig: any) => void;
+  /**
+   * The design to sweep around, as a snapshot.
+   *
+   * DesignSnapshot rather than a strict type because it comes from
+   * captureDesignState and may legitimately be missing fields -- the sweep
+   * reads what it needs and the core supplies its own defaults.
+   */
+  currentConfig: DesignSnapshot;
+  onApply: (newConfig: DesignSnapshot) => void;
   onClose: () => void;
-  dxfData: any;
+  dxfData: DXFRegressionResults | null;
 }
 
 export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: OptimizerProps) {
   const fieldId = useFieldIds();
-  const [paramToSweep, setParamToSweep] = useState<'throatDiameter' | 'length'>('throatDiameter');
+  const [paramToSweep, setParamToSweep] = useState<SweepParam>('throatDiameter');
   const [sweepMin, setSweepMin] = useState<number>(0.005);
   const [sweepMax, setSweepMax] = useState<number>(0.03);
   const [steps, setSteps] = useState<number>(10);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<SweepPoint[]>([]);
   /**
    * Spatial model for the sweep. Defaults to whatever the main editor is set
    * to, so the sweep and the Run button agree unless the user says otherwise.
@@ -29,12 +55,25 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
 
   const runSweep = async () => {
     setIsRunning(true);
-    const sweepResults = [];
+    const sweepResults: SweepPoint[] = [];
     const stepSize = (sweepMax - sweepMin) / Math.max(1, steps - 1);
 
     for (let i = 0; i < steps; i++) {
       const val = sweepMin + i * stepSize;
       const config = { ...currentConfig, [paramToSweep]: val };
+
+      /*
+       * Read a snapshot field as a number, with an explicit fallback.
+       *
+       * The snapshot is a permissive record, so every field is `unknown` until
+       * checked. Before this, a missing field was passed to the solver as
+       * `undefined` and became NaN somewhere inside it -- which surfaced as an
+       * empty sweep with no explanation rather than as a bad input.
+       */
+      const num = (v: unknown, fallback: number): number => {
+        const x = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+        return Number.isFinite(x) ? x : fallback;
+      };
 
       try {
         // Same wasm core as the nominal run, so a swept point can be applied and
@@ -43,14 +82,14 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
         // differences from the main simulation.
         const { results: simRes, warnings: simWarnings } = await runMotor({
           propellant: {
-            density: config.density,
-            a: config.a,
-            n: config.n,
-            flame_temp: config.flameTemp,
-            gamma: config.gamma,
-            molecular_weight: config.molWeight,
-            k_erosive: config.kErosive,
-            g_threshold: config.gThreshold,
+            density: num(config.density, 1800),
+            a: num(config.a, 1e-5),
+            n: num(config.n, 0.3),
+            flame_temp: num(config.flameTemp, 2500),
+            gamma: num(config.gamma, 1.2),
+            molecular_weight: num(config.molWeight, 0.025),
+            k_erosive: num(config.kErosive, 0),
+            g_threshold: num(config.gThreshold, 500),
             /*
              * The measured piecewise law, if the propellant has one.
              *
@@ -59,14 +98,14 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
              * a/n are still plausible coefficients. A sweep whose optimum is
              * computed under a different burn law is worse than no sweep.
              */
-            ...(config.burnRateRegimes?.length
-              ? { burn_rate_regimes: config.burnRateRegimes }
+            ...(Array.isArray(config.burnRateRegimes) && config.burnRateRegimes.length
+              ? { burn_rate_regimes: config.burnRateRegimes as BurnRateRegime[] }
               : {}),
           },
-          grain: grainConfigFromUi(config, dxfData),
+          grain: grainConfigFromUi(config as unknown as GrainUiParams, dxfData),
           nozzle: {
-            throat_diameter: config.throatDiameter,
-            expansion_ratio: config.expansionRatio,
+            throat_diameter: num(config.throatDiameter, 0.015),
+            expansion_ratio: num(config.expansionRatio, 6),
             // Idealized, non-eroding throat.
             material: null,
           },
@@ -79,13 +118,13 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
             c_star_eff: 0.95,
             cf_eff: 0.98,
             model: sweepModel,
-            ...(sweepModel === 'quasi1D' ? { stations: config.stationCount ?? 20 } : {}),
+            ...(sweepModel === 'quasi1D' ? { stations: num(config.stationCount, 20) } : {}),
           },
         });
 
         if (simRes.length > 0) {
-          const maxPc = Math.max(...simRes.map((r: any) => r.Pc)) / 1e6;
-          const maxThrust = Math.max(...simRes.map((r: any) => r.Thrust)) / 1000;
+          const maxPc = Math.max(...simRes.map((r) => r.Pc)) / 1e6;
+          const maxThrust = Math.max(...simRes.map((r) => r.Thrust)) / 1000;
           const initialKn = simRes[0].Ab / simRes[0].ThroatArea;
           sweepResults.push({ val, maxPc, maxThrust, initialKn, warnings: simWarnings });
         }
@@ -107,7 +146,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
         <div className="flex space-x-4 items-end">
           <div className="flex flex-col space-y-1 flex-1">
             <label className="text-[#888]" htmlFor={fieldId('sweep-parameter')}>Sweep Parameter</label>
-            <select id={fieldId('sweep-parameter')} value={paramToSweep} onChange={e => setParamToSweep(e.target.value as any)} className="bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#ffaa00]">
+            <select id={fieldId('sweep-parameter')} value={paramToSweep} onChange={e => setParamToSweep(e.target.value as SweepParam)} className="bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#ffaa00]">
               <option value="throatDiameter">Throat Diameter (m)</option>
               <option value="length">Grain Length (m)</option>
             </select>

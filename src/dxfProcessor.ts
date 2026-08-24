@@ -19,6 +19,23 @@ export interface DXFRegressionResults {
 
 const SCALE = 1000000.0;
 
+/**
+ * The subset of a parsed DXF entity this code actually reads.
+ *
+ * The DXF library returns a loose union covering dozens of entity types; only
+ * these fields are consumed here, and every one is optional because whether a
+ * given entity has it depends on its type. Naming them beats `any`: a typo in
+ * a field name is now a compile error rather than a silent undefined that
+ * skips the entity.
+ */
+interface DxfEntity {
+  type?: string;
+  shape?: boolean;
+  vertices?: Array<{ x?: number; y?: number }>;
+  center?: { x?: number; y?: number };
+  radius?: number;
+}
+
 export function processDXF(dxfText: string, maxRadius: number, dx: number): DXFRegressionResults {
   const parser = new DxfParser();
   const dxf = parser.parseSync(dxfText);
@@ -29,7 +46,7 @@ export function processDXF(dxfText: string, maxRadius: number, dx: number): DXFR
   // For complex cases we should join lines and arcs, but we'll assume clean closed paths
   if (dxf && dxf.entities) {
     for (const rawEntity of dxf.entities) {
-      const entity = rawEntity as any;
+      const entity = rawEntity as DxfEntity;
       if (entity.type === 'LWPOLYLINE' || entity.type === 'POLYLINE') {
          if (entity.vertices && entity.vertices.length > 0) {
             const path: ClipperLib.Path = [];

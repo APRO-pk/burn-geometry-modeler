@@ -292,7 +292,7 @@ export function StructuralTab({
                                   <CartesianGrid strokeDasharray="1 3" stroke="#333" />
                                   <XAxis dataKey="r_mm" type="number" domain={['dataMin', 'dataMax']} stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(1)} label={{ value: 'radius (mm)', position: 'insideBottom', offset: -2, fill: '#666', fontSize: 9 }} />
                                   <YAxis stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} />
-                                  <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: any) => `${Number(v).toFixed(1)} MPa`} />
+                                  <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: number | string) => `${Number(v).toFixed(1)} MPa`} />
                                   <Legend wrapperStyle={{ fontSize: '9px' }} />
                                   <Line type="monotone" dataKey="hoop" name="hoop" stroke="#00aaff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
                                   <Line type="monotone" dataKey="radial" name="radial" stroke="#ff00ff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
@@ -375,7 +375,7 @@ export function StructuralTab({
                                   <CartesianGrid strokeDasharray="1 3" stroke="#333" />
                                   <XAxis dataKey="x_mm" type="number" domain={['dataMin', 'dataMax']} stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} label={{ value: 'distance from joint (mm)', position: 'insideBottom', offset: -2, fill: '#666', fontSize: 9 }} />
                                   <YAxis stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} />
-                                  <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: any) => `${Number(v).toFixed(1)} MPa`} />
+                                  <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: number | string) => `${Number(v).toFixed(1)} MPa`} />
                                   <Legend wrapperStyle={{ fontSize: '9px' }} />
                                   <Line type="monotone" dataKey="hoop" name="hoop" stroke="#00aaff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
                                   <Line type="monotone" dataKey="axial" name="axial" stroke="#00ff88" strokeWidth={1.5} dot={false} isAnimationActive={false} />

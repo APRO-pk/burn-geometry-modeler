@@ -30,7 +30,17 @@ import { OptimizerDialog } from './OptimizerDialog';
 import { SurrogatePanel } from './SurrogatePanel';
 import type { MotorMetrics } from './motorMetrics';
 import { peakErosiveFraction } from './burnLaw';
-import { useMotorConfig, CASING_ALLOYS, GRAIN_TYPES, NOZZLE_MATERIALS, CASING_MATERIALS, SOLVER_MODELS } from './useMotorConfig';
+import {
+  useMotorConfig,
+  CASING_ALLOYS,
+  GRAIN_TYPES,
+  NOZZLE_MATERIALS,
+  CASING_MATERIALS,
+  SOLVER_MODELS,
+  type GrainType,
+  type NozzleMaterialName,
+  type CasingMaterialName,
+} from './useMotorConfig';
 import { ErrorBoundary } from './ErrorBoundary';
 import { StructuralTab } from './StructuralTab';
 import { MonteCarloTab } from './MonteCarloTab';
@@ -63,7 +73,24 @@ const UNIT_FACTORS: Record<string, Record<string, number>> = {
   Temperature: { K: 1 } // Handled separately if needs shift, but let's assume raw delta/scale for now, or just use suffix="K"
 };
 
-export const SettingsContext = React.createContext<any>(null);
+/**
+ * Display preferences, shared with every InputBox so units convert app-wide.
+ *
+ * Typed rather than `any` because InputBox reads `imperialPrefs[unitCat]`
+ * deep inside a render -- an `any` context meant a typo there produced
+ * undefined and a silently unconverted number, not an error.
+ *
+ * The default is null: an InputBox rendered outside the provider falls back to
+ * its own suffix, which is the existing behaviour.
+ */
+export interface UnitSettings {
+  unitSystem: 'Metric' | 'Imperial';
+  imperialPrefs: Record<string, string>;
+  setUnitSystem: React.Dispatch<React.SetStateAction<'Metric' | 'Imperial'>>;
+  setImperialPrefs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}
+
+export const SettingsContext = React.createContext<UnitSettings | null>(null);
 
 const DEFAULT_METRIC_PREFS: Record<string, string> = {
   Length: 'mm',
@@ -265,6 +292,20 @@ const TAB_DEFS = [
 
 export type TabId = (typeof TAB_DEFS)[number]['id'];
 
+/**
+ * The message from a thrown value, whatever it turns out to be.
+ *
+ * `catch (err: any)` then reading `err.message` is a lie in two directions: a
+ * thrown string has no .message, and a thrown object might have one that is not
+ * a string. Neither crashes here, but both produce "undefined" in the log where
+ * an explanation should be.
+ */
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string' && err.trim()) return err;
+  return 'Unknown error';
+}
+
 export default function AppDesktop() {
   const fieldId = useFieldIds();
   /*
@@ -292,7 +333,7 @@ export default function AppDesktop() {
     imperialPrefs,
     setUnitSystem,
     setImperialPrefs
-  }), [unitSystem, imperialPrefs]);
+  }), [unitSystem, imperialPrefs, setUnitSystem, setImperialPrefs]);
 
   const DEFAULT_PROPELLANTS: PropellantData[] = [
     // Burn-rate coefficient `a` is in SI (r_b = a * Pc^n with Pc in Pa, r_b in m/s),
@@ -574,7 +615,7 @@ export default function AppDesktop() {
 
 
   const handleCasingChange = (val: string) => {
-    setCasingMaterial(val as any);
+    setCasingMaterial(val as CasingMaterialName);
     if (val !== 'Custom') {
       const data = CASING_ALLOYS[val as keyof typeof CASING_ALLOYS];
       setCasingYieldStress(data.y);
@@ -648,10 +689,11 @@ export default function AppDesktop() {
    * erosive burning matters. Still defaults to 0-D.
    */
   const [mcSolverModel, setMcSolverModel] = useState<SolverModelType>('0D');
-  const [mcResults, setMcResults] = useState<any[]>([]);
+  const [mcResults, setMcResults] = useState<Array<{ run: number; maxPc: number; maxThrust: number }>>([]);
 
   // Console Logs
   const [logs, setLogs] = useState<string[]>(['[SYSTEM] APRO Modeler Initialized. Ready for input.']);
+
   const addLog = (msg: string) => {
     const time = new Date().toLocaleTimeString([], { hour12: false });
     setLogs(prev => [...prev, `[${time}] ${msg}`]);
@@ -879,8 +921,8 @@ export default function AppDesktop() {
         } else {
           addLog('Simulation failed or produced no results.');
         }
-      } catch (err: any) {
-        addLog(`Simulation error: ${err.message || 'Unknown error'}`);
+      } catch (err: unknown) {
+        addLog(`Simulation error: ${errorMessage(err)}`);
       } finally {
         setIsSimulating(false);
       }
@@ -954,7 +996,8 @@ export default function AppDesktop() {
         for (let i = 0; i < radialSteps; i++) {
           const a = (i * 2 * Math.PI) / radialSteps;
           let r_in = innerRadius;
-          let cx = 0, cy = 0;
+          let cx = 0;
+          const cy = 0;
           if (grainType === 'Star') {
             const sector = (2 * Math.PI) / numPoints;
             let local_a = a % sector;
@@ -1045,8 +1088,8 @@ export default function AppDesktop() {
         aElem.click();
         URL.revokeObjectURL(url);
         addLog('3D model (STL) export complete.');
-      } catch (err: any) {
-        addLog(`STL Generation error: ${err.message || 'Unknown error'}`);
+      } catch (err: unknown) {
+        addLog(`STL Generation error: ${errorMessage(err)}`);
       } finally {
         setIsSimulating(false);
       }
@@ -1188,8 +1231,8 @@ export default function AppDesktop() {
       URL.revokeObjectURL(url);
       addLog('Casing Assembly ZIP export complete.');
 
-    } catch (err: any) {
-      addLog(`Generation error: ${err.message || 'Unknown error'}`);
+    } catch (err: unknown) {
+      addLog(`Generation error: ${errorMessage(err)}`);
     } finally {
       setIsSimulating(false);
     }
@@ -1230,8 +1273,8 @@ export default function AppDesktop() {
       aElem.click();
       URL.revokeObjectURL(url);
       addLog('Full Assembly OpenSCAD script exported. Use FreeCAD to convert to STEP.');
-    } catch(err: any) {
-      addLog(`SCAD Generation error: ${err.message || 'Unknown error'}`);
+    } catch (err: unknown) {
+      addLog(`SCAD Generation error: ${errorMessage(err)}`);
     }
   };
 
@@ -1247,7 +1290,7 @@ export default function AppDesktop() {
     setIsSimulating(true);
     setMcResults([]);
 
-    const runs: any[] = [];
+    const runs: Array<{ run: number; maxPc: number; maxThrust: number }> = [];
 
     // Each run is awaited in turn. The solve happens in the worker, so the main
     // thread is free between runs and the UI keeps painting -- the old
@@ -1535,8 +1578,8 @@ export default function AppDesktop() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
-    input.onchange = (e: any) => {
-      const file = e.target.files[0];
+    input.onchange = (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         setIsSimulating(true);
         setTimeout(() => {
@@ -1670,9 +1713,9 @@ export default function AppDesktop() {
                 const results = processDXF(content, outerRadius, dx);
                 setDxfData(results);
                 addLog(`Successfully processed DXF geometry (Max port area: ${(results.areaTable[0] * 10000).toFixed(2)} cm²).`);
-            } catch (err: any) {
-                addLog(`Failed to load DXF: ${err.message}`);
-                alert(`Error reading DXF: ${err.message}`);
+            } catch (err: unknown) {
+                addLog(`Failed to load DXF: ${errorMessage(err)}`);
+                alert(`Error reading DXF: ${errorMessage(err)}`);
                 setDxfFilename('');
                 setDxfData(null);
             }
@@ -1751,7 +1794,7 @@ export default function AppDesktop() {
   const [ucUnit1, setUcUnit1] = useState<string>('in');
   const [ucUnit2, setUcUnit2] = useState<string>('mm');
 
-  const unitRates: any = {
+  const unitRates: Record<string, Record<string, number>> = {
     Length: { m: 1, cm: 0.01, mm: 0.001, in: 0.0254, ft: 0.3048 },
     Pressure: { Pa: 1, kPa: 1000, MPa: 1e6, psi: 6894.76, bar: 1e5, atm: 101325 },
     Mass: { kg: 1, g: 0.001, lbm: 0.453592 }
@@ -1910,7 +1953,7 @@ export default function AppDesktop() {
               <div>
                 <label className="block mb-1 font-bold text-[#888]" htmlFor={fieldId('measurement-type')}>Measurement Type</label>
                 <select id={fieldId('measurement-type')} value={ucMode} onChange={e => {
-                  const m = e.target.value as any;
+                  const m = e.target.value as 'Length' | 'Pressure' | 'Mass' | 'Temp';
                   setUcMode(m);
                   if(m === 'Length') { setUcUnit1('in'); setUcUnit2('mm'); }
                   if(m === 'Pressure') { setUcUnit1('psi'); setUcUnit2('MPa'); }
@@ -2039,7 +2082,7 @@ export default function AppDesktop() {
                 <InputBox label="σ_p" value={sigma_p} onChange={setSigmaP} suffix="1/K" />
                 <div className="col-span-2 flex items-center justify-end space-x-2 mt-1 border-t border-[#eee] pt-1">
                   <span className="text-[#888] text-[10px]">Erosive Burning Model</span>
-                  <select value={erosiveModel} onChange={e => setErosiveModel(e.target.value as any)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none font-mono text-right text-[10px]">
+                  <select value={erosiveModel} onChange={e => setErosiveModel(e.target.value as 'None' | 'Lenoir-Robillard' | 'JPL')} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none font-mono text-right text-[10px]">
                     <option value="None">None</option>
                     <option value="Lenoir-Robillard">Lenoir-Robillard</option>
                     <option value="JPL">JPL Linear</option>
@@ -2093,7 +2136,7 @@ export default function AppDesktop() {
               </div>
               <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
                 <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs" htmlFor={fieldId('type')}>Type</label>
-                <select id={fieldId('type')} value={grainType} onChange={e => setGrainType(e.target.value as any)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
+                <select id={fieldId('type')} value={grainType} onChange={e => setGrainType(e.target.value as GrainType)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
                   <option value="BATES">BATES</option>
                   <option value="Tubular">Tubular</option>
                   <option value="Star">Star</option>
@@ -2175,7 +2218,7 @@ export default function AppDesktop() {
                 <InputBox label="Cf Efficiency" value={cfEff} onChange={setCfEff} step={0.01} suffix="" />
 
                 <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs" htmlFor={fieldId('material')}>Material</label>
-                <select id={fieldId('material')} value={nozzleMaterial} onChange={e => setNozzleMaterial(e.target.value as any)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
+                <select id={fieldId('material')} value={nozzleMaterial} onChange={e => setNozzleMaterial(e.target.value as NozzleMaterialName)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
                   <option value="Graphite">Graphite</option>
                   <option value="Phenolic">Phenolic</option>
                   <option value="Custom">Custom</option>
@@ -2446,7 +2489,7 @@ export default function AppDesktop() {
                         <YAxis yAxisId="right" orientation="right" stroke="#ffaa00" tick={{ fill: '#ffaa00', fontSize: 10 }} tickFormatter={(v) => v.toFixed(1)} />
                         <Tooltip
                           contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '11px', fontFamily: 'monospace' }}
-                          labelFormatter={(v: any) => `x = ${Number(v).toFixed(3)} m`}
+                          labelFormatter={(v: number | string) => `x = ${Number(v).toFixed(3)} m`}
                         />
                         <Legend wrapperStyle={{ fontSize: '10px' }} />
                         <Line yAxisId="left" type="monotone" dataKey="Pc_MPa" name="Static Pc (MPa)" stroke="#00aaff" strokeWidth={1.5} dot={false} isAnimationActive={false} />

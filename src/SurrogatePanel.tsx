@@ -688,7 +688,7 @@ export function SurrogatePanel({
                     tickFormatter={(v) => (mcTarget === 'peak_pc' ? (v / 1e6).toFixed(1) : v.toFixed(0))} />
                   <YAxis stroke="#666" tick={{ fill: '#888', fontSize: 9 }} />
                   <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px' }}
-                    labelFormatter={(v: any) => FORMAT[mcTarget](Number(v))} />
+                    labelFormatter={(v: number | string) => FORMAT[mcTarget](Number(v))} />
                   <Bar dataKey="count" fill="#00aaff" isAnimationActive={false} />
                   <ReferenceLine x={mcResult[mcTarget].p05} stroke="#ffaa00" strokeDasharray="3 3" />
                   <ReferenceLine x={mcResult[mcTarget].p95} stroke="#ffaa00" strokeDasharray="3 3" />

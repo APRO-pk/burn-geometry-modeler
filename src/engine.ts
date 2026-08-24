@@ -704,8 +704,8 @@ export class MotorSimulation {
         break;
       }
 
-      let r_b_base = this.propellant.a * Math.pow(this.Pc, this.propellant.n);
-      let temp_corr = 1 + this.propellant.sigma_p * (this.T_init - this.propellant.T_ref);
+      const r_b_base = this.propellant.a * Math.pow(this.Pc, this.propellant.n);
+      const temp_corr = 1 + this.propellant.sigma_p * (this.T_init - this.propellant.T_ref);
       let r_b = r_b_base * temp_corr;
 
       const m_dot_ideal = this.propellant.density * Ab * r_b;
