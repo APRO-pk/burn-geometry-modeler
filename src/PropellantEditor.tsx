@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useFieldIds } from './useFieldIds';
 import { Settings, Plus, Trash2, Check } from 'lucide-react';
 import type { BurnRateRegime } from './wasmCore';
 
@@ -32,6 +33,7 @@ interface PropellantEditorProps {
 }
 
 export function PropellantEditor({ propellants, onChange, onApply, onClose }: PropellantEditorProps) {
+  const fieldId = useFieldIds();
   const [selectedId, setSelectedId] = useState<string>(propellants[0]?.id || '');
 
   const selectedIdx = propellants.findIndex(p => p.id === selectedId);
@@ -88,14 +90,36 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
           <div className="w-1/3 border-r border-[#444] flex flex-col bg-[#1a1a1a]">
              <div className="overflow-y-auto flex-1 p-2 space-y-1">
                {propellants.map(p => (
-                 <div 
-                   key={p.id} 
-                   className={`p-2 rounded cursor-pointer flex justify-between items-center group ${selectedId === p.id ? 'bg-[#333] border border-[#555]' : 'hover:bg-[#222] border border-transparent'}`}
-                   onClick={() => setSelectedId(p.id)}
+                 /*
+                  * The row is a plain container; the NAME is the button that
+                  * selects it.
+                  *
+                  * It used to be a clickable <div> with the delete button
+                  * nested inside, which is unreachable by keyboard -- and could
+                  * not simply be promoted to a <button>, because a button
+                  * inside a button is invalid HTML and browsers do not nest
+                  * them. Splitting the row into two sibling buttons is both
+                  * valid and fully operable without a mouse.
+                  */
+                 <div
+                   key={p.id}
+                   className={`p-2 rounded flex justify-between items-center group ${selectedId === p.id ? 'bg-[#333] border border-[#555]' : 'hover:bg-[#222] border border-transparent'}`}
                  >
-                   <span className="truncate pr-2">{p.name || 'Unnamed'}</span>
+                   <button
+                     type="button"
+                     onClick={() => setSelectedId(p.id)}
+                     aria-current={selectedId === p.id}
+                     className="truncate pr-2 flex-1 text-left cursor-pointer bg-transparent border-0 p-0 text-inherit focus:outline-none focus-visible:ring-1 focus-visible:ring-[#00ffaa] rounded"
+                   >
+                     {p.name || 'Unnamed'}
+                   </button>
                    {propellants.length > 1 && (
-                     <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="text-[#666] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <button
+                       type="button"
+                       onClick={() => handleDelete(p.id)}
+                       aria-label={`Delete ${p.name || 'Unnamed'}`}
+                       className="text-[#666] hover:text-red-500 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity focus:outline-none focus-visible:ring-1 focus-visible:ring-red-500 rounded"
+                     >
                        <Trash2 size={12} />
                      </button>
                    )}
@@ -114,42 +138,42 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
              {selectedProp ? (
                <>
                  <div className="space-y-1">
-                   <label className="text-[#888]">Name</label>
-                   <input type="text" value={selectedProp.name} onChange={e => updateSelected('name', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white" />
+                   <label className="text-[#888]" htmlFor={fieldId('name')}>Name</label>
+                   <input id={fieldId('name')} type="text" value={selectedProp.name} onChange={e => updateSelected('name', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white" />
                  </div>
                  
                  <div className="grid grid-cols-2 gap-3">
                    <div className="space-y-1">
-                     <label className="text-[#888]">Density (kg/m³)</label>
-                     <input type="number" step="any" value={selectedProp.density} onChange={e => handleNumChange('density', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
+                     <label className="text-[#888]" htmlFor={fieldId('density-kg-m')}>Density (kg/m³)</label>
+                     <input id={fieldId('density-kg-m')} type="number" step="any" value={selectedProp.density} onChange={e => handleNumChange('density', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]">Burn Coeff 'a' (m/s/Pa^n)</label>
-                     <input type="number" step="any" value={selectedProp.a} onChange={e => handleNumChange('a', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
+                     <label className="text-[#888]" htmlFor={fieldId('burn-coeff-a-m-s-pa-n')}>Burn Coeff 'a' (m/s/Pa^n)</label>
+                     <input id={fieldId('burn-coeff-a-m-s-pa-n')} type="number" step="any" value={selectedProp.a} onChange={e => handleNumChange('a', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]">Pressure Exp 'n'</label>
-                     <input type="number" step="any" value={selectedProp.n} onChange={e => handleNumChange('n', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
+                     <label className="text-[#888]" htmlFor={fieldId('pressure-exp-n')}>Pressure Exp 'n'</label>
+                     <input id={fieldId('pressure-exp-n')} type="number" step="any" value={selectedProp.n} onChange={e => handleNumChange('n', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]">Mol Wt (kg/mol)</label>
-                     <input type="number" step="any" value={selectedProp.molWeight} onChange={e => handleNumChange('molWeight', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
+                     <label className="text-[#888]" htmlFor={fieldId('mol-wt-kg-mol')}>Mol Wt (kg/mol)</label>
+                     <input id={fieldId('mol-wt-kg-mol')} type="number" step="any" value={selectedProp.molWeight} onChange={e => handleNumChange('molWeight', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]">Linear k_erosive</label>
-                     <input type="number" step="any" value={selectedProp.kErosive} onChange={e => handleNumChange('kErosive', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
+                     <label className="text-[#888]" htmlFor={fieldId('linear-k-erosive')}>Linear k_erosive</label>
+                     <input id={fieldId('linear-k-erosive')} type="number" step="any" value={selectedProp.kErosive} onChange={e => handleNumChange('kErosive', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]">G Threshold (kg/m²s)</label>
-                     <input type="number" step="any" value={selectedProp.gThreshold} onChange={e => handleNumChange('gThreshold', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
+                     <label className="text-[#888]" htmlFor={fieldId('g-threshold-kg-m-s')}>G Threshold (kg/m²s)</label>
+                     <input id={fieldId('g-threshold-kg-m-s')} type="number" step="any" value={selectedProp.gThreshold} onChange={e => handleNumChange('gThreshold', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]">Flame Temp (K)</label>
-                     <input type="number" step="any" value={selectedProp.flameTemp} onChange={e => handleNumChange('flameTemp', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
+                     <label className="text-[#888]" htmlFor={fieldId('flame-temp-k')}>Flame Temp (K)</label>
+                     <input id={fieldId('flame-temp-k')} type="number" step="any" value={selectedProp.flameTemp} onChange={e => handleNumChange('flameTemp', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]">Gamma (ratio of specific heats)</label>
-                     <input type="number" step="any" value={selectedProp.gamma} onChange={e => handleNumChange('gamma', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
+                     <label className="text-[#888]" htmlFor={fieldId('gamma-ratio-of-specific-heats')}>Gamma (ratio of specific heats)</label>
+                     <input id={fieldId('gamma-ratio-of-specific-heats')} type="number" step="any" value={selectedProp.gamma} onChange={e => handleNumChange('gamma', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00ffaa] text-white text-right" />
                    </div>
                  </div>
                </>

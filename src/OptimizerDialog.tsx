@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useFieldIds } from './useFieldIds';
 import { Play } from 'lucide-react';
 import { runMotor } from './wasmClient';
 import { grainConfigFromUi } from './wasmCore';
@@ -11,6 +12,7 @@ interface OptimizerProps {
 }
 
 export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: OptimizerProps) {
+  const fieldId = useFieldIds();
   const [paramToSweep, setParamToSweep] = useState<'throatDiameter' | 'length'>('throatDiameter');
   const [sweepMin, setSweepMin] = useState<number>(0.005);
   const [sweepMax, setSweepMax] = useState<number>(0.03);
@@ -104,23 +106,23 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
         
         <div className="flex space-x-4 items-end">
           <div className="flex flex-col space-y-1 flex-1">
-            <label className="text-[#888]">Sweep Parameter</label>
-            <select value={paramToSweep} onChange={e => setParamToSweep(e.target.value as any)} className="bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#ffaa00]">
+            <label className="text-[#888]" htmlFor={fieldId('sweep-parameter')}>Sweep Parameter</label>
+            <select id={fieldId('sweep-parameter')} value={paramToSweep} onChange={e => setParamToSweep(e.target.value as any)} className="bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#ffaa00]">
               <option value="throatDiameter">Throat Diameter (m)</option>
               <option value="length">Grain Length (m)</option>
             </select>
           </div>
           <div className="flex flex-col space-y-1 w-20">
-            <label className="text-[#888]">Min</label>
-            <input type="number" step="any" value={sweepMin} onChange={e => setSweepMin(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
+            <label className="text-[#888]" htmlFor={fieldId('min')}>Min</label>
+            <input id={fieldId('min')} type="number" step="any" value={sweepMin} onChange={e => setSweepMin(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
           </div>
           <div className="flex flex-col space-y-1 w-20">
-            <label className="text-[#888]">Max</label>
-            <input type="number" step="any" value={sweepMax} onChange={e => setSweepMax(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
+            <label className="text-[#888]" htmlFor={fieldId('max')}>Max</label>
+            <input id={fieldId('max')} type="number" step="any" value={sweepMax} onChange={e => setSweepMax(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
           </div>
           <div className="flex flex-col space-y-1 w-20">
-            <label className="text-[#888]">Steps</label>
-            <input type="number" value={steps} onChange={e => setSteps(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
+            <label className="text-[#888]" htmlFor={fieldId('steps')}>Steps</label>
+            <input id={fieldId('steps')} type="number" value={steps} onChange={e => setSteps(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
           </div>
           <div className="flex flex-col space-y-1 w-36">
             <label className="text-[#888]" htmlFor="sweep-model">Solver</label>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useFieldIds } from './useFieldIds';
 import {
   ResponsiveContainer,
   ScatterChart,
@@ -42,16 +43,17 @@ export function MonteCarloTab({
   results,
   onRun,
 }: MonteCarloTabProps) {
+  const fieldId = useFieldIds();
   return (
             <div className="flex-1 flex flex-col space-y-1">
               <div className="flex-none bg-[#e4e4e4] border border-[#ccc] p-2 flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
-                  <label className="text-xs text-[#444] font-bold">Runs:</label>
-                  <input type="number" value={runs} onChange={e => onRunsChange(Number(e.target.value))} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-16 text-xs" />
+                  <label className="text-xs text-[#444] font-bold" htmlFor={fieldId('runs')}>Runs:</label>
+                  <input id={fieldId('runs')} type="number" value={runs} onChange={e => onRunsChange(Number(e.target.value))} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-16 text-xs" />
                 </div>
                 <div className="flex items-center space-x-2">
-                  <label className="text-xs text-[#444] font-bold">Variance (%):</label>
-                  <input type="number" value={variance} onChange={e => onVarianceChange(Number(e.target.value))} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-16 text-xs" />
+                  <label className="text-xs text-[#444] font-bold" htmlFor={fieldId('variance')}>Variance (%):</label>
+                  <input id={fieldId('variance')} type="number" value={variance} onChange={e => onVarianceChange(Number(e.target.value))} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-16 text-xs" />
                 </div>
                 <div className="flex items-center space-x-2">
                   <label htmlFor="mc-solver" className="text-xs text-[#444] font-bold">Solver:</label>

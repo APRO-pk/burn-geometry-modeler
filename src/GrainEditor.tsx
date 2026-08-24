@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useFieldIds } from './useFieldIds';
 import { Settings, Check } from 'lucide-react';
 import { grainFromUi } from './engine';
 import { DXFRegressionResults } from './dxfProcessor';
@@ -24,6 +25,7 @@ interface GrainEditorProps {
 }
 
 export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainEditorProps) {
+  const fieldId = useFieldIds();
   const [params, setParams] = useState(initialParams);
   const [currentY, setCurrentY] = useState(0);
 
@@ -80,8 +82,8 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
           <div className="w-1/3 border-r border-[#444] p-4 space-y-4 overflow-y-auto bg-[#1a1a1a]">
              
              <div className="space-y-1">
-               <label className="text-[#888]">Type</label>
-               <select value={params.grainType} onChange={e => updateParam('grainType', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white">
+               <label className="text-[#888]" htmlFor={fieldId('type')}>Type</label>
+               <select id={fieldId('type')} value={params.grainType} onChange={e => updateParam('grainType', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white">
                   <option value="BATES">BATES</option>
                   <option value="Tubular">Tubular</option>
                   <option value="Star">Star</option>
@@ -93,73 +95,73 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
              </div>
 
              <div className="space-y-1">
-               <label className="text-[#888]">Length (m)</label>
-               <input type="number" step="any" value={params.length} onChange={e => handleNumChange('length', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+               <label className="text-[#888]" htmlFor={fieldId('length-m')}>Length (m)</label>
+               <input id={fieldId('length-m')} type="number" step="any" value={params.length} onChange={e => handleNumChange('length', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
              </div>
 
              <div className="space-y-1">
-               <label className="text-[#888]">Outer Radius (m)</label>
-               <input type="number" step="any" value={params.outerRadius} onChange={e => handleNumChange('outerRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+               <label className="text-[#888]" htmlFor={fieldId('outer-radius-m')}>Outer Radius (m)</label>
+               <input id={fieldId('outer-radius-m')} type="number" step="any" value={params.outerRadius} onChange={e => handleNumChange('outerRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
              </div>
 
              {['Star'].includes(params.grainType) && (
                <>
                  <div className="space-y-1">
-                   <label className="text-[#888]">Valley Radius (m)</label>
-                   <input type="number" step="any" value={params.valleyRadius} onChange={e => handleNumChange('valleyRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[#888]" htmlFor={fieldId('valley-radius-m')}>Valley Radius (m)</label>
+                   <input id={fieldId('valley-radius-m')} type="number" step="any" value={params.valleyRadius} onChange={e => handleNumChange('valleyRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                  </div>
                  <div className="space-y-1">
-                   <label className="text-[#888]">Tip Radius (m)</label>
-                   <input type="number" step="any" value={params.tipRadius} onChange={e => handleNumChange('tipRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[#888]" htmlFor={fieldId('tip-radius-m')}>Tip Radius (m)</label>
+                   <input id={fieldId('tip-radius-m')} type="number" step="any" value={params.tipRadius} onChange={e => handleNumChange('tipRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                  </div>
                  <div className="space-y-1">
-                   <label className="text-[#888]">Points</label>
-                   <input type="number" step="1" value={params.numPoints} onChange={e => handleNumChange('numPoints', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[#888]" htmlFor={fieldId('points')}>Points</label>
+                   <input id={fieldId('points')} type="number" step="1" value={params.numPoints} onChange={e => handleNumChange('numPoints', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                  </div>
                </>
              )}
 
              {['BATES', 'Tubular', 'RodAndTube', 'MoonBurner', 'Finocyl'].includes(params.grainType) && (
                  <div className="space-y-1">
-                   <label className="text-[#888]">Inner Radius (m)</label>
-                   <input type="number" step="any" value={params.innerRadius} onChange={e => handleNumChange('innerRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[#888]" htmlFor={fieldId('inner-radius-m')}>Inner Radius (m)</label>
+                   <input id={fieldId('inner-radius-m')} type="number" step="any" value={params.innerRadius} onChange={e => handleNumChange('innerRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                  </div>
              )}
 
              {['BATES'].includes(params.grainType) && (
                  <div className="space-y-1">
-                   <label className="text-[#888]">Segments</label>
-                   <input type="number" step="1" value={params.numSegments} onChange={e => handleNumChange('numSegments', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[#888]" htmlFor={fieldId('segments')}>Segments</label>
+                   <input id={fieldId('segments')} type="number" step="1" value={params.numSegments} onChange={e => handleNumChange('numSegments', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                  </div>
              )}
 
              {['RodAndTube'].includes(params.grainType) && (
                  <div className="space-y-1">
-                   <label className="text-[#888]">Rod Radius (m)</label>
-                   <input type="number" step="any" value={params.rodRadius} onChange={e => handleNumChange('rodRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[#888]" htmlFor={fieldId('rod-radius-m')}>Rod Radius (m)</label>
+                   <input id={fieldId('rod-radius-m')} type="number" step="any" value={params.rodRadius} onChange={e => handleNumChange('rodRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                  </div>
              )}
 
              {['MoonBurner'].includes(params.grainType) && (
                  <div className="space-y-1">
-                   <label className="text-[#888]">Offset (m)</label>
-                   <input type="number" step="any" value={params.offset} onChange={e => handleNumChange('offset', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[#888]" htmlFor={fieldId('offset-m')}>Offset (m)</label>
+                   <input id={fieldId('offset-m')} type="number" step="any" value={params.offset} onChange={e => handleNumChange('offset', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                  </div>
              )}
 
              {['Finocyl'].includes(params.grainType) && (
                  <>
                    <div className="space-y-1">
-                     <label className="text-[#888]">Fin Depth (m)</label>
-                     <input type="number" step="any" value={params.finDepth} onChange={e => handleNumChange('finDepth', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                     <label className="text-[#888]" htmlFor={fieldId('fin-depth-m')}>Fin Depth (m)</label>
+                     <input id={fieldId('fin-depth-m')} type="number" step="any" value={params.finDepth} onChange={e => handleNumChange('finDepth', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]">Fin Width (m)</label>
-                     <input type="number" step="any" value={params.finWidth} onChange={e => handleNumChange('finWidth', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                     <label className="text-[#888]" htmlFor={fieldId('fin-width-m')}>Fin Width (m)</label>
+                     <input id={fieldId('fin-width-m')} type="number" step="any" value={params.finWidth} onChange={e => handleNumChange('finWidth', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]">Fins</label>
-                     <input type="number" step="1" value={params.numPoints} onChange={e => handleNumChange('numPoints', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                     <label className="text-[#888]" htmlFor={fieldId('fins')}>Fins</label>
+                     <input id={fieldId('fins')} type="number" step="1" value={params.numPoints} onChange={e => handleNumChange('numPoints', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
                    </div>
                  </>
              )}

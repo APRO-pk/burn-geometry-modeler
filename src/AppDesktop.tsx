@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useFieldIds } from './useFieldIds';
 import {
   grainFromUi,
   export_to_eng,
@@ -265,6 +266,7 @@ const TAB_DEFS = [
 export type TabId = (typeof TAB_DEFS)[number]['id'];
 
 export default function AppDesktop() {
+  const fieldId = useFieldIds();
   /*
    * Display preferences, remembered across reloads.
    *
@@ -1851,15 +1853,25 @@ export default function AppDesktop() {
               <button onClick={() => setShowPreferences(false)} className="hover:text-red-500">✕</button>
             </div>
             <div className="p-4 space-y-4 text-xs">
-              <div className="border border-[#444] rounded p-3">
-                <label className="block mb-2 font-bold text-[#aaa] uppercase border-b border-[#444] pb-1">Unit System</label>
+              {/*
+                * A fieldset with a legend, not a label above two loose radios.
+                *
+                * "Unit System" names a GROUP, and a <label> cannot name a group
+                * -- screen readers announced it as a label with nothing to
+                * label. The radios were also missing a shared `name`, so the
+                * browser never treated them as one group and arrow keys did not
+                * move between them; they only happened to behave exclusively
+                * because the click handlers set the same state.
+                */}
+              <fieldset className="border border-[#444] rounded p-3">
+                <legend className="mb-2 font-bold text-[#aaa] uppercase px-1">Unit System</legend>
                 <div className="flex space-x-4 mb-3">
                   <label className="flex items-center space-x-1 cursor-pointer">
-                    <input type="radio" checked={unitSystem === 'Metric'} onChange={() => setUnitSystem('Metric')} className="accent-blue-500" />
+                    <input type="radio" name="unit-system" value="Metric" checked={unitSystem === 'Metric'} onChange={() => setUnitSystem('Metric')} className="accent-blue-500" />
                     <span>Metric</span>
                   </label>
                   <label className="flex items-center space-x-1 cursor-pointer">
-                    <input type="radio" checked={unitSystem === 'Imperial'} onChange={() => setUnitSystem('Imperial')} className="accent-blue-500" />
+                    <input type="radio" name="unit-system" value="Imperial" checked={unitSystem === 'Imperial'} onChange={() => setUnitSystem('Imperial')} className="accent-blue-500" />
                     <span>Imperial</span>
                   </label>
                 </div>
@@ -1881,7 +1893,7 @@ export default function AppDesktop() {
                     ))}
                   </div>
                 )}
-              </div>
+              </fieldset>
             </div>
           </div>
         </div>
@@ -1896,8 +1908,8 @@ export default function AppDesktop() {
             </div>
             <div className="p-4 space-y-4 text-xs">
               <div>
-                <label className="block mb-1 font-bold text-[#888]">Measurement Type</label>
-                <select value={ucMode} onChange={e => {
+                <label className="block mb-1 font-bold text-[#888]" htmlFor={fieldId('measurement-type')}>Measurement Type</label>
+                <select id={fieldId('measurement-type')} value={ucMode} onChange={e => {
                   const m = e.target.value as any;
                   setUcMode(m);
                   if(m === 'Length') { setUcUnit1('in'); setUcUnit2('mm'); }
@@ -2080,8 +2092,8 @@ export default function AppDesktop() {
                 <button onClick={() => setShowGrainEditor(true)} className="text-[#0056b3] hover:underline decoration-[#0056b3] lowercase font-normal">(preview / edit)</button>
               </div>
               <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
-                <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs">Type</label>
-                <select value={grainType} onChange={e => setGrainType(e.target.value as any)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
+                <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs" htmlFor={fieldId('type')}>Type</label>
+                <select id={fieldId('type')} value={grainType} onChange={e => setGrainType(e.target.value as any)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
                   <option value="BATES">BATES</option>
                   <option value="Tubular">Tubular</option>
                   <option value="Star">Star</option>
@@ -2096,10 +2108,16 @@ export default function AppDesktop() {
                 
                 {grainType === 'CustomDXF' && (
                   <div className="col-span-2 pt-1 border-t border-[#eee] mt-1 space-y-1">
-                    <label className="flex items-center text-[#444] text-xs">Upload DXF Cross Section</label>
+                    {/*
+                      * A heading, not a label: the real control here is the
+                      * button below, since the file input itself is hidden and
+                      * only ever opened through it. Marking this a <label> made
+                      * screen readers look for a form field it named.
+                      */}
+                    <p className="flex items-center text-[#444] text-xs" id="dxf-upload-heading">Upload DXF Cross Section</p>
                     <div className="flex items-center space-x-2">
                        <input type="file" accept=".dxf" className="hidden" ref={dxfFileInputRef} onChange={handleDXFUpload} />
-                       <button onClick={() => dxfFileInputRef.current?.click()} className="flex-1 p-1 hover:bg-[#e0e0e0] border border-[#ccc] rounded flex items-center justify-center text-xs text-[#333]">
+                       <button type="button" aria-describedby="dxf-upload-heading" onClick={() => dxfFileInputRef.current?.click()} className="flex-1 p-1 hover:bg-[#e0e0e0] border border-[#ccc] rounded flex items-center justify-center text-xs text-[#333]">
                          <Upload size={14} className="mr-1" /> Load .DXF
                        </button>
                        <span className="text-[10px] text-[#666] truncate max-w-[100px]">{dxfFilename || 'No file'}</span>
@@ -2156,8 +2174,8 @@ export default function AppDesktop() {
                 <InputBox label="C* Efficiency" value={cStarEff} onChange={setCStarEff} step={0.01} suffix="" />
                 <InputBox label="Cf Efficiency" value={cfEff} onChange={setCfEff} step={0.01} suffix="" />
 
-                <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs">Material</label>
-                <select value={nozzleMaterial} onChange={e => setNozzleMaterial(e.target.value as any)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
+                <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs" htmlFor={fieldId('material')}>Material</label>
+                <select id={fieldId('material')} value={nozzleMaterial} onChange={e => setNozzleMaterial(e.target.value as any)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
                   <option value="Graphite">Graphite</option>
                   <option value="Phenolic">Phenolic</option>
                   <option value="Custom">Custom</option>
@@ -2184,8 +2202,8 @@ export default function AppDesktop() {
                 <InputBox label="Igniter Mass" value={igniterMass} onChange={setIgniterMass} suffix="kg" unitCat="Mass" />
                 <InputBox label="Igniter Area" value={igniterSurfaceArea} onChange={setIgniterSurfaceArea} suffix="m²" unitCat="Area" />
                 
-                <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs">Casing Alloy</label>
-                <select value={casingMaterial} onChange={e => handleCasingChange(e.target.value)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
+                <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs" htmlFor={fieldId('casing-alloy')}>Casing Alloy</label>
+                <select id={fieldId('casing-alloy')} value={casingMaterial} onChange={e => handleCasingChange(e.target.value)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
                   <option value="Al 6061-T6">Al 6061-T6</option>
                   <option value="Steel 4130">Steel 4130</option>
                   <option value="Carbon Composite">Carbon Composite</option>
