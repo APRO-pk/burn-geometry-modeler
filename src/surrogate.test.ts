@@ -60,7 +60,40 @@ beforeAll(() => {
 });
 
 /** Ground truth: the same 0-D solve the app runs. */
-function solve(d: RawDesign) {
+/**
+ * Ground truth for one design, memoised.
+ *
+ * WHY THE MEMO
+ *
+ * The held-out set is 45 designs x 7 geometries = 315 designs, built once in
+ * beforeAll and then shared. Three tests read it: one computes error stats for
+ * three targets, one computes band coverage, one compares error against
+ * predicted uncertainty. Between them every design was solved FIVE times, with
+ * identical inputs and therefore identical results -- about 1,575 full solves
+ * to do 315 designs worth of work.
+ *
+ * That made these three tests roughly 116 of the suite s 127 seconds, and the
+ * CPU saturation starved unrelated tests until they tripped their timeouts. So
+ * the flakiness elsewhere was a symptom of waste here.
+ *
+ * Keyed on the design OBJECT, which is stable for the lifetime of the run, so
+ * this is a cache hit by identity with no serialisation cost. A WeakMap because
+ * there is no reason to hold designs alive once a test file is done with them.
+ *
+ * Coverage is unchanged: the same designs are still solved by the same core,
+ * just once each.
+ */
+const solveCache = new WeakMap<RawDesign, ReturnType<typeof solveUncached>>();
+
+function solve(d: RawDesign): ReturnType<typeof solveUncached> {
+  const hit = solveCache.get(d);
+  if (hit) return hit;
+  const fresh = solveUncached(d);
+  solveCache.set(d, fresh);
+  return fresh;
+}
+
+function solveUncached(d: RawDesign) {
   const out = core.simulate({
     propellant: { density: d.density, a: d.a, n: d.n, ...FIXED },
     grain: d.grain,

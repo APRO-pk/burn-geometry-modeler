@@ -341,7 +341,8 @@ describe('thrust-trace shape against real motors', () => {
     // A ratio below 1 is arithmetically impossible; catching it would mean the
     // impulse integral and the peak disagree.
     expect(quantile(ours, 0)).toBeGreaterThanOrEqual(1);
-    // 27 full WASM solves; see the testTimeout note in vite.config.ts.
+    // 27 full WASM solves, ~2.3s. The testTimeout note in vite.config.ts
+    // explains why this once timed out and what actually caused it.
   });
 
   it('makes a thin-web grain more progressive than a thick-web one', () => {

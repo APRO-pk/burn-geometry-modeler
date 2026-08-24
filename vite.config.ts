@@ -15,19 +15,29 @@ export default defineConfig(() => {
     },
     test: {
       /*
-       * 30s, not vitest's 5s default.
+       * 30s headroom, not vitest's 5s default.
        *
-       * These are not unit tests. Several run real WASM physics in sweeps --
-       * 27 motor solves to constrain a distribution, or a 10/20/40/80-station
-       * grid-convergence study -- and take a second or two alone. Under the
-       * parallel file execution the suite uses, on a loaded machine, they
-       * crossed 5s and failed.
+       * This is DEFENCE IN DEPTH, not the fix -- and the distinction matters,
+       * because raising it was originally mistaken for a fix.
        *
-       * That produced the worst kind of failure: load-dependent, so re-running
-       * turned it green and taught everyone to ignore it. The sweeps are the
-       * point of those tests -- a single design would not constrain anything --
-       * so the honest fix is a timeout matched to what they actually do. A
-       * genuinely hung test still fails, just at 30s.
+       * The suite began failing in a different test on each run. Two tests that
+       * run real WASM physics in sweeps were crossing 5s, so this went up and
+       * everything went green. Profiling afterwards showed why they were slow:
+       * three surrogate tests were re-solving the same 315 held-out designs
+       * five times over -- about 1,575 solves to do 315 designs worth of work
+       * -- and were saturating the CPU for roughly 116 of the suite's 127
+       * seconds. The tests that tripped their timeouts were never slow. They
+       * were starved.
+       *
+       * Memoising that solve (see src/surrogate.test.ts) took the suite from
+       * ~126s to ~57s, and those two tests from 6.8s and 5.2s to 2.3s and 2.8s,
+       * comfortably back inside the default.
+       *
+       * The larger timeout stays anyway: a CI runner can be far slower than a
+       * developer machine, and these are physics tests rather than unit tests.
+       * A genuinely hung test still fails, just at 30s. But if a test starts
+       * approaching this limit, the answer is to profile it, not to raise the
+       * number again.
        */
       testTimeout: 30_000,
       // jsdom only for the React hook tests. Everything else -- the physics
