@@ -13,8 +13,6 @@ import type { BurnConfig, SolverModelType, StationProfiles } from './wasmCore';
 import {
   LineChart,
   Line,
-  ScatterChart,
-  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -29,11 +27,15 @@ import { GrainEditor } from './GrainEditor';
 import { exportBurnsimXML, parseBurnsimXML } from './BurnsimHandler';
 import { OptimizerDialog } from './OptimizerDialog';
 import { SurrogatePanel } from './SurrogatePanel';
-import { ModelUncertaintyPanel } from './ModelUncertaintyPanel';
 import type { MotorMetrics } from './motorMetrics';
 import { peakErosiveFraction } from './burnLaw';
 import { useMotorConfig, CASING_ALLOYS, GRAIN_TYPES, NOZZLE_MATERIALS, CASING_MATERIALS, SOLVER_MODELS } from './useMotorConfig';
 import { ErrorBoundary } from './ErrorBoundary';
+import { StructuralTab } from './StructuralTab';
+import { MonteCarloTab } from './MonteCarloTab';
+import { MaterialsTab } from './MaterialsTab';
+import { CustomGraphTab } from './CustomGraphTab';
+import { StatisticsTab } from './StatisticsTab';
 import {
   useDesignHistory,
   applyNumber,
@@ -580,13 +582,10 @@ export default function AppDesktop() {
 
   // UI Modal States
   const [showUnitConverter, setShowUnitConverter] = useState(false);
-  const [showFEA, setShowFEA] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const configFileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Custom Graph State
-  const [customXAxis, setCustomXAxis] = useState<string>('Time');
-  const [customYAxes, setCustomYAxes] = useState<string[]>(['Kn', 'Pc_MPa', 'Thrust_N']);
 
   // Results & State
   const [results, setResults] = useState<SimulationResult[]>([]);
@@ -1317,29 +1316,8 @@ export default function AppDesktop() {
   ]);
 
   /** Lame through-wall profile, reshaped for charting. */
-  const lameChart = useMemo(() => {
-    if (!structural) return [];
-    const p = structural.lame.profile;
-    return Array.from({ length: p.position.length }, (_, i) => ({
-      r_mm: p.position[i] * 1000,
-      hoop: p.hoop[i] / 1e6,
-      radial: p.radial[i] / 1e6,
-      axial: p.axial[i] / 1e6,
-      vonMises: p.vonMises[i] / 1e6,
-    }));
-  }, [structural]);
 
   /** Edge-bending profile along the case, reshaped for charting. */
-  const edgeChart = useMemo(() => {
-    if (!structural) return [];
-    const p = structural.edge.profile;
-    return Array.from({ length: p.position.length }, (_, i) => ({
-      x_mm: p.position[i] * 1000,
-      hoop: p.hoop[i] / 1e6,
-      axial: p.axial[i] / 1e6,
-      vonMises: p.vonMises[i] / 1e6,
-    }));
-  }, [structural]);
 
   /**
    * The current design in the surrogate's own parameter set. Memoised so the
@@ -2465,109 +2443,7 @@ export default function AppDesktop() {
 
             {/* TAB: EXTENDED GRAPHS (now Custom Graph) */}
             {activeTab === 'extended_graphs' && (
-              <div className="flex-1 flex bg-[#222]">
-                {/* Graph Controls Sidebar */}
-                <div className="w-48 bg-[#2a2a2a] border-r border-[#111] px-2 py-3 flex flex-col space-y-4 overflow-y-auto">
-                  
-                  {/* X Axis Selector */}
-                  <div className="border border-[#444] rounded p-2 bg-[#252525]">
-                    <div className="text-[#aaa] text-[10px] font-bold mb-2 uppercase border-b border-[#555] pb-1">X Axis</div>
-                    <div className="flex flex-col space-y-1 text-[11px] text-[#ddd]">
-                      {['Time', 'Regression Depth', 'Web'].map(opt => (
-                        <label key={opt} className="flex items-center space-x-2 cursor-pointer hover:text-[#fff]">
-                          <input type="radio" checked={customXAxis === opt} onChange={() => setCustomXAxis(opt)} className="accent-[#00aaff]" />
-                          <span>{opt}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Y Axis Selector */}
-                  <div className="border border-[#444] rounded p-2 flex-1 bg-[#252525] flex flex-col overflow-hidden">
-                    <div className="text-[#aaa] text-[10px] font-bold mb-2 uppercase border-b border-[#555] pb-1 flex-none">Y Axis</div>
-                    <div className="flex flex-col space-y-1 text-[11px] text-[#ddd] overflow-y-auto pr-1 flex-1">
-                      {[
-                        { label: 'Kn', key: 'Kn', color: '#ffff00' },
-                        { label: 'Chamber Pressure', key: 'Pc_MPa', color: '#00ff00' },
-                        { label: 'Thrust', key: 'Thrust_N', color: '#ff00ff' },
-                        { label: 'Propellant Mass', key: 'PropellantMass_kg', color: '#ff5555' },
-                        { label: 'Volume Loading', key: 'VolumeLoading_pct', color: '#5555ff' },
-                        { label: 'Mass Flow', key: 'MassFlow_kg_s', color: '#55ff55' },
-                        { label: 'Mass Flux', key: 'PortMassFlux_kg_sm2', color: '#00ffff' },
-                        { label: 'Regression Depth', key: 'Regression_mm', color: '#ffaa00' },
-                        { label: 'Web', key: 'Web_mm', color: '#aaffaa' },
-                        { label: 'Nozzle Exit Pressure', key: 'NozzleExitPressure_MPa', color: '#aaaaff' },
-                        { label: 'Change in Throat Diameter', key: 'ChangeInThroatDiameter_mm', color: '#ffaaff' },
-                        { label: 'Core Mach Number', key: 'CoreMachNumber', color: '#ffffff' },
-                      ].map(opt => (
-                        <label key={opt.key} className="flex items-center space-x-2 cursor-pointer hover:text-[#fff]">
-                          <input type="checkbox" checked={customYAxes.includes(opt.key)} onChange={(e) => {
-                            if (e.target.checked) setCustomYAxes([...customYAxes, opt.key]);
-                            else setCustomYAxes(customYAxes.filter(k => k !== opt.key));
-                          }} className="accent-[#00aaff]" />
-                          <div className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: opt.color }}></div>
-                          <span className="truncate" title={opt.label}>{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Grains Selector */}
-                  <div className="border border-[#444] rounded p-2 bg-[#252525]">
-                    <div className="text-[#aaa] text-[10px] font-bold mb-2 uppercase border-b border-[#555] pb-1">Grains</div>
-                    <div className="flex flex-col space-y-1 text-[11px] text-[#ddd]">
-                      <label className="flex items-center space-x-2 cursor-pointer hover:text-[#fff]">
-                        <input type="checkbox" checked={true} readOnly className="accent-[#00aaff]" />
-                        <span>Grain 1..{numSegments}</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Main Graph View */}
-                <div className="flex-1 bg-black relative p-2 flex flex-col border border-[#555]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 10, right: 20, bottom: 20, left: -20 }}>
-                      <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                      <XAxis 
-                        dataKey={customXAxis === 'Time' ? 'Time' : customXAxis === 'Regression Depth' ? 'Regression_mm' : 'Web_mm'} 
-                        type="number" 
-                        domain={['dataMin', 'dataMax']} 
-                        stroke="#666" 
-                        tick={{fill: '#888', fontSize: 10}} 
-                        tickFormatter={(v) => v.toFixed(2)} 
-                        label={{ value: customXAxis, position: 'insideBottom', offset: -15, fill: '#888', fontSize: 12 }} 
-                      />
-                      
-                      <YAxis stroke="#666" tick={{fill: '#888', fontSize: 10}} domain={['auto', 'auto']} tickFormatter={(v) => v >= 1000 ? (v/1000).toFixed(1)+'k' : v.toFixed(1)} />
-                      
-                      <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '11px', fontFamily: 'monospace' }} />
-                      
-                      {/* Lines */}
-                      {[
-                        { label: 'Kn', key: 'Kn', color: '#ffff00' },
-                        { label: 'Chamber Pressure', key: 'Pc_MPa', color: '#00ff00' },
-                        { label: 'Thrust', key: 'Thrust_N', color: '#ff00ff' },
-                        { label: 'Propellant Mass', key: 'PropellantMass_kg', color: '#ff5555' },
-                        { label: 'Volume Loading', key: 'VolumeLoading_pct', color: '#5555ff' },
-                        { label: 'Mass Flow', key: 'MassFlow_kg_s', color: '#55ff55' },
-                        { label: 'Mass Flux', key: 'PortMassFlux_kg_sm2', color: '#00ffff' },
-                        { label: 'Regression Depth', key: 'Regression_mm', color: '#ffaa00' },
-                        { label: 'Web', key: 'Web_mm', color: '#aaffaa' },
-                        { label: 'Nozzle Exit Pressure', key: 'NozzleExitPressure_MPa', color: '#aaaaff' },
-                        { label: 'Change in Throat Diameter', key: 'ChangeInThroatDiameter_mm', color: '#ffaaff' },
-                        { label: 'Core Mach Number', key: 'CoreMachNumber', color: '#ffffff' },
-                      ]
-                        .filter(opt => customYAxes.includes(opt.key))
-                        .map(opt => (
-                          <Line key={opt.key} name={opt.label} type="stepAfter" dataKey={opt.key} stroke={opt.color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                        ))
-                      }
-                      <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace', color: '#ccc' }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+              <CustomGraphTab chartData={chartData} numSegments={numSegments} />
             )}
 
             {/* TAB: GEOMETRY */}
@@ -2702,540 +2578,54 @@ export default function AppDesktop() {
 
             {/* TAB: MONTE CARLO */}
             {activeTab === 'montecarlo' && (
-              <div className="flex-1 flex flex-col space-y-1">
-                <div className="flex-none bg-[#e4e4e4] border border-[#ccc] p-2 flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <label className="text-xs text-[#444] font-bold">Runs:</label>
-                    <input type="number" value={mcRuns} onChange={e => setMcRuns(Number(e.target.value))} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-16 text-xs" />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <label className="text-xs text-[#444] font-bold">Variance (%):</label>
-                    <input type="number" value={mcVariance} onChange={e => setMcVariance(Number(e.target.value))} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-16 text-xs" />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <label htmlFor="mc-solver" className="text-xs text-[#444] font-bold">Solver:</label>
-                    <select
-                      id="mc-solver"
-                      value={mcSolverModel}
-                      onChange={e => setMcSolverModel(e.target.value as SolverModelType)}
-                      className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none text-xs"
-                    >
-                      <option value="0D">0-D lumped (fast)</option>
-                      <option value="quasi1D">Quasi-1-D axial</option>
-                    </select>
-                  </div>
-                  <button onClick={runMonteCarlo} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded shadow-sm">
-                    Run Analysis
-                  </button>
-                  {mcSolverModel === 'quasi1D' && (
-                    <span className="text-[10px] text-[#856404] leading-snug max-w-xs">
-                      {mcRuns} axially resolved solves at {stationCount} stations each. Slower, but
-                      it is the only way to see whether axial resolution changes your dispersion.
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 bg-black border border-[#555] relative flex flex-col">
-                  <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">Monte Carlo: Max Pressure vs Max Thrust</div>
-                  {mcResults.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 10 }}>
-                        <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                        <XAxis dataKey="maxPc" type="number" name="Max Pressure" unit=" MPa" stroke="#666" tick={{fill: '#888', fontSize: 10}} domain={['auto', 'auto']} label={{ value: 'Max Pressure (MPa)', position: 'insideBottom', offset: -10, fill: '#888', fontSize: 10 }} />
-                        <YAxis dataKey="maxThrust" type="number" name="Max Thrust" unit=" kN" stroke="#666" tick={{fill: '#888', fontSize: 10}} domain={['auto', 'auto']} label={{ value: 'Max Thrust (kN)', angle: -90, position: 'insideLeft', fill: '#888', fontSize: 10 }} />
-                        <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#111', borderColor: '#444', color: '#00aaff', fontSize: '11px', fontFamily: 'monospace' }} />
-                        <Scatter name="Runs" data={mcResults} fill="#00aaff" />
-                      </ScatterChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center text-[#555] font-mono text-xs">
-                      Run analysis to view distribution
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MonteCarloTab
+                runs={mcRuns}
+                onRunsChange={setMcRuns}
+                variance={mcVariance}
+                onVarianceChange={setMcVariance}
+                solverModel={mcSolverModel}
+                onSolverModelChange={setMcSolverModel}
+                stationCount={stationCount}
+                results={mcResults}
+                onRun={runMonteCarlo}
+              />
             )}
 
             {/* TAB: MATERIALS */}
             {activeTab === 'materials' && (
-              <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
-                <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">Material Properties Library</div>
-
-                <div className="w-full max-w-4xl space-y-6 mt-6">
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Casing Overview Card */}
-                    <div className="bg-[#111] border border-[#333] p-4 rounded-md shadow-lg relative">
-                      <h3 className="font-mono font-bold text-[#00aaff] mb-4 pb-2 border-b border-[#333] text-sm tracking-wide">CASING ALLOY</h3>
-                      <p className="font-mono text-[#eee] font-bold mb-4">{casingMaterial}</p>
-                      <div className="grid grid-cols-2 gap-y-2 text-xs font-mono">
-                        <div className="text-[#888]">Yield Str:</div>
-                        <div className="text-[#00ff00] font-bold">{casingYieldStress} MPa</div>
-                        <div className="text-[#888]">Young's Mod:</div>
-                        <div className="text-[#00ff00] font-bold">{casingYoungsModulus} GPa</div>
-                      </div>
-                      <div className="absolute top-2 right-2 flex space-x-1">
-                        <button onClick={() => handleSaveMaterial('casing')} className="text-[10px] bg-[#222] text-[#aaa] border border-[#444] px-1 hover:bg-[#333] hover:text-[#fff] rounded">Save</button>
-                        <button onClick={() => handleLoadMaterialClick('casing')} className="text-[10px] bg-[#222] text-[#aaa] border border-[#444] px-1 hover:bg-[#333] hover:text-[#fff] rounded">Load</button>
-                      </div>
-                    </div>
-                    
-                    {/* Propellant Overview Card */}
-                    <div className="bg-[#111] border border-[#333] p-4 rounded-md shadow-lg relative">
-                      <h3 className="font-mono font-bold text-[#00ffff] mb-4 pb-2 border-b border-[#333] text-sm tracking-wide">PROPELLANT</h3>
-                      <div className="grid grid-cols-2 gap-y-2 text-xs font-mono">
-                        <div className="text-[#888]">Density:</div>
-                        <div className="text-[#00ff00] font-bold">{density} kg/m³</div>
-                        <div className="text-[#888]">Burn Coeff(a):</div>
-                        <div className="text-[#00ff00] font-bold">{a}</div>
-                        <div className="text-[#888]">Burn Exp(n):</div>
-                        <div className="text-[#00ff00] font-bold">{n}</div>
-                        <div className="text-[#888]">Flame Temp:</div>
-                        <div className="text-[#00ff00] font-bold">{flameTemp} K</div>
-                        <div className="text-[#888]">Mol Wt:</div>
-                        <div className="text-[#00ff00] font-bold">{molWeight} kg/mol</div>
-                      </div>
-                      <div className="absolute top-2 right-2 flex space-x-1">
-                        <button onClick={() => handleSaveMaterial('propellant')} className="text-[10px] bg-[#222] text-[#aaa] border border-[#444] px-1 hover:bg-[#333] hover:text-[#fff] rounded">Save</button>
-                        <button onClick={() => handleLoadMaterialClick('propellant')} className="text-[10px] bg-[#222] text-[#aaa] border border-[#444] px-1 hover:bg-[#333] hover:text-[#fff] rounded">Load</button>
-                      </div>
-                    </div>
-
-                    {/* Nozzle Overview Card */}
-                    <div className="bg-[#111] border border-[#333] p-4 rounded-md shadow-lg relative">
-                      <h3 className="font-mono font-bold text-[#ffaa00] mb-4 pb-2 border-b border-[#333] text-sm tracking-wide">NOZZLE RESIN</h3>
-                      <p className="font-mono text-[#eee] font-bold mb-4">{nozzleMaterial}</p>
-                      <div className="grid grid-cols-2 gap-y-2 text-xs font-mono">
-                        <div className="text-[#888]">Thermal Cond:</div>
-                        <div className="text-[#00ff00] font-bold">{nozzleMaterial === 'Custom' ? nozzleThermalConductivity : (nozzleMaterial === 'Graphite' ? 100 : 1.2)} W/m-K</div>
-                        <div className="text-[#888]">Specific Heat:</div>
-                        <div className="text-[#00ff00] font-bold">{nozzleMaterial === 'Custom' ? nozzleSpecificHeat : (nozzleMaterial === 'Graphite' ? 710 : 1300)} J/kg-K</div>
-                        <div className="col-span-2 mt-4 text-[9px] text-[#555] leading-tight">
-                          Advanced properties (Phase Change Enthalpy, Oxidation Temps) are mapped internally based on selection.
-                        </div>
-                      </div>
-                      <div className="absolute top-2 right-2 flex space-x-1">
-                        <button onClick={() => handleSaveMaterial('nozzle')} className="text-[10px] bg-[#222] text-[#aaa] border border-[#444] px-1 hover:bg-[#333] hover:text-[#fff] rounded">Save</button>
-                        <button onClick={() => handleLoadMaterialClick('nozzle')} className="text-[10px] bg-[#222] text-[#aaa] border border-[#444] px-1 hover:bg-[#333] hover:text-[#fff] rounded">Load</button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-8 text-[11px] text-[#888] font-mono p-4 border border-[#333] rounded bg-[#0a0a0a]">
-                    <span className="font-bold text-[#aaa]">SYSTEM LOG:</span> Material parameters are currently modified directly via the main Motor Parameters dock on the left, or loaded via entire Config '.json' files. The application's thermodynamic erosion models automatically resolve advanced material properties behind-the-scenes when defined combinations (e.g., Graphite, Phenolic) are requested.
-                  </div>
-
-                </div>
-              </div>
+              <MaterialsTab
+                density={density}
+                a={a}
+                n={n}
+                molWeight={molWeight}
+                flameTemp={flameTemp}
+                casingMaterial={casingMaterial}
+                casingYieldStress={casingYieldStress}
+                casingYoungsModulus={casingYoungsModulus}
+                nozzleMaterial={nozzleMaterial}
+                nozzleThermalConductivity={nozzleThermalConductivity}
+                nozzleSpecificHeat={nozzleSpecificHeat}
+                onSaveMaterial={handleSaveMaterial}
+                onLoadMaterial={handleLoadMaterialClick}
+              />
             )}
 
             {/* TAB: STRUCTURAL */}
             {activeTab === 'structural' && (
-              <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
-                <div className="absolute top-1 left-2 z-10 flex items-center space-x-4">
-                  <span className="text-[#00aaff] text-[10px] font-mono">Structural & Erosion Analysis</span>
-                  <label className="flex items-center space-x-1 cursor-pointer">
-                    <input type="checkbox" checked={showFEA} onChange={e => setShowFEA(e.target.checked)} className="accent-[#00aaff]" />
-                    <span className="text-[10px] text-[#eee] font-mono">2D FEA Visualization Mode</span>
-                  </label>
-                </div>
-
-                {metrics && structural && results.length > 0 ? (
-                  <div className="w-full max-w-4xl space-y-6 mt-6">
-                    {/* Casing Integrity Panel */}
-                    <div className="bg-[#111] border border-[#333] p-5 rounded-md shadow-lg w-full">
-                      <div className="flex justify-between items-end border-b border-[#333] pb-2 mb-4">
-                        <h3 className="font-mono font-bold text-[#00aaff] text-sm tracking-wide">CASING INTEGRITY & BOLTED CLOSURE</h3>
-                        {metrics && (
-                          <div className="flex space-x-2">
-                            <button onClick={handleExportCasingSTL} disabled={isSimulating} className="flex items-center space-x-1 border border-[#666] rounded px-2 py-1 text-xs bg-[#222] text-[#eee] hover:bg-[#333] hover:text-[#fff] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .stl format for additive manufacturing">
-                              <Download className="w-3 h-3" />
-                              <span>AM (.stl)</span>
-                            </button>
-                            <button onClick={handleExportCasingSCAD} disabled={isSimulating} className="flex items-center space-x-1 border border-[#666] rounded px-2 py-1 text-xs bg-[#222] text-[#eee] hover:bg-[#333] hover:text-[#fff] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .scad format. OpenSCAD or FreeCAD can export this to STEP or Parasolid.">
-                              <Download className="w-3 h-3" />
-                              <span>CAD Base (.scad)</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {showFEA ? (
-                        <div className="flex flex-col items-center space-y-4">
-                          <p className="text-xs text-[#888] font-mono self-start">2D Axisymmetric FEA (von Mises Stress Distribution)</p>
-                          {/* Advanced SVG FEA Visualizer */}
-                          <div className="relative w-full h-40 border border-[#444] bg-[#222] rounded overflow-hidden flex flex-col items-center justify-center">
-                            
-                            {/* Color logic: Map vonMises / yieldStress to a color hue mapping */}
-                            {(() => {
-                              const vMises = structural.maxVonMises;
-                              const yieldStress = casingYieldStress * 1e6;
-                              const stressRatio = Math.min(1.2, vMises / yieldStress); // capping at 1.2
-                              
-                              // Hues: Blue (240) -> Green (120) -> Yellow (60) -> Red (0)
-                              const hueMain = 240 - (stressRatio * 0.8 * 240); // cylinder largely uniform hoop
-                              const hueEdge = 240 - (Math.min(1.0, stressRatio * 1.5) * 240); // higher stress near closures
-                              // stress logic check here, keeping original code
-                              return (
-                                <svg viewBox="0 0 800 200" className="w-full h-full drop-shadow-lg">
-                                  <defs>
-                                    <linearGradient id="feaGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                      <stop offset="0%" stopColor={`hsl(${hueEdge}, 100%, 50%)`} />
-                                      <stop offset="10%" stopColor={`hsl(${hueEdge}, 100%, 50%)`} />
-                                      <stop offset="25%" stopColor={`hsl(${hueMain}, 100%, 50%)`} />
-                                      <stop offset="75%" stopColor={`hsl(${hueMain}, 100%, 50%)`} />
-                                      <stop offset="90%" stopColor={`hsl(${hueEdge}, 100%, 50%)`} />
-                                      <stop offset="100%" stopColor={`hsl(${hueEdge}, 100%, 50%)`} />
-                                    </linearGradient>
-                                    <linearGradient id="nozzleGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                      <stop offset="0%" stopColor={`hsl(${hueEdge}, 100%, 40%)`} />
-                                      <stop offset="100%" stopColor="hsl(240, 50%, 30%)" />
-                                    </linearGradient>
-                                  </defs>
-
-                                  {/* Centerline */}
-                                  <line x1="0" y1="100" x2="800" y2="100" stroke="#555" strokeDasharray="10 5" strokeWidth="1" />
-
-                                  {/* Motor Casing Top Half */}
-                                  <rect x="100" y="40" width="500" height="15" fill="url(#feaGradient)" stroke="#111" strokeWidth="1" />
-                                  
-                                  {/* Motor Casing Bottom Half */}
-                                  <rect x="100" y="145" width="500" height="15" fill="url(#feaGradient)" stroke="#111" strokeWidth="1" />
-
-                                  {/* Forward Closure */}
-                                  <path d="M 100 40 Q 50 40 50 100 Q 50 160 100 160 Z" fill={`hsl(${hueEdge - 20}, 90%, 45%)`} stroke="#111" strokeWidth="1" />
-
-                                  {/* Aft Closure & Nozzle block */}
-                                  <rect x="600" y="30" width="30" height="140" fill={`hsl(${hueEdge}, 90%, 45%)`} stroke="#111" strokeWidth="1" />
-                                  <path d="M 630 80 L 700 60 L 750 20 L 750 35 L 700 85 L 630 95 Z" fill="url(#nozzleGradient)" stroke="#111" strokeWidth="1" />
-                                  <path d="M 630 120 L 700 140 L 750 180 L 750 165 L 700 115 L 630 105 Z" fill="url(#nozzleGradient)" stroke="#111" strokeWidth="1" />
-                                  
-                                  {/* Overlay Grid lines to indicate FEA mesh */}
-                                  <pattern id="mesh" width="20" height="20" patternUnits="userSpaceOnUse">
-                                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="0.5" />
-                                  </pattern>
-                                  <rect x="100" y="40" width="500" height="15" fill="url(#mesh)" />
-                                  <rect x="100" y="145" width="500" height="15" fill="url(#mesh)" />
-                                  <rect x="600" y="30" width="30" height="140" fill="url(#mesh)" />
-
-                                  {/* Labels */}
-                                  <text x="350" y="30" fill="white" fontSize="11" fontFamily="monospace" textAnchor="middle">Bore Hoop (Lamé) ≈ {(structural.lame.inner.hoop / 1e6).toFixed(1)} MPa</text>
-                                  <text x="100" y="25" fill="#ff4444" fontSize="11" fontFamily="monospace" textAnchor="end">Peak von Mises ≈ {(structural.maxVonMises / 1e6).toFixed(1)} MPa</text>
-                                  <text x="640" y="20" fill="#ffff00" fontSize="11" fontFamily="monospace">Aft Closure Bending Moment</text>
-                                </svg>
-                              );
-                            })()}
-                          </div>
-                          {/* Legend */}
-                          <div className="flex items-center space-x-2 text-[10px] font-mono w-full justify-between">
-                            <span className="text-[#888]">
-                              Safety factor {structural.safetyFactor.toFixed(2)}x at the {structural.whereMax}.
-                              Colours are indicative only &mdash; this is a schematic, not a mesh.
-                            </span>
-                            <div className="flex items-center space-x-2">
-                              <span className="text-blue-400">Low</span>
-                              <div className="w-32 h-3 bg-gradient-to-r from-blue-500 via-green-500 via-yellow-500 to-red-500 rounded border border-[#555]"></div>
-                              <span className="text-red-500">Yield</span>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-5 text-xs font-mono">
-                          {/* --- inputs governing the analysis --- */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                              <p className="text-[#888] mb-1">Peak Chamber Pressure:</p>
-                              <p className="text-[#ff4444] font-bold">{(metrics.maxPc / 1e6).toFixed(2)} MPa</p>
-                            </div>
-                            <div>
-                              <p className="text-[#888] mb-1">Case Bore Radius:</p>
-                              <p className="text-[#eee]">{(outerRadius * 1000).toFixed(1)} mm</p>
-                            </div>
-                            <div>
-                              <p className="text-[#888] mb-1">Wall Thickness (analysed):</p>
-                              <p className="text-[#eee]">{(caseWallThickness * 1000).toFixed(2)} mm</p>
-                            </div>
-                            <div>
-                              <p className="text-[#888] mb-1">Material:</p>
-                              <p className="text-[#eee]">{casingMaterial} &middot; {casingYieldStress} MPa yield</p>
-                            </div>
-                          </div>
-
-                          {/* --- headline result --- */}
-                          <div className="border border-[#333] rounded p-3 bg-[#0c0c0c] grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                              <p className="text-[#888] mb-1">Peak von Mises:</p>
-                              <p className="text-xl text-[#ffaa00] font-bold">{(structural.maxVonMises / 1e6).toFixed(1)} MPa</p>
-                            </div>
-                            <div>
-                              <p className="text-[#888] mb-1">Governing Location:</p>
-                              <p className="text-[#eee] leading-tight">{structural.whereMax}</p>
-                            </div>
-                            <div>
-                              <p className="text-[#888] mb-1">Safety Factor:</p>
-                              <p className={`text-xl font-bold ${structural.safetyFactor < 1 ? 'text-[#ff4444]' : structural.safetyFactor < 1.5 ? 'text-[#ffaa00]' : 'text-[#00ff00]'}`}>
-                                {structural.safetyFactor.toFixed(2)}x
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[#888] mb-1">Margin of Safety:</p>
-                              <p className={`text-xl font-bold ${structural.marginOfSafety < 0 ? 'text-[#ff4444]' : 'text-[#00ff00]'}`}>
-                                {structural.marginOfSafety >= 0 ? '+' : ''}{structural.marginOfSafety.toFixed(3)}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* --- Lame through-wall distribution --- */}
-                          <div>
-                            <p className="text-[#00aaff] font-bold mb-2 border-b border-[#333] pb-1">
-                              THICK-WALL (LAMÉ) STRESS DISTRIBUTION
-                            </p>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-[11px]">
-                                <thead className="text-[#888]">
-                                  <tr>
-                                    <th className="text-left py-1">Location</th>
-                                    <th className="text-right py-1">Hoop σθ</th>
-                                    <th className="text-right py-1">Radial σr</th>
-                                    <th className="text-right py-1">Axial σz</th>
-                                    <th className="text-right py-1">von Mises</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="text-[#eee]">
-                                  <tr className="border-t border-[#222]">
-                                    <td className="py-1">Inner wall (bore, r = {(outerRadius * 1000).toFixed(1)} mm)</td>
-                                    <td className="text-right">{(structural.lame.inner.hoop / 1e6).toFixed(1)}</td>
-                                    <td className="text-right">{(structural.lame.inner.radial / 1e6).toFixed(1)}</td>
-                                    <td className="text-right">{(structural.lame.inner.axial / 1e6).toFixed(1)}</td>
-                                    <td className="text-right text-[#ffaa00]">{(structural.lame.inner.vonMises / 1e6).toFixed(1)}</td>
-                                  </tr>
-                                  <tr className="border-t border-[#222]">
-                                    <td className="py-1">Outer wall (r = {((outerRadius + caseWallThickness) * 1000).toFixed(1)} mm)</td>
-                                    <td className="text-right">{(structural.lame.outer.hoop / 1e6).toFixed(1)}</td>
-                                    <td className="text-right">{(structural.lame.outer.radial / 1e6).toFixed(1)}</td>
-                                    <td className="text-right">{(structural.lame.outer.axial / 1e6).toFixed(1)}</td>
-                                    <td className="text-right text-[#ffaa00]">{(structural.lame.outer.vonMises / 1e6).toFixed(1)}</td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                              <p className="text-[#666] text-[10px] mt-1">All values MPa. Hoop stress peaks at the bore and falls through the wall.</p>
-                            </div>
-
-                            {lameChart.length > 0 && (
-                              <div className="h-40 mt-3 border border-[#333] rounded bg-[#0c0c0c]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <LineChart data={lameChart} margin={{ top: 12, right: 20, bottom: 4, left: 0 }}>
-                                    <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                                    <XAxis dataKey="r_mm" type="number" domain={['dataMin', 'dataMax']} stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(1)} label={{ value: 'radius (mm)', position: 'insideBottom', offset: -2, fill: '#666', fontSize: 9 }} />
-                                    <YAxis stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: any) => `${Number(v).toFixed(1)} MPa`} />
-                                    <Legend wrapperStyle={{ fontSize: '9px' }} />
-                                    <Line type="monotone" dataKey="hoop" name="hoop" stroke="#00aaff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                    <Line type="monotone" dataKey="radial" name="radial" stroke="#ff00ff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                    <Line type="monotone" dataKey="axial" name="axial" stroke="#00ff88" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                    <Line type="monotone" dataKey="vonMises" name="von Mises" stroke="#ffaa00" strokeWidth={2} dot={false} isAnimationActive={false} />
-                                  </LineChart>
-                                </ResponsiveContainer>
-                              </div>
-                            )}
-
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
-                              <div>
-                                <p className="text-[#888] mb-1">Wall Regime:</p>
-                                <p className={structural.lame.thinWallApplicable ? 'text-[#00ff00]' : 'text-[#ffaa00]'}>
-                                  {structural.lame.thinWallApplicable ? 'Thin' : 'THICK'} &mdash; R_mean/t = {structural.lame.rMeanOverT.toFixed(1)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[#888] mb-1">Thin-wall pR/t would give:</p>
-                                <p className="text-[#eee]">
-                                  {(structural.lame.thinWallHoop / 1e6).toFixed(1)} MPa ({(structural.lame.thinWallError * 100).toFixed(1)}% error)
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[#888] mb-1">Bore Growth at Peak P:</p>
-                                <p className="text-[#eee]">
-                                  {(structural.boreRadialGrowth * 1e6).toFixed(1)} µm ({(structural.boreHoopStrain * 100).toFixed(4)}% strain)
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* --- edge bending --- */}
-                          <div>
-                            <p className="text-[#00aaff] font-bold mb-2 border-b border-[#333] pb-1">
-                              DISCONTINUITY STRESS AT THE CASE-TO-CLOSURE JUNCTION
-                            </p>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              <div>
-                                <p className="text-[#888] mb-1">Peak Combined (von Mises):</p>
-                                <p className="text-xl text-[#ffaa00] font-bold">{(structural.edge.peak.vonMises / 1e6).toFixed(1)} MPa</p>
-                              </div>
-                              <div>
-                                <p className="text-[#888] mb-1">Axial Location:</p>
-                                <p className="text-[#eee]">
-                                  {(structural.edge.peakLocation * 1000).toFixed(2)} mm from joint
-                                  <span className="text-[#666]"> ({structural.edge.peakLocationOverChar.toFixed(2)}/β)</span>
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[#888] mb-1">Critical Surface:</p>
-                                <p className="text-[#eee]">{structural.edge.peakSurface === 'bore' ? 'Bore (inner)' : 'Outer'}</p>
-                              </div>
-                              <div>
-                                <p className="text-[#888] mb-1">Decay Length (3/β):</p>
-                                <p className="text-[#eee]">{(structural.edge.decayLength * 1000).toFixed(1)} mm</p>
-                              </div>
-                              <div>
-                                <p className="text-[#888] mb-1">β = [3(1&minus;ν²)/(R²t²)]<sup>1/4</sup>:</p>
-                                <p className="text-[#eee]">{structural.edge.beta.toFixed(1)} m⁻¹</p>
-                              </div>
-                              <div>
-                                <p className="text-[#888] mb-1">Edge Moment M₀ = p/2β²:</p>
-                                <p className="text-[#eee]">{structural.edge.m0.toFixed(1)} N·m/m</p>
-                              </div>
-                              <div>
-                                <p className="text-[#888] mb-1">Edge Shear Q₀ = &minus;p/β:</p>
-                                <p className="text-[#eee]">{(structural.edge.q0 / 1000).toFixed(1)} kN/m</p>
-                              </div>
-                              <div>
-                                <p className="text-[#888] mb-1">Bending / Membrane Hoop:</p>
-                                <p className="text-[#eee]">{structural.edge.bendingToHoop.toFixed(2)}x</p>
-                              </div>
-                            </div>
-
-                            {edgeChart.length > 0 && (
-                              <div className="h-40 mt-3 border border-[#333] rounded bg-[#0c0c0c]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <LineChart data={edgeChart} margin={{ top: 12, right: 20, bottom: 4, left: 0 }}>
-                                    <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                                    <XAxis dataKey="x_mm" type="number" domain={['dataMin', 'dataMax']} stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} label={{ value: 'distance from joint (mm)', position: 'insideBottom', offset: -2, fill: '#666', fontSize: 9 }} />
-                                    <YAxis stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: any) => `${Number(v).toFixed(1)} MPa`} />
-                                    <Legend wrapperStyle={{ fontSize: '9px' }} />
-                                    <Line type="monotone" dataKey="hoop" name="hoop" stroke="#00aaff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                    <Line type="monotone" dataKey="axial" name="axial" stroke="#00ff88" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                    <Line type="monotone" dataKey="vonMises" name="von Mises" stroke="#ffaa00" strokeWidth={2} dot={false} isAnimationActive={false} />
-                                  </LineChart>
-                                </ResponsiveContainer>
-                              </div>
-                            )}
-                            <p className="text-[#666] text-[10px] mt-1">
-                              Cylindrical-shell edge bending for a clamped junction. Membrane hoop stress is suppressed to
-                              zero at the joint (the closure holds the radius) and recovers over ~{(structural.edge.decayLength * 1000).toFixed(0)} mm.
-                            </p>
-                          </div>
-
-                          {/* --- bolted closure --- */}
-                          {structural.bolts && (
-                            <div>
-                              <p className="text-[#00aaff] font-bold mb-2 border-b border-[#333] pb-1">
-                                BOLTED CLOSURE &mdash; {structural.bolts.count} × ⌀{(structural.bolts.diameter * 1000).toFixed(1)} mm
-                              </p>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div>
-                                  <p className="text-[#888] mb-1">Total Closure Load:</p>
-                                  <p className="text-[#eee]">{(structural.bolts.totalForce / 1000).toFixed(2)} kN</p>
-                                </div>
-                                <div>
-                                  <p className="text-[#888] mb-1">Load per Bolt:</p>
-                                  <p className="text-[#eee]">{(structural.bolts.forcePerBolt / 1000).toFixed(2)} kN</p>
-                                </div>
-                                <div>
-                                  <p className="text-[#888] mb-1">Stress on Shank Area:</p>
-                                  <p className="text-[#eee]">{(structural.bolts.nominalStress / 1e6).toFixed(1)} MPa (SF {structural.bolts.safetyFactorNominal.toFixed(2)})</p>
-                                </div>
-                                <div>
-                                  <p className="text-[#888] mb-1">Stress on Thread Area:</p>
-                                  <p className={`font-bold ${structural.bolts.safetyFactorStressArea < 1.5 ? 'text-[#ff4444]' : 'text-[#00ff00]'}`}>
-                                    {(structural.bolts.stressAreaStress / 1e6).toFixed(1)} MPa (SF {structural.bolts.safetyFactorStressArea.toFixed(2)})
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-[#888] mb-1">Flange Shear-Out:</p>
-                                  <p className={`${structural.bolts.safetyFactorShearOut < 1.5 ? 'text-[#ff4444]' : 'text-[#00ff00]'}`}>
-                                    {(structural.bolts.shearOutStress / 1e6).toFixed(1)} MPa (SF {structural.bolts.safetyFactorShearOut.toFixed(2)})
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-[#888] mb-1">Bolt Edge Distance:</p>
-                                  <p className="text-[#eee]">
-                                    {(structural.bolts.edgeDistance * 1000).toFixed(1)} mm
-                                    <span className="text-[#666]"> (min {(structural.bolts.minEdgeDistance * 1000).toFixed(1)})</span>
-                                  </p>
-                                </div>
-                                <div className="col-span-2">
-                                  <p className="text-[#888] mb-1">Min Thread Engagement:</p>
-                                  <p className="text-[#eee]">
-                                    {(structural.bolts.minEngagementSteel * 1000).toFixed(1)} mm into steel,
-                                    {' '}{(structural.bolts.minEngagementAluminium * 1000).toFixed(1)} mm into aluminium
-                                  </p>
-                                </div>
-                              </div>
-                              <p className="text-[#666] text-[10px] mt-2 leading-snug">
-                                Design to the THREAD tensile-stress area (≈74% of the shank), not the shank. Engagement
-                                shorter than the values above lets the threads strip before the bolt yields, which is the
-                                failure the tension numbers do not cover. Shear-out assumes two tear planes per bolt
-                                through the wall at the stated edge distance, against 0.577·σ_yield of the case material.
-                              </p>
-                            </div>
-                          )}
-
-                          {/* --- assumptions and warnings: the point of the exercise --- */}
-                          {structural.warnings.length > 0 && (
-                            <div className="border border-[#663333] bg-[#1a0d0d] rounded p-3">
-                              <p className="text-[#ff6666] font-bold mb-2 text-[11px]">FLAGS</p>
-                              <ul className="space-y-1.5">
-                                {structural.warnings.map((w, i) => (
-                                  <li key={i} className="text-[#ffaaaa] text-[10px] leading-snug">• {w}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          <div className="border border-[#333] rounded p-3 bg-[#0c0c0c]">
-                            <p className="text-[#888] font-bold mb-2 text-[11px]">ASSUMPTIONS</p>
-                            <ul className="space-y-1.5">
-                              {structural.assumptions.map((a, i) => (
-                                <li key={i} className="text-[#777] text-[10px] leading-snug">• {a}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Nozzle Erosion Panel */}
-                    <div className="bg-[#111] border border-[#333] p-5 rounded-md shadow-lg w-full">
-                      <h3 className="font-mono font-bold text-[#00aaff] mb-4 pb-2 border-b border-[#333] text-sm tracking-wide">NOZZLE EROSION (CONVECTIVE MODEL)</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-xs font-mono">
-                        <div>
-                          <p className="text-[#888] mb-1">Throat Material:</p>
-                          <p className="text-[#eee]">{nozzleMaterial}</p>
-                        </div>
-                        <div className="col-span-2 md:col-span-3 text-[#888] text-[10px] leading-tight flex items-center">
-                          Note: Convective ablation model driven by the selected throat material's thermal properties. Bartz heat-transfer coefficient scales as Pc^0.8 * Tf^0.5 * Dt^-0.2; recession begins once the surface reaches the material's oxidation temperature.
-                        </div>
-                        
-                        <div className="col-span-2 border-t border-[#333] pt-4 mt-2">
-                          <p className="text-[#888] mb-1">Initial Throat Diameter:</p>
-                          <p className="text-lg text-[#eee]">{(throatDiameter * 1000).toFixed(2)} mm</p>
-                        </div>
-                        <div className="col-span-2 border-t border-[#333] pt-4 mt-2">
-                          <p className="text-[#888] mb-1">Final Throat Diameter:</p>
-                          <p className="text-xl text-[#ffaa00] font-bold">
-                            {(Math.sqrt(4 * results[results.length - 1].ThroatArea / Math.PI) * 1000).toFixed(3)} mm
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-[#666] italic font-mono text-xs mt-6">
-                    {metrics && results.length > 0
-                      ? 'Loading the structural core...'
-                      : 'Run a simulation to view structural analysis.'}
-                  </div>
-                )}
-              </div>
+              <StructuralTab
+                structural={structural}
+                metrics={metrics}
+                results={results}
+                caseWallThickness={caseWallThickness}
+                casingMaterial={casingMaterial}
+                casingYieldStress={casingYieldStress}
+                outerRadius={outerRadius}
+                throatDiameter={throatDiameter}
+                nozzleMaterial={nozzleMaterial}
+                isSimulating={isSimulating}
+                onExportCasingSTL={handleExportCasingSTL}
+                onExportCasingSCAD={handleExportCasingSCAD}
+              />
             )}
 
             {/* TAB: STATISTICS */}
@@ -3282,95 +2672,17 @@ export default function AppDesktop() {
             )}
 
             {activeTab === 'statistics' && (
-              <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
-                <div className="absolute top-1 left-2 z-10 text-[#00ff00] text-[10px] font-mono">Motor Statistics & Summary</div>
-                
-                {metrics ? (
-                  <div className="w-full max-w-4xl space-y-4 mt-6">
-                    <div className="bg-[#111] border border-[#333] p-5 rounded-md shadow-lg text-[#ddd]">
-                      <div className="text-[12px] uppercase font-bold text-[#aaa] border-b border-[#555] pb-2 mb-4 tracking-wider">Comprehensive Performance Data</div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-sm font-mono">
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Motor Designation:</span>
-                          <span className="text-white">{(metrics.totalImpulse > 0 && metrics.totalImpulse < 100000) ? 
-                            String.fromCharCode(65 + Math.min(25, Math.floor(Math.log2(metrics.totalImpulse / 2.5)))) : 'M'} ({(metrics.volumeLoading * 100).toFixed(0)}%)</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Average Pressure:</span>
-                          <span className="text-white">{(metrics.avgPc / 6894.76).toFixed(2)} psi / {(metrics.avgPc / 1e6).toFixed(2)} MPa</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Propellant Mass:</span>
-                          <span className="text-white">{(metrics.propMass * 2.20462).toFixed(2)} lb / {metrics.propMass.toFixed(2)} kg</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Impulse:</span>
-                          <span className="text-white">{metrics.totalImpulse.toFixed(2)} Ns</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Peak Pressure:</span>
-                          <span className="text-white">{(metrics.maxPc / 6894.76).toFixed(2)} psi / {(metrics.maxPc / 1e6).toFixed(2)} MPa</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Propellant Length:</span>
-                          <span className="text-white">{(length * 39.3701).toFixed(2)} in / {(length * 1000).toFixed(1)} mm</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Delivered ISP:</span>
-                          <span className="text-white">{metrics.isp.toFixed(2)} s</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Initial Kn:</span>
-                          <span className="text-white">{metrics.initialKn.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Port/Throat Ratio:</span>
-                          <span className="text-white">{metrics.portThroatRatio.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Burn Time:</span>
-                          <span className="text-white">{metrics.actionTime.toFixed(2)} s</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Peak Kn:</span>
-                          <span className="text-white">{metrics.peakKn.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Peak Mass Flux:</span>
-                          <span className="text-white">{(metrics.peakMassFlux * 0.00142233).toFixed(2)} lb/(in²·s)</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Volume Loading:</span>
-                          <span className="text-white">{(metrics.volumeLoading * 100).toFixed(2)}%</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#444] pb-1">
-                          <span className="text-[#888]">Thrust Coefficient:</span>
-                          <span className="text-white">{(metrics.maxThrust / (metrics.maxPc * Math.PI * Math.pow(throatDiameter/2, 2))).toFixed(2)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/*
-                      * Every number above is printed to several significant
-                      * figures. This says how many of them mean anything.
-                      */}
-                    <ModelUncertaintyPanel
-                      grainKind={grainType}
-                      n={n}
-                      hasBurnRateRegimes={burnRateRegimes.length > 0}
-                      propellantName={propellantName}
-                      erosiveModel={erosiveModel}
-                      erosiveFraction={erosiveFraction}
-                      hasNozzleMaterial={!!nozzleMaterial}
-                      peakPressurePa={metrics.maxPc}
-                      totalImpulseNs={metrics.totalImpulse}
-                      burnTimeS={metrics.actionTime}
-                    />
-                  </div>
-                ) : (
-                  <div className="text-[#666] italic font-mono text-xs">Run a simulation to view motor statistics.</div>
-                )}
-              </div>
+              <StatisticsTab
+                metrics={metrics}
+                throatDiameter={throatDiameter}
+                grainKind={grainType}
+                n={n}
+                propellantName={propellantName}
+                burnRateRegimes={burnRateRegimes}
+                erosiveModel={erosiveModel}
+                erosiveFraction={erosiveFraction}
+                nozzleMaterial={nozzleMaterial}
+              />
             )}
             
             </ErrorBoundary>
