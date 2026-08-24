@@ -45,8 +45,25 @@ entries are grouped by date rather than version.
 - **Unit preference is remembered** across reloads, rather than resetting to
   Metric every time.
 - Error boundaries per tab, so one failing chart no longer blanks the app.
+- **Every form label is associated with its control** (34 were not), the unit
+  system is a proper fieldset whose radios finally share a `name`, and the
+  propellant list is keyboard-operable instead of a clickable `div` with an
+  unreachable delete button.
 
 ### Changed
+
+- **Every tab view is its own component.** `AppDesktop.tsx` went from 3,410
+  lines and 88 `useState` calls to 2,720 and 26, with the Structural, Custom
+  Graph, Statistics, Materials and Monte Carlo views extracted. State that only
+  one view used moved with it.
+- **No `any` left in `src/`**, down from 34. Several were hiding defects: the
+  BurnSim export wrote `undefined`/`NaN` into files that other tools read as a
+  silent zero, the parameter sweep passed unchecked fields to the solver, and
+  five `catch (err: any)` blocks logged "undefined" instead of the error.
+- **Test timeout raised to 30s**, set once with the reasoning. Two tests run
+  real physics sweeps and crossed vitest's 5s default under parallel load,
+  failing differently on each run — the kind of flake that teaches people to
+  ignore the suite.
 
 - **KNSB re-fitted to measurement**: `a=6.01e-5, n=0.32` → `a=3.628e-4,
   n=0.2117`, plus Nakka's five measured bands. The old coefficients read low at
