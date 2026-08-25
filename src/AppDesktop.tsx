@@ -21,7 +21,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { Play, Terminal, Download, Calculator, Settings, Upload, Undo, Redo, Zap, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, Terminal, Download, Calculator, Settings, Upload, Undo, Redo, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import { processDXF } from './dxfProcessor';
 import { PropellantEditor, PropellantData } from './PropellantEditor';
 import { GrainEditor } from './GrainEditor';
@@ -48,6 +48,7 @@ import { modelUncertainty, formatBand } from './modelUncertainty';
 import './ui/theme.css';
 import { MenuBar, Toolbar, ToolbarSep, ToolbarSpacer, Dock, TabStrip, StatusBar } from './ui/shell';
 import { useNotifications, NotificationBell } from './ui/notifications';
+import { AlertChip } from './ui/AlertChip';
 import { Button, Checkbox, Stat, FieldGroup } from './ui/primitives';
 import { MonteCarloTab } from './MonteCarloTab';
 import { MaterialsTab } from './MaterialsTab';
@@ -2272,17 +2273,32 @@ export default function AppDesktop() {
           * collapsible groups, the offending one can easily be scrolled out of
           * sight, and "Run does nothing" is a miserable thing to debug.
           */}
-        {blockingIssues.length > 0 && (
-          <button
-            type="button"
-            className="sh-issue-chip"
-            onClick={() => setConsoleOpen(true)}
-            title={blockingIssues.map((i) => i.message).join('\n')}
-          >
-            <AlertTriangle size={12} />
-            {blockingIssues.length} problem{blockingIssues.length > 1 ? 's' : ''}
-          </button>
-        )}
+        {/*
+          * Two compact chips rather than banners.
+          *
+          * Both conditions used to take a full-width stripe: validation as a
+          * blocking alert, stability as a panel that pushed the chart down on
+          * every run of a marginal design. Neither earns that space -- they are
+          * a line of text you read once.
+          *
+          * The toast announces them; these persist for as long as the condition
+          * holds, because a faded toast is not a record and the console scrolls
+          * away. Hover for the text, click for the list.
+          */}
+        <AlertChip
+          severity="error"
+          noun="problem"
+          title="Design problems blocking the run"
+          items={blockingIssues.map((i) => i.message)}
+          footer="Each is also marked on the field that caused it."
+        />
+        <AlertChip
+          severity="warning"
+          noun="warning"
+          title="Solver stability warnings"
+          items={stabilityWarnings}
+          footer="Raised by the solver during the last run."
+        />
         <NotificationBell />
         <span className="sh-toolbar-note">
           {autosave.unavailable
@@ -2594,16 +2610,6 @@ export default function AppDesktop() {
             )}
 
 
-            {stabilityWarnings.length > 0 && (
-              <div className="flex-none bg-[var(--sem-warn-wash)] border border-[var(--sem-warn)] p-2 rounded flex flex-col space-y-1 mb-1">
-                <div className="text-[var(--sem-warn)] text-xs font-bold flex items-center">
-                  <Terminal size={14} className="mr-1" /> STABILITY WARNINGS DETECTED
-                </div>
-                {stabilityWarnings.map((w, idx) => (
-                  <div key={idx} className="text-[var(--sem-warn)] text-[11px] font-mono pl-4">• {w}</div>
-                ))}
-              </div>
-            )}
 
             {/*
               * One boundary around the tab content, keyed on the active tab.
@@ -2921,6 +2927,7 @@ export default function AppDesktop() {
               <StatisticsTab
                 metrics={metrics}
                 throatDiameter={throatDiameter}
+                grainLength={length}
                 grainKind={grainType}
                 n={n}
                 propellantName={propellantName}

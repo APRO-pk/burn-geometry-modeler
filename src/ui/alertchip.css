@@ -1,0 +1,115 @@
+/* Toolbar alert chips and their popovers. Colours come only from theme.css. */
+
+.ac-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ac-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--row-h);
+  padding: 0 9px;
+  border-radius: var(--radius);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ac-chip.is-warning {
+  background: var(--sem-warn-wash);
+  border: 1px solid var(--sem-warn);
+  color: var(--sem-warn);
+}
+.ac-chip.is-warning:hover,
+.ac-chip.is-warning.is-open {
+  background: var(--sem-warn);
+  color: var(--t-inverse);
+}
+
+.ac-chip.is-error {
+  background: var(--sem-danger-wash);
+  border: 1px solid var(--sem-danger);
+  color: var(--sem-danger);
+}
+.ac-chip.is-error:hover,
+.ac-chip.is-error.is-open {
+  background: var(--sem-danger);
+  color: #fff;
+}
+
+/* ---- popover ---- */
+
+.ac-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  /*
+   * Anchored to the chip's right edge. These chips sit near the right of the
+   * toolbar, so left-anchoring would push a 340px panel off the window.
+   */
+  right: 0;
+  z-index: 800;
+  width: 340px;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  background: var(--s-raised);
+  border: 1px solid var(--b-strong);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px #000000b0;
+  overflow: hidden;
+}
+.ac-pop.is-warning {
+  border-left-color: var(--sem-warn);
+}
+.ac-pop.is-error {
+  border-left-color: var(--sem-danger);
+}
+
+.ac-pop-head {
+  flex: none;
+  height: var(--row-h);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--s-panel);
+  border-bottom: 1px solid var(--b-strong);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+}
+
+.ac-pop-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px 10px 6px 22px;
+  list-style: disc;
+}
+.ac-pop-list li {
+  margin: 4px 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--t-primary);
+}
+.ac-pop.is-warning .ac-pop-list li::marker {
+  color: var(--sem-warn);
+}
+.ac-pop.is-error .ac-pop-list li::marker {
+  color: var(--sem-danger);
+}
+
+.ac-pop-foot {
+  flex: none;
+  padding: 6px 10px;
+  border-top: 1px solid var(--b-soft);
+  font-size: var(--fs-xs);
+  color: var(--t-muted);
+}

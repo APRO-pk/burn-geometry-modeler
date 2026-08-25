@@ -67,7 +67,7 @@ export function MonteCarloTab({
                     <option value="quasi1D">Quasi-1-D axial</option>
                   </select>
                 </div>
-                <button onClick={onRun} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded shadow-sm">
+                <button onClick={onRun} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-[var(--t-primary)] text-xs font-bold rounded shadow-sm">
                   Run Analysis
                 </button>
                 {solverModel === 'quasi1D' && (

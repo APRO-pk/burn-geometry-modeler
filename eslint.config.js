@@ -95,6 +95,25 @@ export default tseslint.config(
       'jsx-a11y/label-has-associated-control': 'warn',
 
       // --- correctness ---
+      /*
+       * Bare DOM globals that read like ordinary local variables.
+       *
+       * StatisticsTab rendered "Propellant Length: 0.00 mm" for a while because
+       * it referenced `length` without receiving it as a prop: that resolves to
+       * `window.length`, the frame count, which is a real global of the right
+       * type -- so TypeScript accepted it and the readout was silently zero.
+       *
+       * These are the globals most likely to be meant as data.
+       */
+      'no-restricted-globals': [
+        'error',
+        { name: 'length', message: 'Did you mean a prop or local? window.length is the frame count.' },
+        { name: 'name', message: 'window.name is the browsing-context name. Use a prop or local.' },
+        { name: 'status', message: 'window.status is the (defunct) status bar text. Use a prop or local.' },
+        { name: 'origin', message: 'window.origin is the page origin. Use a prop or local.' },
+        { name: 'closed', message: 'window.closed refers to the window. Use a prop or local.' },
+        { name: 'event', message: 'Use the handler argument, not the deprecated global event.' },
+      ],
       eqeqeq: ['error', 'smart'],
       'no-var': 'error',
       'prefer-const': 'warn',

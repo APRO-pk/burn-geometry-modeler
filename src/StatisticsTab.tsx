@@ -13,6 +13,15 @@ import type { BurnRateRegime } from './wasmCore';
 export interface StatisticsTabProps {
   metrics: MotorMetrics | null;
   throatDiameter: number;
+  /**
+   * Grain length, metres.
+   *
+   * Explicitly a prop because it was previously a bare `length`, which
+   * TypeScript happily resolved to the DOM global `window.length` -- the frame
+   * count, always 0. The readout showed "0.00 in / 0.0 mm" and nothing
+   * complained, because it is a legitimate global of the right type.
+   */
+  grainLength: number;
   /** Inputs to the uncertainty budget -- see src/modelUncertainty.ts. */
   grainKind: string;
   n: number;
@@ -27,6 +36,7 @@ export interface StatisticsTabProps {
 export function StatisticsTab({
   metrics,
   throatDiameter,
+  grainLength,
   grainKind,
   n,
   propellantName,
@@ -46,60 +56,60 @@ export function StatisticsTab({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-sm font-mono">
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Motor Designation:</span>
-                        <span className="text-white">{(metrics.totalImpulse > 0 && metrics.totalImpulse < 100000) ? 
+                        <span className="text-[var(--t-primary)]">{(metrics.totalImpulse > 0 && metrics.totalImpulse < 100000) ? 
                           String.fromCharCode(65 + Math.min(25, Math.floor(Math.log2(metrics.totalImpulse / 2.5)))) : 'M'} ({(metrics.volumeLoading * 100).toFixed(0)}%)</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Average Pressure:</span>
-                        <span className="text-white">{(metrics.avgPc / 6894.76).toFixed(2)} psi / {(metrics.avgPc / 1e6).toFixed(2)} MPa</span>
+                        <span className="text-[var(--t-primary)]">{(metrics.avgPc / 6894.76).toFixed(2)} psi / {(metrics.avgPc / 1e6).toFixed(2)} MPa</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Propellant Mass:</span>
-                        <span className="text-white">{(metrics.propMass * 2.20462).toFixed(2)} lb / {metrics.propMass.toFixed(2)} kg</span>
+                        <span className="text-[var(--t-primary)]">{(metrics.propMass * 2.20462).toFixed(2)} lb / {metrics.propMass.toFixed(2)} kg</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Impulse:</span>
-                        <span className="text-white">{metrics.totalImpulse.toFixed(2)} Ns</span>
+                        <span className="text-[var(--t-primary)]">{metrics.totalImpulse.toFixed(2)} Ns</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Peak Pressure:</span>
-                        <span className="text-white">{(metrics.maxPc / 6894.76).toFixed(2)} psi / {(metrics.maxPc / 1e6).toFixed(2)} MPa</span>
+                        <span className="text-[var(--t-primary)]">{(metrics.maxPc / 6894.76).toFixed(2)} psi / {(metrics.maxPc / 1e6).toFixed(2)} MPa</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Propellant Length:</span>
-                        <span className="text-white">{(length * 39.3701).toFixed(2)} in / {(length * 1000).toFixed(1)} mm</span>
+                        <span className="text-[var(--t-primary)]">{(grainLength * 39.3701).toFixed(2)} in / {(grainLength * 1000).toFixed(1)} mm</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Delivered ISP:</span>
-                        <span className="text-white">{metrics.isp.toFixed(2)} s</span>
+                        <span className="text-[var(--t-primary)]">{metrics.isp.toFixed(2)} s</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Initial Kn:</span>
-                        <span className="text-white">{metrics.initialKn.toFixed(2)}</span>
+                        <span className="text-[var(--t-primary)]">{metrics.initialKn.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Port/Throat Ratio:</span>
-                        <span className="text-white">{metrics.portThroatRatio.toFixed(2)}</span>
+                        <span className="text-[var(--t-primary)]">{metrics.portThroatRatio.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Burn Time:</span>
-                        <span className="text-white">{metrics.actionTime.toFixed(2)} s</span>
+                        <span className="text-[var(--t-primary)]">{metrics.actionTime.toFixed(2)} s</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Peak Kn:</span>
-                        <span className="text-white">{metrics.peakKn.toFixed(2)}</span>
+                        <span className="text-[var(--t-primary)]">{metrics.peakKn.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Peak Mass Flux:</span>
-                        <span className="text-white">{(metrics.peakMassFlux * 0.00142233).toFixed(2)} lb/(in²·s)</span>
+                        <span className="text-[var(--t-primary)]">{(metrics.peakMassFlux * 0.00142233).toFixed(2)} lb/(in²·s)</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Volume Loading:</span>
-                        <span className="text-white">{(metrics.volumeLoading * 100).toFixed(2)}%</span>
+                        <span className="text-[var(--t-primary)]">{(metrics.volumeLoading * 100).toFixed(2)}%</span>
                       </div>
                       <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
                         <span className="text-[var(--t-secondary)]">Thrust Coefficient:</span>
-                        <span className="text-white">{(metrics.maxThrust / (metrics.maxPc * Math.PI * Math.pow(throatDiameter/2, 2))).toFixed(2)}</span>
+                        <span className="text-[var(--t-primary)]">{(metrics.maxThrust / (metrics.maxPc * Math.PI * Math.pow(throatDiameter/2, 2))).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>

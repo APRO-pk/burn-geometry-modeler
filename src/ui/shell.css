@@ -431,25 +431,7 @@
   white-space: nowrap;
 }
 
-.sh-issue-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: var(--row-h);
-  padding: 0 9px;
-  background: var(--sem-danger-wash);
-  border: 1px solid var(--sem-danger);
-  border-radius: var(--radius);
-  color: var(--sem-danger);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.sh-issue-chip:hover {
-  background: var(--sem-danger);
-  color: #fff;
-}
+
 
 /* ---------------------------------------------------- Ballistics tab body */
 

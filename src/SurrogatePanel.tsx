@@ -573,7 +573,7 @@ export function SurrogatePanel({
                           onApplyDesign(c.design);
                           addLog(`Applied surrogate candidate ${i + 1} (${kind}) to the design inputs.`);
                         }}
-                        className="text-[var(--a-accent)] hover:text-white border border-[var(--b-strong)] px-1 rounded text-[10px]"
+                        className="text-[var(--a-accent)] hover:text-[var(--t-primary)] border border-[var(--b-strong)] px-1 rounded text-[10px]"
                       >
                         Apply
                       </button>
