@@ -1,0 +1,358 @@
+/* Widget styles for src/ui/primitives.tsx. Colours come only from theme.css. */
+
+/* ------------------------------------------------------------------ Panel */
+
+.ui-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--s-panel);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ui-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  height: var(--row-h);
+  padding: 0 var(--gap);
+  background: var(--s-raised);
+  border-bottom: 1px solid var(--b-strong);
+  flex: none;
+}
+
+.ui-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.ui-panel-toggle {
+  cursor: pointer;
+  font-family: inherit;
+}
+.ui-panel-toggle:hover {
+  color: var(--t-primary);
+}
+
+.ui-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+}
+
+.ui-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--gap);
+}
+.ui-panel-body.is-flush {
+  padding: 0;
+}
+
+/* ------------------------------------------------------------------ Field */
+
+.ui-field {
+  display: grid;
+  /*
+   * A fixed label column so every row in a dock aligns. Ragged label widths
+   * are the single thing that makes a dense parameter form look amateur.
+   */
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 0 var(--gap);
+  margin-bottom: var(--gap-sm);
+}
+
+.ui-field-label {
+  font-size: var(--fs-sm);
+  color: var(--t-secondary);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+.ui-field-control {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.ui-field-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  font-size: var(--fs-xs);
+  color: var(--t-muted);
+  background: var(--s-raised);
+  border: 1px solid var(--b-control);
+  border-left: 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  white-space: nowrap;
+}
+.ui-field-suffix select {
+  border: 0;
+  background: none;
+  color: var(--t-secondary);
+  font-size: var(--fs-xs);
+  height: 100%;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.ui-field-msgs {
+  grid-column: 2;
+  margin: 1px 0 3px;
+}
+.ui-field-msg {
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  margin: 0;
+}
+.ui-field-msg.is-error {
+  color: var(--sem-danger);
+}
+.ui-field-msg.is-warning {
+  color: var(--sem-warn);
+}
+
+.ui-field.is-error .ui-input {
+  border-color: var(--sem-danger);
+}
+.ui-field.is-warning .ui-input {
+  border-color: var(--sem-warn);
+}
+
+/* ------------------------------------------------------------------ Input */
+
+.ui-input {
+  min-width: 0;
+  flex: 1;
+  height: var(--row-h);
+  padding: 0 5px;
+  background: var(--s-sunken);
+  color: var(--t-primary);
+  border: 1px solid var(--b-control);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.ui-input:hover:not(:disabled) {
+  border-color: var(--t-muted);
+}
+.ui-input:disabled {
+  color: var(--t-muted);
+  background: var(--s-panel);
+}
+
+/* Numeric entry is right-aligned so magnitudes line up down a column. */
+.ui-input-num {
+  text-align: right;
+}
+
+/* A field with a unit suffix shares its border with it. */
+.ui-field-suffix + .ui-input,
+.ui-field-control > .ui-input:not(:last-child) {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.ui-select {
+  font-family: var(--font-ui);
+  cursor: pointer;
+  /* Native arrow, restyled by the browser's dark scheme. */
+  color-scheme: dark;
+}
+
+/* ----------------------------------------------------------------- Button */
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: var(--row-h);
+  padding: 0 9px;
+  background: var(--s-raised);
+  color: var(--t-primary);
+  border: 1px solid var(--b-control);
+  border-radius: var(--radius);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ui-btn:hover:not(:disabled) {
+  background: var(--s-active);
+  border-color: var(--t-muted);
+}
+.ui-btn:active:not(:disabled) {
+  background: var(--s-sunken);
+}
+.ui-btn:disabled {
+  color: var(--t-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ui-btn.is-primary {
+  background: var(--a-accent-dim);
+  border-color: var(--a-accent);
+  color: #fff;
+  font-weight: 600;
+}
+.ui-btn.is-primary:hover:not(:disabled) {
+  background: var(--a-accent);
+}
+
+.ui-btn.is-ghost {
+  background: none;
+  border-color: transparent;
+  color: var(--t-secondary);
+}
+.ui-btn.is-ghost:hover:not(:disabled) {
+  background: var(--s-hover);
+  color: var(--t-primary);
+}
+
+.ui-btn.is-danger {
+  color: var(--sem-danger);
+  border-color: transparent;
+  background: none;
+}
+.ui-btn.is-danger:hover:not(:disabled) {
+  background: var(--sem-danger-wash);
+}
+
+/* --------------------------------------------------------------- Checkbox */
+
+.ui-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--row-h-sm);
+  padding: 0 2px;
+  font-size: var(--fs-sm);
+  color: var(--t-secondary);
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+.ui-check:hover {
+  background: var(--s-hover);
+  color: var(--t-primary);
+}
+.ui-check.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-check input {
+  accent-color: var(--a-accent);
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  cursor: inherit;
+}
+.ui-check-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+.ui-check-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -------------------------------------------------------------- Statistic */
+
+.ui-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px 10px;
+  border-left: 2px solid transparent;
+  min-width: 0;
+}
+.ui-stat-label {
+  font-size: var(--fs-xs);
+  color: var(--t-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ui-stat-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  color: var(--t-primary);
+  white-space: nowrap;
+}
+.ui-stat-band {
+  margin-left: 5px;
+  font-size: var(--fs-xs);
+  color: var(--t-muted);
+}
+.ui-stat.is-ok {
+  border-left-color: var(--sem-ok);
+}
+.ui-stat.is-warn {
+  border-left-color: var(--sem-warn);
+}
+.ui-stat.is-warn .ui-stat-band {
+  color: var(--sem-warn);
+}
+.ui-stat.is-danger {
+  border-left-color: var(--sem-danger);
+}
+.ui-stat.is-danger .ui-stat-band {
+  color: var(--sem-danger);
+}
+
+/* ---------------------------------------------------------------- Group */
+
+.ui-group {
+  border-bottom: 1px solid var(--b-soft);
+}
+.ui-group:last-child {
+  border-bottom: 0;
+}
+
+.ui-group-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: var(--row-h);
+  padding: 0 var(--gap);
+  background: none;
+  border: 0;
+  color: var(--t-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+}
+.ui-group-head:hover {
+  background: var(--s-hover);
+  color: var(--t-primary);
+}
+
+.ui-group-body {
+  padding: var(--gap-sm) var(--gap) var(--gap);
+}

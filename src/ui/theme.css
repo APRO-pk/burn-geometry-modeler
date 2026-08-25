@@ -1,0 +1,162 @@
+/*
+ * Desktop theme tokens.
+ *
+ * WHY TOKENS AND NOT MORE TAILWIND HEXES
+ *
+ * The previous UI hardcoded colours inline: `bg-[#ececec]`, `border-[#888]`,
+ * `text-[#00aaff]`, several hundred times across one file. Every panel had
+ * slightly different greys because each was chosen at the point of use, and
+ * changing the theme meant a find-and-replace over JSX.
+ *
+ * These are the whole palette. A component that needs a colour takes one from
+ * here or it is wrong.
+ *
+ * PALETTE INTENT
+ *
+ * Dark, dense, and quiet, in the manner of a native engineering tool. The
+ * chrome recedes so the data does not compete with it: greys carry the
+ * structure, and saturated colour is reserved for things that mean something --
+ * a series on a chart, a warning, a value outside its band. If everything is
+ * blue then nothing is.
+ */
+
+:root {
+  /* ---- surfaces, darkest to lightest ---------------------------------- */
+  /* Window background, behind every panel. */
+  --s-window: #16181c;
+  /* Panel and dock bodies. */
+  --s-panel: #1c1f24;
+  /* Raised strips: toolbars, headers, table heads. */
+  --s-raised: #23272e;
+  /* Inputs and other sunken wells. */
+  --s-sunken: #101216;
+  /* Plot canvases, which sit darker than their panel so traces read cleanly. */
+  --s-canvas: #0c0e11;
+  /* Hover and selection washes, layered over whatever is beneath. */
+  --s-hover: #ffffff0d;
+  --s-active: #ffffff1a;
+
+  /* ---- borders --------------------------------------------------------- */
+  /* Structural divisions between regions. */
+  --b-strong: #34393f;
+  /* Divisions inside a region, e.g. table rules. */
+  --b-soft: #262a30;
+  /* The edge of an interactive control at rest. */
+  --b-control: #3b414a;
+
+  /* ---- text ------------------------------------------------------------ */
+  --t-primary: #e6e9ee;
+  --t-secondary: #9aa3af;
+  --t-muted: #6b7280;
+  /* On a coloured fill. */
+  --t-inverse: #0c0e11;
+
+  /* ---- accent ---------------------------------------------------------- */
+  /* The single interactive accent: focus, selection, primary action. */
+  --a-accent: #4d9fff;
+  --a-accent-dim: #2b6cb8;
+  --a-accent-wash: #4d9fff22;
+
+  /* ---- semantic -------------------------------------------------------- */
+  /* Reserved for meaning, never decoration. */
+  --sem-ok: #3ecf8e;
+  --sem-warn: #e0a33a;
+  --sem-danger: #f2604c;
+  --sem-ok-wash: #3ecf8e1a;
+  --sem-warn-wash: #e0a33a1a;
+  --sem-danger-wash: #f2604c1a;
+
+  /*
+   * ---- chart series -----------------------------------------------------
+   *
+   * Chosen to stay distinguishable on the dark canvas and to survive the
+   * common forms of colour blindness -- these traces are frequently compared
+   * against each other, so a pair that merges is a real loss of information.
+   */
+  --c-1: #4d9fff; /* pressure */
+  --c-2: #3ecf8e; /* Kn */
+  --c-3: #d78bff; /* thrust */
+  --c-4: #e0a33a; /* mass flux */
+  --c-5: #ff8fa3; /* auxiliary */
+  --c-6: #56d4dd; /* auxiliary */
+  --c-grid: #22262c;
+  --c-axis: #4a515a;
+
+  /* ---- metrics ---------------------------------------------------------- */
+  /*
+   * Desktop density. Rows are 22px, not the 40px a web app would use: this
+   * tool shows forty inputs at once and scrolling to reach them is the thing
+   * that makes an engineering UI tiring.
+   */
+  --row-h: 22px;
+  --row-h-sm: 18px;
+  --gap: 6px;
+  --gap-sm: 3px;
+  --gap-lg: 12px;
+  --radius: 3px;
+
+  --font-ui: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+  --fs-base: 12px;
+  --fs-sm: 11px;
+  --fs-xs: 10px;
+}
+
+/* ------------------------------------------------------------------------ */
+
+.app-root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--s-window);
+  color: var(--t-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  /*
+   * Chrome is not selectable; readouts are. Dragging across a desktop app's
+   * panels should not paint half the interface blue, but a user copying a
+   * computed number out of a results table must be able to.
+   */
+  user-select: none;
+}
+
+.selectable {
+  user-select: text;
+  cursor: text;
+}
+
+/* ---- focus ------------------------------------------------------------- */
+/*
+ * One focus treatment everywhere, and only for keyboard users. A visible ring
+ * on every mouse click is noise; its absence for keyboard users is a barrier.
+ */
+.app-root :focus {
+  outline: none;
+}
+.app-root :focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: -1px;
+  border-radius: var(--radius);
+}
+
+/* ---- scrollbars -------------------------------------------------------- */
+.app-root *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.app-root *::-webkit-scrollbar-track {
+  background: var(--s-sunken);
+}
+.app-root *::-webkit-scrollbar-thumb {
+  background: var(--b-control);
+  border: 2px solid var(--s-sunken);
+  border-radius: 5px;
+}
+.app-root *::-webkit-scrollbar-thumb:hover {
+  background: var(--t-muted);
+}
+.app-root *::-webkit-scrollbar-corner {
+  background: var(--s-sunken);
+}

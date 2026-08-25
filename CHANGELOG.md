@@ -12,6 +12,21 @@ entries are grouped by date rather than version.
 
 ### Added
 
+- **Rebuilt the interface as a dark desktop application.** Menu bar, slim
+  toolbar, two resizable docks, a status strip and a collapsible console, all
+  built on a token palette in `src/ui/theme.css` rather than several hundred
+  hardcoded hex values. Rows are 22px: this tool shows forty inputs at once, and
+  scrolling to reach them is what makes an engineering UI tiring.
+- **One overlaid trace instead of two fixed charts.** Chamber pressure and
+  thrust were plotted separately, which answers "what did pressure do" but not
+  "did thrust peak before or after it". Any of twelve channels can now be
+  plotted together, chosen in the right dock.
+- **Uncertainty is always visible.** Peak pressure carries its band inline in
+  the status strip, the right dock lists the live budget, and the trace draws
+  the band around the peak. Previously it lived in a tab you had to remember to
+  open — which is no use at the moment you are reading the number.
+
+
 - **Model uncertainty, per output.** Motor Statistics now reports how much to
   trust each number, with the contributions ranked and every figure citing the
   test that measured it. Pressure carries the `1/(1-n)` amplification that

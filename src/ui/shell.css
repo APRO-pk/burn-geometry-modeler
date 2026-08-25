@@ -1,0 +1,459 @@
+/* Window furniture styles for src/ui/shell.tsx. */
+
+/* ---------------------------------------------------------------- MenuBar */
+
+.sh-menubar {
+  display: flex;
+  align-items: stretch;
+  height: 24px;
+  flex: none;
+  background: var(--s-raised);
+  border-bottom: 1px solid var(--b-strong);
+  padding-left: 2px;
+}
+
+.sh-menu {
+  position: relative;
+}
+
+.sh-menu-btn {
+  height: 100%;
+  padding: 0 10px;
+  background: none;
+  border: 0;
+  color: var(--t-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.sh-menu-btn:hover,
+.sh-menu-btn.is-open {
+  background: var(--s-active);
+  color: var(--t-primary);
+}
+
+.sh-menu-pop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 500;
+  min-width: 210px;
+  padding: 3px;
+  background: var(--s-raised);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+  /* A real drop shadow: the menu must read as floating above the window. */
+  box-shadow: 0 8px 24px #000000a8;
+}
+
+.sh-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  height: var(--row-h);
+  padding: 0 8px;
+  background: none;
+  border: 0;
+  border-radius: 2px;
+  color: var(--t-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.sh-menu-item:hover:not(:disabled) {
+  background: var(--a-accent-dim);
+}
+.sh-menu-item:disabled {
+  color: var(--t-muted);
+  cursor: default;
+}
+
+.sh-menu-accel {
+  color: var(--t-muted);
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+}
+.sh-menu-item:hover:not(:disabled) .sh-menu-accel {
+  color: #ffffffb0;
+}
+
+.sh-menu-sep {
+  height: 1px;
+  margin: 3px 6px;
+  background: var(--b-strong);
+}
+
+/* ---------------------------------------------------------------- Toolbar */
+
+.sh-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  flex: none;
+  padding: 0 6px;
+  background: var(--s-panel);
+  border-bottom: 1px solid var(--b-strong);
+}
+
+.sh-toolbar-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--b-strong);
+  flex: none;
+}
+
+.sh-toolbar-spacer {
+  flex: 1;
+}
+
+/* ------------------------------------------------------------------- Body */
+
+.sh-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.sh-dock {
+  flex: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--s-panel);
+  overflow: hidden;
+}
+
+.sh-dock-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sh-splitter {
+  flex: none;
+  width: 4px;
+  cursor: col-resize;
+  background: var(--s-window);
+  border-left: 1px solid var(--b-strong);
+  border-right: 1px solid var(--b-strong);
+}
+.sh-splitter:hover,
+.sh-splitter:focus-visible {
+  background: var(--a-accent-dim);
+}
+
+.sh-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--s-window);
+}
+
+/* ------------------------------------------------------------------- Tabs */
+
+.sh-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 26px;
+  flex: none;
+  padding: 0 4px;
+  background: var(--s-window);
+  border-bottom: 1px solid var(--b-strong);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sh-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.sh-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 12px;
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  color: var(--t-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sh-tab:hover {
+  color: var(--t-primary);
+  background: var(--s-hover);
+}
+.sh-tab.is-active {
+  background: var(--s-panel);
+  border-color: var(--b-strong);
+  color: var(--t-primary);
+  /* Sits over the strip's bottom rule, the way a selected document tab does. */
+  margin-bottom: -1px;
+  padding-bottom: 1px;
+}
+
+.sh-tabpanel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--gap);
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------- Status */
+
+.sh-status {
+  display: flex;
+  align-items: stretch;
+  height: 34px;
+  flex: none;
+  background: var(--s-raised);
+  border-top: 1px solid var(--b-strong);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.sh-status::-webkit-scrollbar {
+  display: none;
+}
+
+.sh-status-msg {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+  color: var(--t-secondary);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------- Console */
+
+.sh-console {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--s-canvas);
+  border-top: 1px solid var(--b-strong);
+}
+
+.sh-console-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--row-h);
+  padding: 0 var(--gap);
+  background: var(--s-raised);
+  border-bottom: 1px solid var(--b-strong);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+}
+
+.sh-console-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--sem-ok);
+}
+.sh-console-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ------------------------------------------------------- Ballistics chart */
+
+.bc-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--s-canvas);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+}
+
+.bc-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--s-canvas);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+  color: var(--t-muted);
+  font-size: var(--fs-sm);
+  font-style: italic;
+}
+
+.bc-note {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  right: 8px;
+  z-index: 5;
+  padding: 3px 7px;
+  background: var(--sem-warn-wash);
+  border: 1px solid var(--sem-warn);
+  border-radius: var(--radius);
+  color: var(--sem-warn);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+
+/* --------------------------------------------------------- Dock internals */
+
+.sh-dock-title {
+  display: flex;
+  align-items: center;
+  height: var(--row-h);
+  flex: none;
+  padding: 0 var(--gap);
+  background: var(--s-raised);
+  border-bottom: 1px solid var(--b-strong);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+}
+
+/* ------------------------------------------------------- Toolbar extras */
+
+.sh-toolbar-note {
+  font-size: var(--fs-xs);
+  color: var(--t-muted);
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.sh-issue-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--row-h);
+  padding: 0 9px;
+  background: var(--sem-danger-wash);
+  border: 1px solid var(--sem-danger);
+  border-radius: var(--radius);
+  color: var(--sem-danger);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sh-issue-chip:hover {
+  background: var(--sem-danger);
+  color: #fff;
+}
+
+/* ---------------------------------------------------- Ballistics tab body */
+
+.bal-stack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.bal-axial {
+  position: relative;
+  flex: 1;
+  min-height: 160px;
+  background: var(--s-canvas);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+}
+
+.bal-axial-title {
+  position: absolute;
+  top: 4px;
+  left: 10px;
+  z-index: 5;
+  font-size: var(--fs-xs);
+  color: var(--t-secondary);
+}
+
+/* --------------------------------------------- Right-dock readout blocks */
+
+.unc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.unc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  height: var(--row-h-sm);
+  font-size: var(--fs-sm);
+}
+.unc-name {
+  color: var(--t-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.unc-band {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.unc-band.is-ok {
+  color: var(--sem-ok);
+}
+.unc-band.is-warn {
+  color: var(--sem-warn);
+}
+.unc-band.is-danger {
+  color: var(--sem-danger);
+}
+
+.unc-note {
+  margin: 6px 0;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--t-muted);
+}
+
+.chk-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.chk-item {
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  padding-left: 8px;
+  border-left: 2px solid transparent;
+}
+.chk-item.is-error {
+  color: var(--sem-danger);
+  border-left-color: var(--sem-danger);
+}
+.chk-item.is-warning {
+  color: var(--sem-warn);
+  border-left-color: var(--sem-warn);
+}

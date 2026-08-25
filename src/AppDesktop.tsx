@@ -21,7 +21,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { Save, Play, Terminal, Download, FolderUp, FolderDown, Calculator, Settings, Upload, Undo, Redo, Zap } from 'lucide-react';
+import { Play, Terminal, Download, Calculator, Settings, Upload, Undo, Redo, Zap, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { processDXF } from './dxfProcessor';
 import { PropellantEditor, PropellantData } from './PropellantEditor';
 import { GrainEditor } from './GrainEditor';
@@ -43,6 +43,11 @@ import {
 } from './useMotorConfig';
 import { ErrorBoundary } from './ErrorBoundary';
 import { StructuralTab } from './StructuralTab';
+import { BallisticsChart, SERIES } from './BallisticsChart';
+import { modelUncertainty, formatBand } from './modelUncertainty';
+import './ui/theme.css';
+import { MenuBar, Toolbar, ToolbarSep, ToolbarSpacer, Dock, TabStrip, StatusBar } from './ui/shell';
+import { Button, Checkbox, Stat, FieldGroup } from './ui/primitives';
 import { MonteCarloTab } from './MonteCarloTab';
 import { MaterialsTab } from './MaterialsTab';
 import { CustomGraphTab } from './CustomGraphTab';
@@ -210,22 +215,24 @@ const InputBox = ({
   };
 
   const errors = issues.filter((i) => i.severity === 'error');
-  const warnings = issues.filter((i) => i.severity === 'warning');
-  const borderClass = errors.length
-    ? 'border-red-500'
-    : warnings.length
-      ? 'border-amber-500'
-      : 'border-[#bbb]';
+  const worst = errors.length ? 'error' : issues.length ? 'warning' : null;
 
+  /*
+   * Markup matches the Field primitive in src/ui/primitives.tsx rather than
+   * carrying its own styles.
+   *
+   * InputBox predates that primitive and is used at roughly forty call sites.
+   * Rewriting all of them was not worth the risk for a visual change, so
+   * instead this adopts the same class names -- which is what actually makes
+   * the form look uniform. New code should use Field; this stays because it
+   * already handles unit conversion, which Field does not.
+   */
   return (
-    <>
-      <label
-        htmlFor={inputId}
-        className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs"
-      >
+    <div className={`ui-field ${worst ? `is-${worst}` : ''}`}>
+      <label className="ui-field-label" htmlFor={inputId}>
         {label}
       </label>
-      <div className={`relative flex items-center bg-white border ${borderClass} rounded overflow-hidden focus-within:border-blue-500`}>
+      <div className="ui-field-control">
         <input
           id={inputId}
           type={type}
@@ -234,39 +241,42 @@ const InputBox = ({
           onChange={handleChange}
           aria-invalid={errors.length > 0 || undefined}
           aria-describedby={issues.length ? issueId : undefined}
-          className="pl-1 pr-1 py-0.5 w-full bg-transparent outline-none text-right font-mono text-xs"
+          className="ui-input ui-input-num"
         />
-        {unitCat && UNIT_FACTORS[unitCat] ? (
-          <select
-            value={localUnit}
-            onChange={e => setLocalUnit(e.target.value)}
-            aria-label={`Unit for ${label}`}
-            className="bg-[#f0f0f0] text-[#555] text-[10px] font-bold border-l border-[#ccc] px-1 py-0.5 outline-none cursor-pointer"
-          >
-            {Object.keys(UNIT_FACTORS[unitCat]).map(u => <option key={u} value={u}>{u}</option>)}
-          </select>
-        ) : (
-          <span className="bg-[#f0f0f0] text-[#777] px-1.5 py-0.5 border-l border-[#ccc] min-w-[30px] text-center text-[10px] font-bold pointer-events-none">
-            {suffix}
-          </span>
-        )}
+        <div className="ui-field-suffix">
+          {unitCat && UNIT_FACTORS[unitCat] ? (
+            <select
+              value={localUnit}
+              onChange={(e) => setLocalUnit(e.target.value)}
+              aria-label={`Unit for ${label}`}
+            >
+              {Object.keys(UNIT_FACTORS[unitCat]).map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>{suffix}</span>
+          )}
+        </div>
       </div>
       {issues.length > 0 && (
-        <div id={issueId} className="col-span-2 -mt-0.5 mb-0.5 space-y-0.5">
+        <div id={issueId} className="ui-field-msgs">
           {issues.map((i, idx) => (
             <p
               key={idx}
               // Errors are announced immediately; warnings wait for a pause, so
               // typing a value that is briefly invalid is not read out mid-edit.
               role={i.severity === 'error' ? 'alert' : undefined}
-              className={`text-[10px] leading-snug ${i.severity === 'error' ? 'text-red-600' : 'text-amber-700'}`}
+              className={`ui-field-msg is-${i.severity}`}
             >
               {i.message}
             </p>
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 };
 
@@ -327,6 +337,33 @@ export default function AppDesktop() {
     isStringRecord
   );
   const [showPreferences, setShowPreferences] = useState(false);
+
+  /*
+   * Window layout, remembered across reloads.
+   *
+   * Dock widths and whether the console is open are exactly the kind of thing a
+   * desktop application is expected to restore -- being handed back a layout you
+   * did not choose, every launch, is a small insult repeated forever.
+   */
+  const [leftDockWidth, setLeftDockWidth] = usePersistentState<number>(
+    'apro:layout:leftDock:v1', 300, (v): v is number => typeof v === 'number' && v >= 200 && v <= 560
+  );
+  const [rightDockWidth, setRightDockWidth] = usePersistentState<number>(
+    'apro:layout:rightDock:v1', 250, (v): v is number => typeof v === 'number' && v >= 200 && v <= 560
+  );
+  /**
+   * Which channels the main trace plots. Remembered, because a user who works
+   * on pressure and mass flux should not have to re-pick them every session.
+   */
+  const [enabledSeries, setEnabledSeries] = usePersistentState<string[]>(
+    'apro:layout:series:v1',
+    ['Pc_MPa', 'Thrust_kN'],
+    (v): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string')
+  );
+
+  const [consoleOpen, setConsoleOpen] = usePersistentState<boolean>(
+    'apro:layout:console:v1', true, (v): v is boolean => typeof v === 'boolean'
+  );
 
   const settingsContextValue = React.useMemo(() => ({
     unitSystem,
@@ -496,6 +533,7 @@ export default function AppDesktop() {
     ]
   );
   const issuesFor = useMemo(() => byField(validationIssues), [validationIssues]);
+
   const blockingIssues = useMemo(() => errorsOnly(validationIssues), [validationIssues]);
 
   /*
@@ -669,6 +707,54 @@ export default function AppDesktop() {
       1 + sigma_p * (T_init - T_ref)
     );
   }, [results, a, n, burnRateRegimes, sigma_p, T_init, T_ref]);
+
+  /**
+   * The live error budget, computed for whatever is currently configured.
+   *
+   * Shown in the right dock and the status strip rather than only inside the
+   * statistics tab, because uncertainty that you have to go looking for does
+   * not inform the design decision you are making right now.
+   */
+  const uncertaintyBudget = useMemo(
+    () =>
+      modelUncertainty({
+        grainKind: grainType,
+        n,
+        hasBurnRateRegimes: burnRateRegimes.length > 0,
+        propellantName,
+        erosiveModel,
+        hasNozzleMaterial: !!nozzleMaterial,
+        erosiveFraction,
+      }),
+    [grainType, n, burnRateRegimes, propellantName, erosiveModel, nozzleMaterial, erosiveFraction]
+  );
+  const peakPcBand = useMemo(
+    () => uncertaintyBudget.find((u) => u.output === 'peak_pressure'),
+    [uncertaintyBudget]
+  );
+  const impulseBand = useMemo(
+    () => uncertaintyBudget.find((u) => u.output === 'total_impulse'),
+    [uncertaintyBudget]
+  );
+  const burnTimeBand = useMemo(
+    () => uncertaintyBudget.find((u) => u.output === 'burn_time'),
+    [uncertaintyBudget]
+  );
+
+  /**
+   * NAR/TRA-style impulse class letter, plus volume loading.
+   *
+   * Each class is double the previous, starting at 2.5 N*s for an A, so the
+   * letter is log2 of the ratio. Clamped at Z rather than running off the end
+   * of the alphabet for an absurd design.
+   */
+  const motorDesignation = useMemo(() => {
+    if (!metrics || !(metrics.totalImpulse > 0)) return String.fromCharCode(63);
+    const letter = String.fromCharCode(
+      65 + Math.max(0, Math.min(25, Math.floor(Math.log2(metrics.totalImpulse / 2.5))))
+    );
+    return letter + " (" + (metrics.volumeLoading * 100).toFixed(0) + "%)";
+  }, [metrics]);
   const [visualizerIndex, setVisualizerIndex] = useState<number>(0);
   const [statusMsg, setStatusMsg] = useState<string>('System Ready');
   // TabId is derived from TAB_DEFS, so the tab bar and this state cannot
@@ -1823,7 +1909,7 @@ export default function AppDesktop() {
 
   return (
     <SettingsContext.Provider value={settingsContextValue}>
-      <div className="h-screen w-screen flex flex-col bg-[#ececec] text-[#333] font-sans text-sm overflow-hidden select-none relative">
+      <div className="app-root">
       <input type="file" accept=".json" className="hidden" ref={configFileInputRef} onChange={handleLoadConfig} />
       
       {showGrainEditor && (
@@ -2000,64 +2086,127 @@ export default function AppDesktop() {
         />
       )}
 
-      {/* QToolBar */}
-      <div className="flex-none h-10 bg-[#f0f0f0] border-b border-[#ccc] flex items-center px-2 space-x-1 shadow-sm z-10 w-full overflow-x-auto">
-        <input type="file" accept=".bsd,.bsx,.xml" className="hidden" ref={burnsimFileInputRef} onChange={handleLoadBurnsim} />
-        
-        <button onClick={handleSaveConfig} className="p-1.5 hover:bg-[#e0e0e0] border border-transparent hover:border-[#ccc] rounded flex items-center text-xs">
-          <FolderDown size={14} className="mr-1 text-[#555]" /> Save Config
-        </button>
-        <button onClick={() => configFileInputRef.current?.click()} className="p-1.5 hover:bg-[#e0e0e0] border border-transparent hover:border-[#ccc] rounded flex items-center text-xs">
-          <FolderUp size={14} className="mr-1 text-[#555]" /> Load Config
-        </button>
-        <div className="w-px h-5 bg-[#ccc] mx-1"></div>
-        <button onClick={handleSaveBurnsim} className="p-1.5 hover:bg-[#e0e0e0] border border-transparent hover:border-[#ccc] rounded flex items-center text-xs text-blue-800">
-          <FolderDown size={14} className="mr-1" /> Save .BSD
-        </button>
-        <button onClick={() => burnsimFileInputRef.current?.click()} className="p-1.5 hover:bg-[#e0e0e0] border border-transparent hover:border-[#ccc] rounded flex items-center text-xs text-blue-800">
-          <FolderUp size={14} className="mr-1" /> Load .BSD
-        </button>
-        <div className="w-px h-5 bg-[#ccc] mx-1"></div>
-        <button onClick={handleExportENG} className="p-1.5 hover:bg-[#e0e0e0] border border-transparent hover:border-[#ccc] rounded flex items-center text-xs">
-          <Save size={14} className="mr-1 text-blue-600" /> Export .ENG
-        </button>
-        <button onClick={handleExportCSV} className="p-1.5 hover:bg-[#e0e0e0] border border-transparent hover:border-[#ccc] rounded flex items-center text-xs">
-          <Download size={14} className="mr-1 text-blue-600" /> Export CSV
-        </button>
-        <div className="w-px h-5 bg-[#ccc] mx-1"></div>
-        
-        <button onClick={handleUndo} disabled={!designHistory.canUndo} className={`p-1.5 border hover:bg-[#e0e0e0] rounded flex items-center text-xs ${!designHistory.canUndo ? 'opacity-50 cursor-not-allowed border-transparent' : 'border-transparent hover:border-[#ccc]'}`}>
-          <Undo size={14} className="mr-1 text-[#555]" /> Undo
-        </button>
-        <button onClick={handleRedo} disabled={!designHistory.canRedo} className={`p-1.5 border hover:bg-[#e0e0e0] rounded flex items-center text-xs ${!designHistory.canRedo ? 'opacity-50 cursor-not-allowed border-transparent' : 'border-transparent hover:border-[#ccc]'}`}>
-          <Redo size={14} className="mr-1 text-[#555]" /> Redo
-        </button>
-        <div className="w-px h-5 bg-[#ccc] mx-1"></div>
+      {/*
+        * Menu bar, then a slim toolbar of the few actions worth a permanent
+        * button.
+        *
+        * The previous UI put all twelve actions in one horizontal strip, which
+        * meant the two anyone actually presses -- Run and Optimize -- sat in a
+        * queue behind Save Config and Export CSV. Desktop tools put the long
+        * tail in menus and keep the toolbar for what you reach for repeatedly.
+        */}
+      <MenuBar
+        menus={[
+          {
+            label: 'File',
+            items: [
+              { label: 'Save Configuration…', accel: 'Ctrl+S', onSelect: handleSaveConfig },
+              { label: 'Load Configuration…', accel: 'Ctrl+O', onSelect: () => configFileInputRef.current?.click() },
+              { label: 'Save BurnSim (.bsd)…', separatorBefore: true, onSelect: handleSaveBurnsim },
+              { label: 'Load BurnSim (.bsd)…', onSelect: () => burnsimFileInputRef.current?.click() },
+              { label: 'Export Engine File (.eng)…', separatorBefore: true, onSelect: handleExportENG },
+              { label: 'Export Data (.csv)…', onSelect: handleExportCSV },
+            ],
+          },
+          {
+            label: 'Edit',
+            items: [
+              { label: 'Undo', accel: 'Ctrl+Z', onSelect: handleUndo, disabled: !designHistory.canUndo },
+              { label: 'Redo', accel: 'Ctrl+Y', onSelect: handleRedo, disabled: !designHistory.canRedo },
+              { label: 'Preferences…', separatorBefore: true, onSelect: () => setShowPreferences(true) },
+            ],
+          },
+          {
+            label: 'Simulate',
+            items: [
+              { label: 'Run Simulation', accel: 'Ctrl+R', onSelect: runSimulation, disabled: isSimulating },
+              { label: 'Parameter Sweep…', separatorBefore: true, onSelect: () => setShowOptimizer(true) },
+              { label: 'Monte Carlo', onSelect: () => setActiveTab('montecarlo') },
+            ],
+          },
+          {
+            label: 'Design',
+            items: [
+              { label: 'Grain Editor…', onSelect: () => setShowGrainEditor(true) },
+              { label: 'Propellant Library…', onSelect: () => setShowPropellantEditor(true) },
+              { label: 'Unit Converter…', separatorBefore: true, onSelect: () => setShowUnitConverter(true) },
+            ],
+          },
+          {
+            label: 'Analyze',
+            items: [
+              { label: 'Model Uncertainty', onSelect: () => setActiveTab('statistics') },
+              { label: 'Structural Analysis', onSelect: () => setActiveTab('structural') },
+              { label: 'Surrogate (fast)', onSelect: () => setActiveTab('surrogate') },
+              { label: '3-D Burn-back', separatorBefore: true, onSelect: () => setActiveTab('burn3d') },
+            ],
+          },
+        ]}
+      />
 
-        <button onClick={() => setShowUnitConverter(true)} className="p-1.5 hover:bg-[#e0e0e0] border border-transparent hover:border-[#ccc] rounded flex items-center text-xs">
-          <Calculator size={14} className="mr-1 text-[#555]" /> Unit Converter
-        </button>
-        <button onClick={() => setShowPreferences(true)} className="p-1.5 hover:bg-[#e0e0e0] border border-transparent hover:border-[#ccc] rounded flex items-center text-xs">
-          <Settings size={14} className="mr-1 text-[#555]" /> Preferences
-        </button>
-        <div className="w-px h-5 bg-[#ccc] mx-1"></div>
-        <button onClick={() => setShowOptimizer(true)} className="p-1.5 hover:bg-[#ffefd5] border border-transparent hover:border-[#ffcc00] rounded flex items-center text-xs text-[#d37000] font-bold">
-          <Zap size={14} className="mr-1" /> Optimize
-        </button>
-        <button disabled={isSimulating} onClick={runSimulation} className={`p-1.5 border rounded flex items-center text-xs font-semibold ${isSimulating ? 'bg-[#e0e0e0] text-[#888] cursor-not-allowed border-[#ccc]' : 'hover:bg-[#d4edda] border-transparent hover:border-[#c3e6cb] text-green-800'}`}>
-          <Play size={14} className={`mr-1 ${isSimulating ? 'text-[#888]' : 'text-green-600'}`} /> {isSimulating ? 'Running...' : 'Run Simulation'}
-        </button>
-      </div>
+      <Toolbar>
+        <input type="file" accept=".bsd,.bsx,.xml" className="hidden" ref={burnsimFileInputRef} onChange={handleLoadBurnsim} />
+        <Button
+          variant="primary"
+          icon={<Play size={12} />}
+          onClick={runSimulation}
+          disabled={isSimulating || blockingIssues.length > 0}
+          title={blockingIssues.length ? `${blockingIssues.length} problem(s) must be fixed first` : 'Run the full simulation (Ctrl+R)'}
+        >
+          {isSimulating ? 'Running…' : 'Run'}
+        </Button>
+        <Button icon={<Zap size={12} />} onClick={() => setShowOptimizer(true)} disabled={isSimulating}>
+          Sweep
+        </Button>
+        <ToolbarSep />
+        <Button variant="ghost" icon={<Undo size={12} />} onClick={handleUndo} disabled={!designHistory.canUndo} title="Undo" aria-label="Undo" />
+        <Button variant="ghost" icon={<Redo size={12} />} onClick={handleRedo} disabled={!designHistory.canRedo} title="Redo" aria-label="Redo" />
+        <ToolbarSep />
+        <Button variant="ghost" icon={<Settings size={12} />} onClick={() => setShowPropellantEditor(true)}>
+          Propellant
+        </Button>
+        <Button variant="ghost" icon={<Calculator size={12} />} onClick={() => setShowGrainEditor(true)}>
+          Grain
+        </Button>
+
+        <ToolbarSpacer />
+
+        {/*
+          * Blocking problems get a permanent home in the toolbar rather than
+          * only appearing beside their field. With forty inputs across
+          * collapsible groups, the offending one can easily be scrolled out of
+          * sight, and "Run does nothing" is a miserable thing to debug.
+          */}
+        {blockingIssues.length > 0 && (
+          <button
+            type="button"
+            className="sh-issue-chip"
+            onClick={() => setConsoleOpen(true)}
+            title={blockingIssues.map((i) => i.message).join('\n')}
+          >
+            <AlertTriangle size={12} />
+            {blockingIssues.length} problem{blockingIssues.length > 1 ? 's' : ''}
+          </button>
+        )}
+        <span className="sh-toolbar-note">
+          {autosave.unavailable
+            ? 'Autosave off'
+            : autosave.lastSavedAt
+              ? `Saved ${new Date(autosave.lastSavedAt).toLocaleTimeString()}`
+              : 'Autosave pending'}
+        </span>
+      </Toolbar>
 
       {/* Main Window Area */}
-      <div className="flex-1 flex overflow-hidden">
-        
-        {/* Left QDockWidget: Motor Parameters */}
-        <div className="w-80 flex-none bg-[#f0f0f0] border-r border-[#ccc] flex flex-col z-0">
-          <div className="bg-[#e4e4e4] px-2 py-1 border-b border-[#ccc] font-bold text-xs text-[#555] shadow-sm">
-            Motor Parameters
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-3 custom-scrollbar">
+      <div className="sh-body">
+        <Dock
+          side="left"
+          width={leftDockWidth}
+          onWidthChange={setLeftDockWidth}
+          label="Motor parameters"
+        >
+          <div className="sh-dock-title">Motor Parameters</div>
+          <div className="sh-dock-scroll">
             
             {/* QGroupBox: Propellant Data */}
             <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-2 bg-[#fafafa]">
@@ -2310,60 +2459,22 @@ export default function AppDesktop() {
             )}
 
           </div>
-        </div>
+        </Dock>
 
         {/* Central Widget: Tabbed Layout (QTabWidget) */}
-        <div className="flex-1 flex flex-col bg-[#a0a0a0] overflow-hidden">
+        <div className="sh-center">
           
           {/*
-            * QTabBar, as a real ARIA tablist.
-            *
-            * These were plain buttons: a screen reader announced ten unrelated
-            * controls with no indication that they were tabs, which one was
-            * selected, or what they controlled. Keyboard users had to Tab
-            * through every one to reach the last.
-            *
-            * Now it follows the standard tabs pattern -- arrow keys move
-            * between tabs, Home and End jump to the ends, and only the active
-            * tab is in the Tab order, so one Tab press leaves the bar and
-            * reaches the content.
+            * Document-style tabs. The roles, roving tabindex and arrow-key
+            * navigation are unchanged from the previous tablist -- that part was
+            * already correct, so only the appearance moved.
             */}
-          <div
-            role="tablist"
-            aria-label="Analysis views"
-            className="flex-none h-7 bg-[#d0d0d0] border-b border-[#888] flex items-end px-1 space-x-0.5 pt-1 overflow-x-auto"
-            onKeyDown={(e) => {
-              const ids = TAB_DEFS.map((t) => t.id);
-              const current = ids.indexOf(activeTab);
-              let next = -1;
-              if (e.key === 'ArrowRight') next = (current + 1) % ids.length;
-              else if (e.key === 'ArrowLeft') next = (current - 1 + ids.length) % ids.length;
-              else if (e.key === 'Home') next = 0;
-              else if (e.key === 'End') next = ids.length - 1;
-              if (next < 0) return;
-              e.preventDefault();
-              setActiveTab(ids[next]);
-              // Move focus with the selection, or the next arrow press would
-              // continue from wherever focus was left behind.
-              document.getElementById(`tab-${ids[next]}`)?.focus();
-            }}
-          >
-            {TAB_DEFS.map(tab => (
-              <button
-                key={tab.id}
-                id={`tab-${tab.id}`}
-                role="tab"
-                type="button"
-                aria-selected={activeTab === tab.id}
-                aria-controls="tab-panel"
-                tabIndex={activeTab === tab.id ? 0 : -1}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1 text-xs border border-[#888] border-b-0 rounded-t flex items-center whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:z-20 ${activeTab === tab.id ? 'bg-[#a0a0a0] font-bold text-black z-10 relative top-[1px] border-b-[#a0a0a0]' : 'bg-[#e0e0e0] text-[#555] hover:bg-[#d8d8d8]'}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <TabStrip
+            tabs={TAB_DEFS}
+            active={activeTab}
+            onChange={(id) => setActiveTab(id as TabId)}
+            label="Analysis views"
+          />
 
           {/* Tab Content Area */}
           <div
@@ -2371,7 +2482,7 @@ export default function AppDesktop() {
             role="tabpanel"
             aria-labelledby={`tab-${activeTab}`}
             tabIndex={0}
-            className="flex-1 p-1 flex flex-col space-y-1 overflow-hidden bg-[#a0a0a0] relative focus:outline-none"
+            className="sh-tabpanel"
           >
             
             {isSimulating && (
@@ -2444,57 +2555,65 @@ export default function AppDesktop() {
             <ErrorBoundary label={`The ${activeTab} tab`} onError={addLog} key={activeTab}>
             {/* TAB: BALLISTICS */}
             {activeTab === 'ballistics' && (
-              <div className="flex-1 flex flex-col space-y-1">
-                <div className="flex-1 bg-black border border-[#555] relative flex flex-col">
-                  <div className="absolute top-1 left-2 z-10 text-[#00ff00] text-[10px] font-mono">Chamber Pressure vs. Time</div>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 20, right: 10, bottom: 5, left: 0 }}>
-                      <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                      <XAxis dataKey="Time" type="number" domain={['dataMin', 'dataMax']} stroke="#666" tick={{fill: '#888', fontSize: 10}} tickFormatter={(v) => v.toFixed(2)} />
-                      <YAxis stroke="#666" tick={{fill: '#888', fontSize: 10}} tickFormatter={(v) => v.toFixed(1)} />
-                      <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', color: '#00ff00', fontSize: '11px', fontFamily: 'monospace' }} itemStyle={{ color: '#00ff00' }} />
-                      <Line type="stepAfter" dataKey="Pc_MPa" stroke="#00ff00" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex-1 bg-black border border-[#555] relative flex flex-col">
-                  <div className="absolute top-1 left-2 z-10 text-[#ff00ff] text-[10px] font-mono">Thrust vs. Time</div>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 20, right: 10, bottom: 5, left: 0 }}>
-                      <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                      <XAxis dataKey="Time" type="number" domain={['dataMin', 'dataMax']} stroke="#666" tick={{fill: '#888', fontSize: 10}} tickFormatter={(v) => v.toFixed(2)} />
-                      <YAxis stroke="#666" tick={{fill: '#888', fontSize: 10}} tickFormatter={(v) => v.toFixed(1)} />
-                      <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', color: '#ff00ff', fontSize: '11px', fontFamily: 'monospace' }} itemStyle={{ color: '#ff00ff' }} />
-                      <Line type="stepAfter" dataKey="Thrust_kN" stroke="#ff00ff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+              <div className="bal-stack">
+                {/*
+                  * One overlaid trace, not two stacked single-series charts.
+                  *
+                  * Chamber pressure and thrust were previously plotted
+                  * separately, which answers "what did pressure do" but not "did
+                  * thrust peak before or after it" -- the question a coupled
+                  * system actually raises. Channels are chosen in the right dock.
+                  */}
+                <BallisticsChart
+                  data={chartData}
+                  enabled={enabledSeries}
+                  peakPc={
+                    metrics && peakPcBand
+                      ? { value: metrics.maxPc / 1e6, relative: peakPcBand.relative }
+                      : undefined
+                  }
+                />
 
-                {/* Axial profile: only exists after a quasi-1-D run. This is the
-                    whole point of the model -- it shows the head end and the aft
-                    end of the same grain burning at different rates. */}
+                {/*
+                  * The axial profile, which only exists under the quasi-1-D
+                  * model. It is the whole point of that model -- the head end
+                  * and the aft end of one grain burning at different rates --
+                  * and it plots against POSITION, not time, so it cannot be
+                  * folded into the trace above.
+                  */}
                 {stations && axialData.length > 0 && (
-                  <div className="flex-1 bg-black border border-[#555] relative flex flex-col">
-                    <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">
-                      Axial Profile at Peak Pressure &mdash; head end (x=0) to nozzle
+                  <div className="bal-axial">
+                    <div className="bal-axial-title">
+                      Axial profile at peak pressure — head end (x=0) to nozzle
                     </div>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={axialData} margin={{ top: 20, right: 40, bottom: 5, left: 0 }}>
-                        <CartesianGrid strokeDasharray="1 3" stroke="#333" />
+                      <LineChart data={axialData} margin={{ top: 24, right: 34, bottom: 16, left: 0 }}>
+                        <CartesianGrid strokeDasharray="2 4" stroke="var(--c-grid)" />
                         <XAxis
-                          dataKey="x" type="number" domain={['dataMin', 'dataMax']} stroke="#666"
-                          tick={{ fill: '#888', fontSize: 10 }} tickFormatter={(v) => v.toFixed(2)}
+                          dataKey="x"
+                          type="number"
+                          domain={['dataMin', 'dataMax']}
+                          stroke="var(--c-axis)"
+                          tick={{ fill: 'var(--t-muted)', fontSize: 10 }}
+                          tickFormatter={(v: number) => v.toFixed(2)}
+                          label={{ value: 'Position (m)', position: 'insideBottom', offset: -8, fill: 'var(--t-muted)', fontSize: 10 }}
                         />
-                        <YAxis yAxisId="left" stroke="#00aaff" tick={{ fill: '#00aaff', fontSize: 10 }} tickFormatter={(v) => v.toFixed(2)} />
-                        <YAxis yAxisId="right" orientation="right" stroke="#ffaa00" tick={{ fill: '#ffaa00', fontSize: 10 }} tickFormatter={(v) => v.toFixed(1)} />
+                        <YAxis yAxisId="left" stroke="var(--c-1)" tick={{ fill: 'var(--c-1)', fontSize: 10 }} tickFormatter={(v: number) => v.toFixed(2)} />
+                        <YAxis yAxisId="right" orientation="right" stroke="var(--c-4)" tick={{ fill: 'var(--c-4)', fontSize: 10 }} tickFormatter={(v: number) => v.toFixed(1)} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '11px', fontFamily: 'monospace' }}
+                          contentStyle={{
+                            background: 'var(--s-raised)',
+                            border: '1px solid var(--b-strong)',
+                            borderRadius: 3,
+                            fontSize: 11,
+                            fontFamily: 'var(--font-mono)',
+                          }}
                           labelFormatter={(v: number | string) => `x = ${Number(v).toFixed(3)} m`}
                         />
-                        <Legend wrapperStyle={{ fontSize: '10px' }} />
-                        <Line yAxisId="left" type="monotone" dataKey="Pc_MPa" name="Static Pc (MPa)" stroke="#00aaff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                        <Line yAxisId="right" type="monotone" dataKey="G" name="Mass flux (kg/m²s)" stroke="#ffaa00" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                        <Line yAxisId="right" type="monotone" dataKey="rb_mm_s" name="Burn rate (mm/s)" stroke="#00ff88" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                        <Legend verticalAlign="top" height={20} iconType="plainline" wrapperStyle={{ fontSize: 10 }} />
+                        <Line yAxisId="left" type="monotone" dataKey="Pc_MPa" name="Static Pc (MPa)" stroke="var(--c-1)" strokeWidth={1.6} dot={false} isAnimationActive={false} />
+                        <Line yAxisId="right" type="monotone" dataKey="G" name="Mass flux (kg/m²s)" stroke="var(--c-4)" strokeWidth={1.6} dot={false} isAnimationActive={false} />
+                        <Line yAxisId="right" type="monotone" dataKey="rb_mm_s" name="Burn rate (mm/s)" stroke="var(--c-2)" strokeWidth={1.6} dot={false} isAnimationActive={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -2749,27 +2868,185 @@ export default function AppDesktop() {
             </ErrorBoundary>
           </div>
         </div>
+
+        {/*
+          * Right dock: what to plot, and how much to believe it.
+          *
+          * openMotor puts axis checkboxes here. This keeps that -- picking
+          * channels is the most frequent thing you do to a trace -- and adds
+          * the thing this tool has that openMotor does not: a live uncertainty
+          * budget, visible while you design rather than filed away in a tab you
+          * have to remember to open.
+          */}
+        <Dock
+          side="right"
+          width={rightDockWidth}
+          onWidthChange={setRightDockWidth}
+          label="Channels and uncertainty"
+        >
+          <div className="sh-dock-title">Trace &amp; Confidence</div>
+          <div className="sh-dock-scroll">
+            <FieldGroup title="Channels">
+              {SERIES.map((s) => (
+                <Checkbox
+                  key={s.key}
+                  checked={enabledSeries.includes(s.key)}
+                  swatch={s.color}
+                  label={
+                    <>
+                      {s.label} <span style={{ color: 'var(--t-muted)' }}>({s.unit})</span>
+                    </>
+                  }
+                  onChange={(on) =>
+                    setEnabledSeries((prev) =>
+                      on ? [...prev, s.key] : prev.filter((k) => k !== s.key)
+                    )
+                  }
+                />
+              ))}
+            </FieldGroup>
+
+            <FieldGroup title="Model uncertainty">
+              {metrics ? (
+                <div className="unc-list">
+                  {uncertaintyBudget.map((u) => (
+                    <div key={u.output} className="unc-row" title={`Dominated by: ${u.dominant}`}>
+                      <span className="unc-name">{u.label}</span>
+                      <span
+                        className={`unc-band ${
+                          u.orderOfMagnitudeOnly || u.relative >= 0.25
+                            ? 'is-danger'
+                            : u.relative >= 0.1
+                              ? 'is-warn'
+                              : 'is-ok'
+                        }`}
+                      >
+                        {formatBand(u)}
+                      </span>
+                    </div>
+                  ))}
+                  <p className="unc-note">
+                    Measured model error, propagated. A floor on the error, not a bound — batch,
+                    casting and machining variation are invisible to any solver.
+                  </p>
+                  <Button variant="ghost" onClick={() => setActiveTab('statistics')}>
+                    Full breakdown →
+                  </Button>
+                </div>
+              ) : (
+                <p className="unc-note">Run a simulation to see the error budget.</p>
+              )}
+            </FieldGroup>
+
+            <FieldGroup title="Design checks" defaultOpen={validationIssues.length > 0}>
+              {validationIssues.length === 0 ? (
+                <p className="unc-note" style={{ color: 'var(--sem-ok)' }}>
+                  No problems found.
+                </p>
+              ) : (
+                <ul className="chk-list">
+                  {validationIssues.map((v, i) => (
+                    <li key={i} className={`chk-item is-${v.severity}`}>
+                      {v.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </FieldGroup>
+          </div>
+        </Dock>
       </div>
 
-      {/* Bottom QDockWidget: Console */}
-      <div className="h-24 flex-none bg-[#f0f0f0] border-t border-[#ccc] flex flex-col z-10">
-        <div className="bg-[#e4e4e4] px-2 py-1 border-b border-[#ccc] font-bold text-xs text-[#555] shadow-sm flex items-center">
-          <Terminal size={12} className="mr-1" /> System Output Console
-          {/* Quiet confirmation that work is being kept. Silence would leave
-              the user unsure whether autosave is doing anything at all. */}
-          <span className="ml-auto font-normal text-[10px] text-[#888]">
-            {autosave.unavailable
-              ? 'Autosave unavailable (browser storage blocked)'
-              : autosave.lastSavedAt
-                ? `Autosaved ${new Date(autosave.lastSavedAt).toLocaleTimeString()}`
-                : 'Autosave pending'}
+      {/*
+        * Status strip: the handful of numbers that describe the motor, always
+        * visible regardless of which tab is open.
+        *
+        * Peak pressure carries its band inline. That placement is the whole
+        * argument -- a peak quoted to four figures beside a wall thickness
+        * invites a confidence the model has not earned, and the band is only
+        * useful at the moment someone reads the number.
+        */}
+      <StatusBar>
+        {metrics ? (
+          <>
+            <Stat label="Designation" value={motorDesignation} />
+            <Stat
+              label="Total Impulse"
+              value={`${metrics.totalImpulse.toFixed(0)} N·s`}
+              band={impulseBand ? formatBand(impulseBand) : undefined}
+            />
+            <Stat
+              label="Peak Pressure"
+              value={`${(metrics.maxPc / 1e6).toFixed(2)} MPa`}
+              band={peakPcBand ? formatBand(peakPcBand) : undefined}
+              tone={
+                !peakPcBand
+                  ? 'default'
+                  : peakPcBand.orderOfMagnitudeOnly || peakPcBand.relative >= 0.25
+                    ? 'danger'
+                    : peakPcBand.relative >= 0.1
+                      ? 'warn'
+                      : 'ok'
+              }
+              hint={peakPcBand ? `Dominated by: ${peakPcBand.dominant}` : undefined}
+            />
+            <Stat label="Max Thrust" value={`${(metrics.maxThrust / 1000).toFixed(2)} kN`} />
+            <Stat
+              label="Burn Time"
+              value={`${metrics.actionTime.toFixed(3)} s`}
+              band={burnTimeBand ? formatBand(burnTimeBand) : undefined}
+            />
+            <Stat label="Delivered Isp" value={`${metrics.isp.toFixed(1)} s`} />
+            <Stat label="Propellant" value={`${metrics.propMass.toFixed(3)} kg`} />
+            <Stat
+              label="Port / Throat"
+              value={metrics.portThroatRatio.toFixed(2)}
+              tone={metrics.portThroatRatio < 2 ? 'warn' : 'default'}
+              hint={
+                metrics.portThroatRatio < 2
+                  ? 'Below 2, erosive burning dominates — and that model is uncalibrated here.'
+                  : undefined
+              }
+            />
+            <Stat label="Peak Kn" value={metrics.peakKn.toFixed(0)} />
+          </>
+        ) : (
+          <div className="sh-status-msg">
+            {statusMsg || 'No results — press Run to simulate this design.'}
+          </div>
+        )}
+      </StatusBar>
+
+      {/*
+        * Console. Collapsible, because it is essential while something is going
+        * wrong and pure furniture the rest of the time.
+        */}
+      <div className="sh-console" style={{ height: consoleOpen ? 108 : undefined }}>
+        <div className="sh-console-head">
+          <button
+            type="button"
+            className="ui-panel-title ui-panel-toggle"
+            onClick={() => setConsoleOpen(!consoleOpen)}
+            aria-expanded={consoleOpen}
+            aria-controls="console-body"
+          >
+            {consoleOpen ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
+            <Terminal size={11} />
+            <span>Console</span>
+          </button>
+          <span style={{ color: 'var(--t-muted)', textTransform: 'none', letterSpacing: 0 }}>
+            {logs.length} message{logs.length === 1 ? '' : 's'}
           </span>
         </div>
-        <div className="flex-1 bg-black text-[#00ff00] font-mono text-[11px] p-2 overflow-y-auto whitespace-pre-wrap leading-tight">
-          {logs.map((log, i) => (
-            <div key={i}>{log}</div>
-          ))}
-        </div>
+        {consoleOpen && (
+          <div id="console-body" className="sh-console-body selectable">
+            {logs.map((log, i) => (
+              <div key={i} className="sh-console-line">
+                {log}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* QStatusBar */}
