@@ -54,23 +54,23 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div
         role="alert"
-        className="border border-[#663333] bg-[#1a0d0d] rounded p-4 m-2 font-mono text-xs"
+        className="border border-[var(--sem-danger)] bg-[var(--sem-danger-wash)] rounded p-4 m-2 font-mono text-xs"
       >
-        <div className="flex items-center gap-2 text-[#ff6666] font-bold mb-2">
+        <div className="flex items-center gap-2 text-[var(--sem-danger)] font-bold mb-2">
           <AlertTriangle size={14} aria-hidden="true" />
           <span>{this.props.label} failed to render</span>
         </div>
-        <p className="text-[#ffaaaa] leading-snug mb-3">
+        <p className="text-[var(--sem-danger)] leading-snug mb-3">
           The rest of the app is unaffected and your design is intact. This panel
           hit an error while drawing.
         </p>
-        <pre className="text-[10px] text-[#cc8888] whitespace-pre-wrap break-words mb-3">
+        <pre className="text-[10px] text-[var(--sem-danger)] whitespace-pre-wrap break-words mb-3">
           {error.message}
         </pre>
         <button
           type="button"
           onClick={this.reset}
-          className="border border-[#885555] text-[#ffaaaa] px-3 py-1 rounded hover:bg-[#2a1414] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#ff6666]"
+          className="border border-[var(--sem-danger)] text-[var(--sem-danger)] px-3 py-1 rounded hover:bg-[var(--sem-danger-wash)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sem-danger)]"
         >
           Try again
         </button>

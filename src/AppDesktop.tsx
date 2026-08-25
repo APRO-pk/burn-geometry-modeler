@@ -47,6 +47,7 @@ import { BallisticsChart, SERIES } from './BallisticsChart';
 import { modelUncertainty, formatBand } from './modelUncertainty';
 import './ui/theme.css';
 import { MenuBar, Toolbar, ToolbarSep, ToolbarSpacer, Dock, TabStrip, StatusBar } from './ui/shell';
+import { useNotifications, NotificationBell } from './ui/notifications';
 import { Button, Checkbox, Stat, FieldGroup } from './ui/primitives';
 import { MonteCarloTab } from './MonteCarloTab';
 import { MaterialsTab } from './MaterialsTab';
@@ -341,6 +342,8 @@ export default function AppDesktop() {
     DEFAULT_IMPERIAL_PREFS,
     isStringRecord
   );
+  const { notify } = useNotifications();
+
   const [showPreferences, setShowPreferences] = useState(false);
 
   /*
@@ -364,6 +367,13 @@ export default function AppDesktop() {
     'apro:layout:series:v1',
     ['Pc_MPa', 'Thrust_kN'],
     (v): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string')
+  );
+
+  const [leftDockOpen, setLeftDockOpen] = usePersistentState<boolean>(
+    'apro:layout:leftOpen:v1', true, (v): v is boolean => typeof v === 'boolean'
+  );
+  const [rightDockOpen, setRightDockOpen] = usePersistentState<boolean>(
+    'apro:layout:rightOpen:v1', true, (v): v is boolean => typeof v === 'boolean'
   );
 
   const [consoleOpen, setConsoleOpen] = usePersistentState<boolean>(
@@ -656,6 +666,45 @@ export default function AppDesktop() {
   const handleUndo = designHistory.undo;
   const handleRedo = designHistory.redo;
 
+  /*
+   * ---------------------------------------------------------------------
+   * Things worth telling the user about
+   * ---------------------------------------------------------------------
+   *
+   * Each of these used to interrupt: the recovery offer was a banner parked
+   * across the top of the chart, and validation failures were alert() calls
+   * that froze the application one problem at a time. As notifications they
+   * announce themselves and then get out of the way, while the centre keeps
+   * the record for anyone who was looking elsewhere.
+   */
+
+  // A design left over from a previous session. This one asks a question, so
+  // it carries actions and therefore never auto-dismisses.
+  const recoveryOffered = useRef(false);
+  useEffect(() => {
+    if (!autosave.recovered || recoveryOffered.current) return;
+    recoveryOffered.current = true;
+    const when = new Date(autosave.recovered.savedAt).toLocaleString();
+    notify({
+      title: 'Unsaved design found',
+      body: `Last edited ${when}. Restoring replaces what is currently in the editor.`,
+      severity: 'info',
+      actions: [
+        {
+          label: 'Restore',
+          primary: true,
+          onClick: () => {
+            autosave.acceptRecovery();
+            addLog('Restored the autosaved design.');
+          },
+        },
+        { label: 'Discard', onClick: autosave.dismissRecovery },
+      ],
+    });
+  }, [autosave, notify]);
+
+
+
 
   const handleCasingChange = (val: string) => {
     setCasingMaterial(val as CasingMaterialName);
@@ -678,6 +727,26 @@ export default function AppDesktop() {
   /** Axial station profiles from the last run. Undefined after a 0-D run. */
   const [stations, setStations] = useState<StationProfiles | undefined>(undefined);
   const [stabilityWarnings, setStabilityWarnings] = useState<string[]>([]);
+
+  /*
+   * Solver stability warnings, raised once per distinct set.
+   *
+   * Keyed on the joined text so a re-run producing the same warnings does not
+   * announce them again -- these come back on every run of a marginal design,
+   * and repeating them would train the user to ignore the corner they appear in.
+   */
+  const lastWarnings = useRef('');
+  useEffect(() => {
+    const key = stabilityWarnings.join('|');
+    if (!key || key === lastWarnings.current) return;
+    lastWarnings.current = key;
+    notify({
+      title: `Solver stability: ${stabilityWarnings.length} warning${stabilityWarnings.length > 1 ? 's' : ''}`,
+      body: stabilityWarnings[0],
+      severity: 'warning',
+      dedupe: 'stability',
+    });
+  }, [stabilityWarnings, notify]);
   /**
    * Summary numbers every tab reads.
    *
@@ -896,6 +965,14 @@ export default function AppDesktop() {
       addLog(`Cannot run: ${blockingIssues.length} problem${blockingIssues.length > 1 ? 's' : ''} with the design.`);
       for (const issue of blockingIssues) addLog(`  - ${issue.message}`);
       setStatusMsg('Fix the highlighted inputs before running.');
+      notify({
+        title: `Cannot run: ${blockingIssues.length} problem${blockingIssues.length > 1 ? 's' : ''}`,
+        // The first is enough for a toast; the console has them all, and the
+        // offending fields are already marked.
+        body: blockingIssues[0].message,
+        severity: 'error',
+        dedupe: 'validation',
+      });
       return;
     }
 
@@ -1009,11 +1086,24 @@ export default function AppDesktop() {
             volumeLoading
           });
           addLog(`Simulation complete. Action Time: ${actionTime.toFixed(3)}s, Max Thrust: ${(maxThrust/1000).toFixed(2)}kN`);
+          notify({
+            title: 'Simulation complete',
+            body: `${(maxThrust / 1000).toFixed(2)} kN peak, ${actionTime.toFixed(3)} s burn, ${(maxPc / 1e6).toFixed(2)} MPa peak pressure.`,
+            severity: 'success',
+            dedupe: 'sim',
+          });
         } else {
           addLog('Simulation failed or produced no results.');
+          notify({
+            title: 'Simulation produced no results',
+            body: 'The solver returned an empty trace. Check the geometry and propellant.',
+            severity: 'error',
+            dedupe: 'sim',
+          });
         }
       } catch (err: unknown) {
         addLog(`Simulation error: ${errorMessage(err)}`);
+        notify({ title: 'Simulation failed', body: errorMessage(err), severity: 'error', dedupe: 'sim' });
       } finally {
         setIsSimulating(false);
       }
@@ -1981,8 +2071,8 @@ export default function AppDesktop() {
 
       {showPreferences && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-          <div className="bg-[#111] border border-[#444] shadow-2xl rounded w-96 flex flex-col font-mono text-[#eee]">
-            <div className="bg-[#222] px-3 py-1.5 border-b border-[#444] flex justify-between items-center font-bold text-xs text-[#ffaa00]">
+          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-96 flex flex-col font-mono text-[var(--t-primary)]">
+            <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--sem-warn)]">
               <div className="flex items-center"><Settings size={14} className="mr-1" /> Preferences</div>
               <button onClick={() => setShowPreferences(false)} className="hover:text-red-500">✕</button>
             </div>
@@ -1997,8 +2087,8 @@ export default function AppDesktop() {
                 * move between them; they only happened to behave exclusively
                 * because the click handlers set the same state.
                 */}
-              <fieldset className="border border-[#444] rounded p-3">
-                <legend className="mb-2 font-bold text-[#aaa] uppercase px-1">Unit System</legend>
+              <fieldset className="border border-[var(--b-strong)] rounded p-3">
+                <legend className="mb-2 font-bold text-[var(--t-secondary)] uppercase px-1">Unit System</legend>
                 <div className="flex space-x-4 mb-3">
                   <label className="flex items-center space-x-1 cursor-pointer">
                     <input type="radio" name="unit-system" value="Metric" checked={unitSystem === 'Metric'} onChange={() => setUnitSystem('Metric')} className="accent-blue-500" />
@@ -2011,15 +2101,15 @@ export default function AppDesktop() {
                 </div>
                 
                 {unitSystem === 'Imperial' && (
-                  <div className="space-y-2 mt-4 text-[#ddd]">
-                    <div className="text-[10px] text-[#888] mb-1">Preferred Imperial Units</div>
+                  <div className="space-y-2 mt-4 text-[var(--t-primary)]">
+                    <div className="text-[10px] text-[var(--t-secondary)] mb-1">Preferred Imperial Units</div>
                     {Object.keys(IMPERIAL_OPTIONS).map(cat => (
                       <div key={cat} className="flex justify-between items-center">
                         <span>{cat}</span>
                         <select 
                           value={imperialPrefs[cat]} 
                           onChange={e => setImperialPrefs({...imperialPrefs, [cat]: e.target.value})}
-                          className="bg-[#222] border border-[#444] rounded px-2 py-0.5 outline-none focus:border-blue-500"
+                          className="bg-[var(--s-sunken)] border border-[var(--b-strong)] rounded px-2 py-0.5 outline-none focus:border-blue-500"
                         >
                           {IMPERIAL_OPTIONS[cat].map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
@@ -2035,14 +2125,14 @@ export default function AppDesktop() {
 
       {showUnitConverter && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-          <div className="bg-[#111] border border-[#444] shadow-2xl rounded w-80 flex flex-col font-mono text-[#eee]">
-            <div className="bg-[#222] px-3 py-1.5 border-b border-[#444] flex justify-between items-center font-bold text-xs text-[#00aaff]">
+          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-80 flex flex-col font-mono text-[var(--t-primary)]">
+            <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--a-accent)]">
               <div className="flex items-center"><Calculator size={14} className="mr-1" /> Unit Converter</div>
               <button onClick={() => setShowUnitConverter(false)} className="hover:text-red-500">✕</button>
             </div>
             <div className="p-4 space-y-4 text-xs">
               <div>
-                <label className="block mb-1 font-bold text-[#888]" htmlFor={fieldId('measurement-type')}>Measurement Type</label>
+                <label className="block mb-1 font-bold text-[var(--t-secondary)]" htmlFor={fieldId('measurement-type')}>Measurement Type</label>
                 <select id={fieldId('measurement-type')} value={ucMode} onChange={e => {
                   const m = e.target.value as 'Length' | 'Pressure' | 'Mass' | 'Temp';
                   setUcMode(m);
@@ -2050,7 +2140,7 @@ export default function AppDesktop() {
                   if(m === 'Pressure') { setUcUnit1('psi'); setUcUnit2('MPa'); }
                   if(m === 'Mass') { setUcUnit1('lbm'); setUcUnit2('kg'); }
                   if(m === 'Temp') { setUcUnit1('F'); setUcUnit2('C'); }
-                }} className="w-full bg-[#222] border border-[#444] text-[#eee] rounded px-2 py-1 outline-none focus:border-[#00aaff]">
+                }} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] rounded px-2 py-1 outline-none focus:border-[var(--a-accent)]">
                   <option value="Length">Length</option>
                   <option value="Pressure">Pressure</option>
                   <option value="Mass">Mass</option>
@@ -2059,8 +2149,8 @@ export default function AppDesktop() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <input type="number" step="any" value={ucVal1} onChange={e => setUcVal1(e.target.value)} className="w-full bg-[#000] border border-[#444] text-[#00ff00] rounded px-2 py-1 mb-1 font-mono text-right outline-none focus:border-[#00aaff]" />
-                  <select value={ucUnit1} onChange={e => setUcUnit1(e.target.value)} className="w-full bg-[#222] border border-[#444] text-[#eee] rounded px-2 py-1 outline-none focus:border-[#00aaff]">
+                  <input type="number" step="any" value={ucVal1} onChange={e => setUcVal1(e.target.value)} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--sem-ok)] rounded px-2 py-1 mb-1 font-mono text-right outline-none focus:border-[var(--a-accent)]" />
+                  <select value={ucUnit1} onChange={e => setUcUnit1(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] rounded px-2 py-1 outline-none focus:border-[var(--a-accent)]">
                     {ucMode === 'Length' && ['m','cm','mm','in','ft'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Pressure' && ['Pa','kPa','MPa','psi','bar','atm'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Mass' && ['kg','g','lbm'].map(u => <option key={u} value={u}>{u}</option>)}
@@ -2068,8 +2158,8 @@ export default function AppDesktop() {
                   </select>
                 </div>
                 <div>
-                  <input type="text" readOnly value={getUcConvertedMode()} className="w-full bg-[#000] border border-[#444] text-[#00aaff] rounded px-2 py-1 mb-1 font-mono text-right font-bold outline-none" />
-                  <select value={ucUnit2} onChange={e => setUcUnit2(e.target.value)} className="w-full bg-[#222] border border-[#444] text-[#eee] rounded px-2 py-1 outline-none focus:border-[#00aaff]">
+                  <input type="text" readOnly value={getUcConvertedMode()} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--a-accent)] rounded px-2 py-1 mb-1 font-mono text-right font-bold outline-none" />
+                  <select value={ucUnit2} onChange={e => setUcUnit2(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] rounded px-2 py-1 outline-none focus:border-[var(--a-accent)]">
                     {ucMode === 'Length' && ['m','cm','mm','in','ft'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Pressure' && ['Pa','kPa','MPa','psi','bar','atm'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Mass' && ['kg','g','lbm'].map(u => <option key={u} value={u}>{u}</option>)}
@@ -2193,6 +2283,7 @@ export default function AppDesktop() {
             {blockingIssues.length} problem{blockingIssues.length > 1 ? 's' : ''}
           </button>
         )}
+        <NotificationBell />
         <span className="sh-toolbar-note">
           {autosave.unavailable
             ? 'Autosave off'
@@ -2208,9 +2299,11 @@ export default function AppDesktop() {
           side="left"
           width={leftDockWidth}
           onWidthChange={setLeftDockWidth}
-          label="Motor parameters"
+          label="Motor Parameters"
+          railLabel="Parameters"
+          open={leftDockOpen}
+          onOpenChange={setLeftDockOpen}
         >
-          <div className="sh-dock-title">Motor Parameters</div>
           <div className="sh-dock-scroll">
             
             {/* QGroupBox: Propellant Data */}
@@ -2317,7 +2410,7 @@ export default function AppDesktop() {
                        <button type="button" aria-describedby="dxf-upload-heading" onClick={() => dxfFileInputRef.current?.click()} className="ui-btn" style={{ flex: 1 }}>
                          <Upload size={14} className="mr-1" /> Load .DXF
                        </button>
-                       <span className="text-[10px] text-[#666] truncate max-w-[100px]">{dxfFilename || 'No file'}</span>
+                       <span className="text-[10px] text-[var(--t-muted)] truncate max-w-[100px]">{dxfFilename || 'No file'}</span>
                     </div>
                   </div>
                 )}
@@ -2444,7 +2537,7 @@ export default function AppDesktop() {
             {/* QGroupBox: Results Summary */}
             {metrics && (
               <div className="ui-groupbox is-result">
-                <span className="absolute -top-2.5 left-2 bg-[#e8f4f8] px-1 text-[10px] font-bold text-[#0056b3] uppercase">Results Summary</span>
+                <span className="absolute -top-2.5 left-2 bg-[var(--s-panel)] px-1 text-[10px] font-bold text-[var(--a-accent)] uppercase">Results Summary</span>
                 <div className="ui-fields">
                   <div className="ui-kv-key">Max Thrust:</div><div className="ui-kv-val">{(metrics.maxThrust/1000).toFixed(2)} kN</div>
                   <div className="ui-kv-key">Max Press:</div><div className="ui-kv-val">{(metrics.maxPc/1e6).toFixed(2)} MPa</div>
@@ -2452,7 +2545,7 @@ export default function AppDesktop() {
                   <div className="ui-kv-key">Isp:</div><div className="ui-kv-val">{metrics.isp.toFixed(1)} s</div>
                   <div className="ui-kv-key">Action Time:</div><div className="ui-kv-val">{metrics.actionTime.toFixed(2)} s</div>
                   <div className="ui-kv-key">Case SF:</div>
-                  <div className={`font-mono font-bold ${structural && structural.safetyFactor < 1.5 ? 'text-[#cc0000]' : 'text-[#000]'}`}>
+                  <div className={`font-mono font-bold ${structural && structural.safetyFactor < 1.5 ? 'text-[var(--sem-danger)]' : 'text-[var(--s-canvas)]'}`}>
                     {structural ? `${structural.safetyFactor.toFixed(2)}x` : '--'}
                   </div>
                   <div className="ui-kv-key">Bore Growth:</div>
@@ -2491,55 +2584,23 @@ export default function AppDesktop() {
           >
             
             {isSimulating && (
-              <div className="absolute inset-0 z-50 bg-[#111] bg-opacity-80 flex flex-col items-center justify-center font-mono">
-                <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-[#00aaff] mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <div className="absolute inset-0 z-50 bg-[var(--s-canvas)] bg-opacity-80 flex flex-col items-center justify-center font-mono">
+                <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-[var(--a-accent)] mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <div className="text-[#00aaff] text-sm animate-pulse tracking-widest font-bold">SOLVING MESH & THERMO MODELS...</div>
+                <div className="text-[var(--a-accent)] text-sm animate-pulse tracking-widest font-bold">SOLVING MESH & THERMO MODELS...</div>
               </div>
             )}
 
-            {autosave.recovered && (
-              <div
-                role="region"
-                aria-label="Recover unsaved design"
-                className="flex-none bg-[#d1ecf1] border border-[#bee5eb] p-2 rounded flex items-center justify-between mb-1"
-              >
-                <div className="text-[#0c5460] text-xs">
-                  <span className="font-bold">Unsaved design found.</span>{' '}
-                  Last edited {new Date(autosave.recovered.savedAt).toLocaleString()}. Restoring
-                  replaces what is currently in the editor.
-                </div>
-                <div className="flex items-center space-x-2 flex-none ml-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      autosave.acceptRecovery();
-                      addLog('Restored the autosaved design.');
-                    }}
-                    className="px-3 py-1 bg-[#0c5460] text-white text-xs font-bold rounded hover:bg-[#0a4650] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0c5460]"
-                  >
-                    Restore
-                  </button>
-                  <button
-                    type="button"
-                    onClick={autosave.dismissRecovery}
-                    className="px-3 py-1 border border-[#0c5460] text-[#0c5460] text-xs rounded hover:bg-[#c1e4ea] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0c5460]"
-                  >
-                    Discard
-                  </button>
-                </div>
-              </div>
-            )}
 
             {stabilityWarnings.length > 0 && (
-              <div className="flex-none bg-[#fff3cd] border border-[#ffeeba] p-2 rounded flex flex-col space-y-1 mb-1">
-                <div className="text-[#856404] text-xs font-bold flex items-center">
+              <div className="flex-none bg-[var(--sem-warn-wash)] border border-[var(--sem-warn)] p-2 rounded flex flex-col space-y-1 mb-1">
+                <div className="text-[var(--sem-warn)] text-xs font-bold flex items-center">
                   <Terminal size={14} className="mr-1" /> STABILITY WARNINGS DETECTED
                 </div>
                 {stabilityWarnings.map((w, idx) => (
-                  <div key={idx} className="text-[#856404] text-[11px] font-mono pl-4">• {w}</div>
+                  <div key={idx} className="text-[var(--sem-warn)] text-[11px] font-mono pl-4">• {w}</div>
                 ))}
               </div>
             )}
@@ -2633,22 +2694,22 @@ export default function AppDesktop() {
 
             {/* TAB: GEOMETRY */}
             {activeTab === 'geometry' && (
-              <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-center">
-                <div className="absolute top-1 left-2 z-10 text-[#00ffff] text-[10px] font-mono">Grain Cross-Section Regression</div>
+              <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-center">
+                <div className="absolute top-1 left-2 z-10 text-[var(--c-6)] text-[10px] font-mono">Grain Cross-Section Regression</div>
                 <div className="w-full h-full flex items-center justify-center p-8">
-                  <svg viewBox="0 0 200 200" className="w-full h-full max-w-[500px] max-h-[500px] bg-[#222] rounded-full border border-[#444] shadow-2xl">
-                    <circle cx="100" cy="100" r={(outerRadius / outerRadius) * 95} fill="#555" />
+                  <svg viewBox="0 0 200 200" className="w-full h-full max-w-[500px] max-h-[500px] bg-[var(--s-sunken)] rounded-full border border-[var(--b-strong)] shadow-2xl">
+                    <circle cx="100" cy="100" r={(outerRadius / outerRadius) * 95} fill="var(--b-control)" />
                     {grainType === 'BATES' || grainType === 'Tubular' ? (
-                      <circle cx="100" cy="100" r={Math.min(outerRadius, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="#111" />
+                      <circle cx="100" cy="100" r={Math.min(outerRadius, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="var(--s-canvas)" />
                     ) : grainType === 'RodAndTube' ? (
                       <>
-                        <circle cx="100" cy="100" r={Math.min(outerRadius, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="#111" />
+                        <circle cx="100" cy="100" r={Math.min(outerRadius, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="var(--s-canvas)" />
                         {rodRadius - currentY > 0 && (
-                          <circle cx="100" cy="100" r={Math.max(0, rodRadius - currentY) / outerRadius * 95} fill="#555" />
+                          <circle cx="100" cy="100" r={Math.max(0, rodRadius - currentY) / outerRadius * 95} fill="var(--b-control)" />
                         )}
                       </>
                     ) : grainType === 'MoonBurner' ? (
-                      <circle cx={100 + (offset / outerRadius) * 95} cy="100" r={Math.min(outerRadius + offset, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="#111" />
+                      <circle cx={100 + (offset / outerRadius) * 95} cy="100" r={Math.min(outerRadius + offset, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="var(--s-canvas)" />
                     ) : grainType === 'Finocyl' ? (
                       <path d={(() => {
                         const scale = 95 / outerRadius;
@@ -2702,9 +2763,9 @@ export default function AppDesktop() {
                            path += `A ${rc} ${rc} 0 0 1 ${next_p1x} ${next_p1y} `;
                         }
                         return path + "Z";
-                      })()} fill="#111" />
+                      })()} fill="var(--s-canvas)" />
                     ) : grainType === 'CustomDXF' && dxfData ? (
-                      <circle cx="100" cy="100" r={Math.sqrt(dxfData.areaTable[Math.min(Math.floor(currentY / dxfData.dx), dxfData.areaTable.length - 1)] / Math.PI) / outerRadius * 95} fill="#111" />
+                      <circle cx="100" cy="100" r={Math.sqrt(dxfData.areaTable[Math.min(Math.floor(currentY / dxfData.dx), dxfData.areaTable.length - 1)] / Math.PI) / outerRadius * 95} fill="var(--s-canvas)" />
                     ) : (
                       <path d={(() => {
                         const scale = 95 / outerRadius;
@@ -2719,27 +2780,27 @@ export default function AppDesktop() {
                           path += (i === 0 ? `M ${px} ${py} ` : `L ${px} ${py} `);
                         }
                         return path + "Z";
-                      })()} fill="#111" />
+                      })()} fill="var(--s-canvas)" />
                     )}
                   </svg>
                 </div>
-                <div className="absolute bottom-4 left-4 right-4 flex flex-col space-y-2 bg-[#111] p-3 rounded border border-[#333]">
-                  <div className="flex justify-between text-[#00ffff] text-[10px] font-mono px-2">
+                <div className="absolute bottom-4 left-4 right-4 flex flex-col space-y-2 bg-[var(--s-canvas)] p-3 rounded border border-[var(--b-soft)]">
+                  <div className="flex justify-between text-[var(--c-6)] text-[10px] font-mono px-2">
                     <span>Burn Area: {(results[visualizerIndex]?.Ab * 10000 || 0).toFixed(1)} cm²</span>
                     <span>Port Area: {(results[visualizerIndex]?.PortArea * 10000 || 0).toFixed(1)} cm²</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-[#00ffff] text-[10px] font-mono w-16">T: {results[visualizerIndex]?.Time.toFixed(2) || '0.00'}s</span>
+                    <span className="text-[var(--c-6)] text-[10px] font-mono w-16">T: {results[visualizerIndex]?.Time.toFixed(2) || '0.00'}s</span>
                     <input 
                       type="range" 
                       min="0" 
                       max={Math.max(0, results.length - 1)} 
                       value={visualizerIndex} 
                       onChange={(e) => setVisualizerIndex(Number(e.target.value))}
-                      className="flex-1 accent-[#00ffff]"
+                      className="flex-1 accent-[var(--c-6)]"
                       disabled={results.length === 0}
                     />
-                    <span className="text-[#00ffff] text-[10px] font-mono w-16 text-right">W: {(currentY * 1000).toFixed(1)}mm</span>
+                    <span className="text-[var(--c-6)] text-[10px] font-mono w-16 text-right">W: {(currentY * 1000).toFixed(1)}mm</span>
                   </div>
                 </div>
               </div>
@@ -2747,15 +2808,15 @@ export default function AppDesktop() {
 
             {/* TAB: THERMO */}
             {activeTab === 'thermo' && (
-              <div className="flex-1 bg-black border border-[#555] relative flex flex-col">
-                <div className="absolute top-1 left-2 z-10 text-[#ffff00] text-[10px] font-mono">Burn Rate vs. Chamber Pressure</div>
+              <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col">
+                <div className="absolute top-1 left-2 z-10 text-[var(--sem-warn)] text-[10px] font-mono">Burn Rate vs. Chamber Pressure</div>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={burnRateData} margin={{ top: 20, right: 20, bottom: 20, left: 10 }}>
-                    <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                    <XAxis dataKey="pressure" type="number" domain={['dataMin', 'dataMax']} stroke="#666" tick={{fill: '#888', fontSize: 10}} label={{ value: 'Pressure (MPa)', position: 'insideBottom', offset: -10, fill: '#888', fontSize: 10 }} />
-                    <YAxis stroke="#666" tick={{fill: '#888', fontSize: 10}} label={{ value: 'Burn Rate (mm/s)', angle: -90, position: 'insideLeft', fill: '#888', fontSize: 10 }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', color: '#ffff00', fontSize: '11px', fontFamily: 'monospace' }} itemStyle={{ color: '#ffff00' }} />
-                    <Line type="monotone" dataKey="burnRate" stroke="#ffff00" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                    <CartesianGrid strokeDasharray="1 3" stroke="var(--b-soft)" />
+                    <XAxis dataKey="pressure" type="number" domain={['dataMin', 'dataMax']} stroke="var(--t-muted)" tick={{fill: 'var(--t-secondary)', fontSize: 10}} label={{ value: 'Pressure (MPa)', position: 'insideBottom', offset: -10, fill: 'var(--t-secondary)', fontSize: 10 }} />
+                    <YAxis stroke="var(--t-muted)" tick={{fill: 'var(--t-secondary)', fontSize: 10}} label={{ value: 'Burn Rate (mm/s)', angle: -90, position: 'insideLeft', fill: 'var(--t-secondary)', fontSize: 10 }} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--s-canvas)', borderColor: 'var(--b-strong)', color: 'var(--sem-warn)', fontSize: '11px', fontFamily: 'monospace' }} itemStyle={{ color: 'var(--sem-warn)' }} />
+                    <Line type="monotone" dataKey="burnRate" stroke="var(--sem-warn)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -2816,17 +2877,17 @@ export default function AppDesktop() {
             {/* TAB: STATISTICS */}
             {/* TAB: 3D BURN */}
             {activeTab === 'burn3d' && (
-              <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
-                <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">
+              <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
+                <div className="absolute top-1 left-2 z-10 text-[var(--a-accent)] text-[10px] font-mono">
                   Live Grain Burn-Back
                 </div>
                 {grainType === 'CustomDXF' && !dxfData ? (
-                  <div className="text-[#666] italic font-mono text-xs mt-6">
+                  <div className="text-[var(--t-muted)] italic font-mono text-xs mt-6">
                     Load a DXF profile to view its burn-back.
                   </div>
                 ) : (
                   <React.Suspense
-                    fallback={<div className="text-[#666] italic font-mono text-xs mt-6">Loading 3D view…</div>}
+                    fallback={<div className="text-[var(--t-muted)] italic font-mono text-xs mt-6">Loading 3D view…</div>}
                   >
                     <GrainBurn3D grain={burn3dGrain} results={results} />
                   </React.Suspense>
@@ -2836,12 +2897,12 @@ export default function AppDesktop() {
 
             {/* TAB: SURROGATE */}
             {activeTab === 'surrogate' && (
-              <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
-                <div className="absolute top-1 left-2 z-10 text-[#00aaff] text-[10px] font-mono">
+              <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
+                <div className="absolute top-1 left-2 z-10 text-[var(--a-accent)] text-[10px] font-mono">
                   Physics-Trained Surrogate
                 </div>
                 {grainType === 'CustomDXF' && !dxfData ? (
-                  <div className="text-[#666] italic font-mono text-xs mt-6 max-w-lg text-center">
+                  <div className="text-[var(--t-muted)] italic font-mono text-xs mt-6 max-w-lg text-center">
                     Load a DXF profile first — the surrogate predicts from the grain's burn-back
                     curves, and a Custom DXF grain has none until its cross-section is traced.
                   </div>
@@ -2887,9 +2948,11 @@ export default function AppDesktop() {
           side="right"
           width={rightDockWidth}
           onWidthChange={setRightDockWidth}
-          label="Channels and uncertainty"
+          label="Trace & Confidence"
+          railLabel="Trace"
+          open={rightDockOpen}
+          onOpenChange={setRightDockOpen}
         >
-          <div className="sh-dock-title">Trace &amp; Confidence</div>
           <div className="sh-dock-scroll">
             <FieldGroup title="Channels">
               {SERIES.map((s) => (
@@ -3055,8 +3118,8 @@ export default function AppDesktop() {
       </div>
 
       {/* QStatusBar */}
-      <div className="h-6 flex-none bg-[#f0f0f0] border-t border-[#ccc] flex items-center px-3 z-20">
-        <span className="text-[11px] text-[#555] font-medium">{statusMsg}</span>
+      <div className="h-6 flex-none bg-[var(--s-raised)] border-t border-[var(--t-primary)] flex items-center px-3 z-20">
+        <span className="text-[11px] text-[var(--b-control)] font-medium">{statusMsg}</span>
       </div>
 
     </div>

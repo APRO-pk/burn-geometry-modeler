@@ -127,6 +127,88 @@
   flex-direction: column;
   background: var(--s-panel);
   overflow: hidden;
+  /*
+   * Sliding, not appearing. The eye follows a panel that moves and can see
+   * where it went; one that blinks out has to be found again.
+   */
+  transition: width 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sh-dock.is-closed {
+  border: 0;
+}
+
+/*
+ * The contents keep their full width while the shell collapses around them, so
+ * labels do not rewrap mid-slide -- a panel whose text reflows on the way out
+ * looks broken rather than animated.
+ */
+.sh-dock-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-dock {
+    transition: none;
+  }
+}
+
+/* ---- collapsed rail ---- */
+
+.sh-rail {
+  flex: none;
+  width: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  background: var(--s-panel);
+  border: 0;
+  color: var(--t-muted);
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.sh-rail.is-left {
+  border-right: 1px solid var(--b-strong);
+}
+.sh-rail.is-right {
+  border-left: 1px solid var(--b-strong);
+}
+.sh-rail:hover {
+  background: var(--s-raised);
+  color: var(--t-primary);
+}
+
+.sh-rail-label {
+  /* Reads bottom-to-top, the convention for a vertical tab. */
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sh-dock-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--t-muted);
+  cursor: pointer;
+}
+.sh-dock-collapse:hover {
+  background: var(--s-hover);
+  color: var(--t-primary);
 }
 
 .sh-dock-scroll {
@@ -327,6 +409,7 @@
 .sh-dock-title {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   height: var(--row-h);
   flex: none;
   padding: 0 var(--gap);

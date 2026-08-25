@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './shell.css';
 
 /**
@@ -133,15 +134,28 @@ export interface DockProps {
   max?: number;
   children: React.ReactNode;
   label: string;
+  /** Collapsed docks slide away and leave a labelled rail. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Shown vertically on the rail when collapsed. Defaults to `label`. */
+  railLabel?: string;
 }
 
 /**
- * A resizable side dock.
+ * A resizable dock that slides away when collapsed.
  *
- * The splitter is a real control, not a decorative line: it is focusable and
- * responds to arrow keys, because a mouse-only resize handle is unusable to
- * anyone who cannot use a mouse, and this dock holds forty parameters that a
- * user may well want more room for.
+ * Collapsing leaves a narrow rail carrying the panel's name turned on its side
+ * and a chevron, so the panel is still discoverable and one click brings it
+ * back. A dock that vanished entirely would be a feature nobody finds again.
+ *
+ * The panel is translated rather than unmounted. Unmounting would lose the
+ * scroll position and every collapsed field group, so reopening would not
+ * return you to what you were looking at -- and it would make the slide
+ * impossible to animate.
+ *
+ * The splitter is a real control: focusable, and responds to arrow keys,
+ * because a mouse-only resize handle is unusable to anyone who cannot use a
+ * mouse, and this dock holds forty parameters.
  */
 export function Dock({
   side,
@@ -151,6 +165,9 @@ export function Dock({
   max = 560,
   children,
   label,
+  open,
+  onOpenChange,
+  railLabel,
 }: DockProps) {
   const dragging = useRef(false);
 
@@ -171,6 +188,19 @@ export function Dock({
       document.removeEventListener('mouseup', onUp);
     };
   }, [side, min, max, onWidthChange]);
+
+  const rail = (
+    <button
+      type="button"
+      className={`sh-rail is-${side}`}
+      onClick={() => onOpenChange(true)}
+      aria-expanded={false}
+      title={`Show ${label}`}
+    >
+      {side === 'left' ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+      <span className="sh-rail-label">{railLabel ?? label}</span>
+    </button>
+  );
 
   const splitter = (
     <div
@@ -196,13 +226,46 @@ export function Dock({
     />
   );
 
+  const panel = (
+    <aside
+      className={`sh-dock is-${side} ${open ? 'is-open' : 'is-closed'}`}
+      /*
+       * Width collapses to zero rather than the element being removed, and the
+       * contents keep their own width so the text does not reflow while it
+       * slides -- a panel whose labels rewrap on the way out looks broken.
+       */
+      style={{ width: open ? width : 0 }}
+      aria-label={label}
+      aria-hidden={!open}
+      // A collapsed dock must not be reachable by Tab. React types `inert` as
+      // boolean, but only the attribute presence matters to the browser.
+      {...(!open ? { inert: true as unknown as boolean } : {})}
+    >
+      <div className="sh-dock-inner" style={{ width }}>
+        <div className="sh-dock-title">
+          <span>{label}</span>
+          <button
+            type="button"
+            className="sh-dock-collapse"
+            onClick={() => onOpenChange(false)}
+            aria-expanded
+            title={`Hide ${label}`}
+          >
+            {side === 'left' ? <ChevronLeft size={12} /> : <ChevronRight size={12} />}
+          </button>
+        </div>
+        {children}
+      </div>
+    </aside>
+  );
+
   return (
     <>
-      {side === 'right' && splitter}
-      <aside className="sh-dock" style={{ width }} aria-label={label}>
-        {children}
-      </aside>
-      {side === 'left' && splitter}
+      {side === 'right' && !open && rail}
+      {side === 'right' && open && splitter}
+      {panel}
+      {side === 'left' && open && splitter}
+      {side === 'left' && !open && rail}
     </>
   );
 }

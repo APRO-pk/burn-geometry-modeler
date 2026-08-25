@@ -1,0 +1,368 @@
+/* Toasts and the notification centre. Colours come only from theme.css. */
+
+/* ------------------------------------------------------------ ToastStack */
+
+.nt-stack {
+  position: fixed;
+  right: 14px;
+  /* Clear of the status strip and console so a toast never covers a readout. */
+  bottom: 14px;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 330px;
+  max-width: calc(100vw - 28px);
+  pointer-events: none;
+}
+.nt-stack > * {
+  pointer-events: auto;
+}
+
+/* Off-screen live regions. */
+.nt-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.nt-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  background: var(--s-raised);
+  border: 1px solid var(--b-strong);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px #000000a0;
+  overflow: hidden;
+  animation: nt-in 160ms ease-out;
+}
+
+@keyframes nt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Motion is decoration here; the information is in the text and the colour. */
+@media (prefers-reduced-motion: reduce) {
+  .nt-toast {
+    animation: none;
+  }
+}
+
+.nt-toast.is-info {
+  border-left-color: var(--a-accent);
+}
+.nt-toast.is-info .nt-toast-icon {
+  color: var(--a-accent);
+}
+.nt-toast.is-success {
+  border-left-color: var(--sem-ok);
+}
+.nt-toast.is-success .nt-toast-icon {
+  color: var(--sem-ok);
+}
+.nt-toast.is-warning {
+  border-left-color: var(--sem-warn);
+}
+.nt-toast.is-warning .nt-toast-icon {
+  color: var(--sem-warn);
+}
+.nt-toast.is-error {
+  border-left-color: var(--sem-danger);
+}
+.nt-toast.is-error .nt-toast-icon {
+  color: var(--sem-danger);
+}
+
+.nt-toast-icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+.nt-toast-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.nt-toast-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--t-primary);
+  line-height: 1.35;
+}
+
+.nt-toast-body {
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--t-secondary);
+  /* Long detail belongs in the console; three lines is the limit here. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.nt-toast-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.nt-action {
+  height: 20px;
+  padding: 0 9px;
+  background: var(--s-panel);
+  border: 1px solid var(--b-control);
+  border-radius: var(--radius);
+  color: var(--t-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+.nt-action:hover {
+  background: var(--s-active);
+  border-color: var(--t-muted);
+}
+.nt-action.is-primary {
+  background: var(--a-accent-dim);
+  border-color: var(--a-accent);
+  color: #fff;
+  font-weight: 600;
+}
+.nt-action.is-primary:hover {
+  background: var(--a-accent);
+}
+
+.nt-toast-close {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--t-muted);
+  cursor: pointer;
+}
+.nt-toast-close:hover {
+  background: var(--s-hover);
+  color: var(--t-primary);
+}
+
+/*
+ * Countdown along the bottom edge, so a disappearing toast is predictable.
+ *
+ * A CSS animation rather than a React-driven width: it stays in step with real
+ * time, pauses with animation-play-state, and costs no renders. The previous
+ * version ticked React state every 100ms and drifted under load.
+ */
+.nt-toast-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--t-muted);
+  opacity: 0.45;
+  transform-origin: left center;
+  animation-name: nt-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes nt-countdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The bar stops moving, but the toast still dismisses on schedule. */
+  .nt-toast-timer { animation: none; opacity: 0.25; }
+}
+
+/* --------------------------------------------------------------- Bell */
+
+.nt-bell-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.nt-bell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--row-h);
+  height: var(--row-h);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--t-secondary);
+  cursor: pointer;
+}
+.nt-bell:hover,
+.nt-bell.is-open {
+  background: var(--s-active);
+  color: var(--t-primary);
+  border-color: var(--b-control);
+}
+
+.nt-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sem-danger);
+  color: #fff;
+  border-radius: 7px;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ------------------------------------------------------------- Panel */
+
+.nt-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 950;
+  width: 360px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  background: var(--s-raised);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px #000000b0;
+  overflow: hidden;
+}
+
+.nt-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--row-h);
+  flex: none;
+  padding: 0 var(--gap);
+  background: var(--s-panel);
+  border-bottom: 1px solid var(--b-strong);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+}
+
+.nt-panel-clear {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  color: var(--t-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.nt-panel-clear:hover:not(:disabled) {
+  color: var(--sem-danger);
+}
+.nt-panel-clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.nt-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.nt-empty {
+  margin: 0;
+  padding: 18px;
+  text-align: center;
+  color: var(--t-muted);
+  font-size: var(--fs-sm);
+  font-style: italic;
+}
+
+.nt-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--b-soft);
+}
+.nt-item:last-child {
+  border-bottom: 0;
+}
+.nt-item:hover {
+  background: var(--s-hover);
+}
+
+.nt-item-icon {
+  flex: none;
+  margin-top: 1px;
+}
+.nt-item.is-info .nt-item-icon {
+  color: var(--a-accent);
+}
+.nt-item.is-success .nt-item-icon {
+  color: var(--sem-ok);
+}
+.nt-item.is-warning .nt-item-icon {
+  color: var(--sem-warn);
+}
+.nt-item.is-error .nt-item-icon {
+  color: var(--sem-danger);
+}
+
+.nt-item-text {
+  flex: 1;
+  min-width: 0;
+}
+.nt-item-title {
+  font-size: var(--fs-sm);
+  color: var(--t-primary);
+  line-height: 1.35;
+}
+.nt-item-body {
+  margin-top: 1px;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--t-muted);
+}
+
+.nt-item-time {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--t-muted);
+}

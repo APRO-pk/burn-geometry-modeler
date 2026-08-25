@@ -82,20 +82,20 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
   }, [grain, currentY, params.grainType, params.numSegments]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-70 font-mono text-xs text-[#eee]">
-      <div className="bg-[#111] border border-[#444] shadow-2xl rounded w-[800px] flex flex-col max-h-[90vh]">
-        <div className="bg-[#222] px-3 py-2 border-b border-[#444] flex justify-between items-center font-bold text-[#00aaff]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-70 font-mono text-xs text-[var(--t-primary)]">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-[800px] flex flex-col max-h-[90vh]">
+        <div className="bg-[var(--s-sunken)] px-3 py-2 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-[var(--a-accent)]">
           <div className="flex items-center"><Settings size={14} className="mr-1" /> Grain Geometry Editor & Previewer</div>
           <button onClick={onClose} className="hover:text-red-500">✕</button>
         </div>
         
         <div className="flex flex-1 overflow-hidden min-h-[500px]">
           {/* Left: Inputs */}
-          <div className="w-1/3 border-r border-[#444] p-4 space-y-4 overflow-y-auto bg-[#1a1a1a]">
+          <div className="w-1/3 border-r border-[var(--b-strong)] p-4 space-y-4 overflow-y-auto bg-[var(--s-sunken)]">
              
              <div className="space-y-1">
-               <label className="text-[#888]" htmlFor={fieldId('type')}>Type</label>
-               <select id={fieldId('type')} value={params.grainType} onChange={e => updateParam('grainType', e.target.value as GrainEditorParams['grainType'])} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white">
+               <label className="text-[var(--t-secondary)]" htmlFor={fieldId('type')}>Type</label>
+               <select id={fieldId('type')} value={params.grainType} onChange={e => updateParam('grainType', e.target.value as GrainEditorParams['grainType'])} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white">
                   <option value="BATES">BATES</option>
                   <option value="Tubular">Tubular</option>
                   <option value="Star">Star</option>
@@ -107,73 +107,73 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
              </div>
 
              <div className="space-y-1">
-               <label className="text-[#888]" htmlFor={fieldId('length-m')}>Length (m)</label>
-               <input id={fieldId('length-m')} type="number" step="any" value={params.length} onChange={e => handleNumChange('length', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+               <label className="text-[var(--t-secondary)]" htmlFor={fieldId('length-m')}>Length (m)</label>
+               <input id={fieldId('length-m')} type="number" step="any" value={params.length} onChange={e => handleNumChange('length', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
              </div>
 
              <div className="space-y-1">
-               <label className="text-[#888]" htmlFor={fieldId('outer-radius-m')}>Outer Radius (m)</label>
-               <input id={fieldId('outer-radius-m')} type="number" step="any" value={params.outerRadius} onChange={e => handleNumChange('outerRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+               <label className="text-[var(--t-secondary)]" htmlFor={fieldId('outer-radius-m')}>Outer Radius (m)</label>
+               <input id={fieldId('outer-radius-m')} type="number" step="any" value={params.outerRadius} onChange={e => handleNumChange('outerRadius', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
              </div>
 
              {['Star'].includes(params.grainType) && (
                <>
                  <div className="space-y-1">
-                   <label className="text-[#888]" htmlFor={fieldId('valley-radius-m')}>Valley Radius (m)</label>
-                   <input id={fieldId('valley-radius-m')} type="number" step="any" value={params.valleyRadius} onChange={e => handleNumChange('valleyRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[var(--t-secondary)]" htmlFor={fieldId('valley-radius-m')}>Valley Radius (m)</label>
+                   <input id={fieldId('valley-radius-m')} type="number" step="any" value={params.valleyRadius} onChange={e => handleNumChange('valleyRadius', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                  </div>
                  <div className="space-y-1">
-                   <label className="text-[#888]" htmlFor={fieldId('tip-radius-m')}>Tip Radius (m)</label>
-                   <input id={fieldId('tip-radius-m')} type="number" step="any" value={params.tipRadius} onChange={e => handleNumChange('tipRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[var(--t-secondary)]" htmlFor={fieldId('tip-radius-m')}>Tip Radius (m)</label>
+                   <input id={fieldId('tip-radius-m')} type="number" step="any" value={params.tipRadius} onChange={e => handleNumChange('tipRadius', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                  </div>
                  <div className="space-y-1">
-                   <label className="text-[#888]" htmlFor={fieldId('points')}>Points</label>
-                   <input id={fieldId('points')} type="number" step="1" value={params.numPoints} onChange={e => handleNumChange('numPoints', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[var(--t-secondary)]" htmlFor={fieldId('points')}>Points</label>
+                   <input id={fieldId('points')} type="number" step="1" value={params.numPoints} onChange={e => handleNumChange('numPoints', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                  </div>
                </>
              )}
 
              {['BATES', 'Tubular', 'RodAndTube', 'MoonBurner', 'Finocyl'].includes(params.grainType) && (
                  <div className="space-y-1">
-                   <label className="text-[#888]" htmlFor={fieldId('inner-radius-m')}>Inner Radius (m)</label>
-                   <input id={fieldId('inner-radius-m')} type="number" step="any" value={params.innerRadius} onChange={e => handleNumChange('innerRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[var(--t-secondary)]" htmlFor={fieldId('inner-radius-m')}>Inner Radius (m)</label>
+                   <input id={fieldId('inner-radius-m')} type="number" step="any" value={params.innerRadius} onChange={e => handleNumChange('innerRadius', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                  </div>
              )}
 
              {['BATES'].includes(params.grainType) && (
                  <div className="space-y-1">
-                   <label className="text-[#888]" htmlFor={fieldId('segments')}>Segments</label>
-                   <input id={fieldId('segments')} type="number" step="1" value={params.numSegments} onChange={e => handleNumChange('numSegments', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[var(--t-secondary)]" htmlFor={fieldId('segments')}>Segments</label>
+                   <input id={fieldId('segments')} type="number" step="1" value={params.numSegments} onChange={e => handleNumChange('numSegments', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                  </div>
              )}
 
              {['RodAndTube'].includes(params.grainType) && (
                  <div className="space-y-1">
-                   <label className="text-[#888]" htmlFor={fieldId('rod-radius-m')}>Rod Radius (m)</label>
-                   <input id={fieldId('rod-radius-m')} type="number" step="any" value={params.rodRadius} onChange={e => handleNumChange('rodRadius', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[var(--t-secondary)]" htmlFor={fieldId('rod-radius-m')}>Rod Radius (m)</label>
+                   <input id={fieldId('rod-radius-m')} type="number" step="any" value={params.rodRadius} onChange={e => handleNumChange('rodRadius', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                  </div>
              )}
 
              {['MoonBurner'].includes(params.grainType) && (
                  <div className="space-y-1">
-                   <label className="text-[#888]" htmlFor={fieldId('offset-m')}>Offset (m)</label>
-                   <input id={fieldId('offset-m')} type="number" step="any" value={params.offset} onChange={e => handleNumChange('offset', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                   <label className="text-[var(--t-secondary)]" htmlFor={fieldId('offset-m')}>Offset (m)</label>
+                   <input id={fieldId('offset-m')} type="number" step="any" value={params.offset} onChange={e => handleNumChange('offset', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                  </div>
              )}
 
              {['Finocyl'].includes(params.grainType) && (
                  <>
                    <div className="space-y-1">
-                     <label className="text-[#888]" htmlFor={fieldId('fin-depth-m')}>Fin Depth (m)</label>
-                     <input id={fieldId('fin-depth-m')} type="number" step="any" value={params.finDepth} onChange={e => handleNumChange('finDepth', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                     <label className="text-[var(--t-secondary)]" htmlFor={fieldId('fin-depth-m')}>Fin Depth (m)</label>
+                     <input id={fieldId('fin-depth-m')} type="number" step="any" value={params.finDepth} onChange={e => handleNumChange('finDepth', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]" htmlFor={fieldId('fin-width-m')}>Fin Width (m)</label>
-                     <input id={fieldId('fin-width-m')} type="number" step="any" value={params.finWidth} onChange={e => handleNumChange('finWidth', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                     <label className="text-[var(--t-secondary)]" htmlFor={fieldId('fin-width-m')}>Fin Width (m)</label>
+                     <input id={fieldId('fin-width-m')} type="number" step="any" value={params.finWidth} onChange={e => handleNumChange('finWidth', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[#888]" htmlFor={fieldId('fins')}>Fins</label>
-                     <input id={fieldId('fins')} type="number" step="1" value={params.numPoints} onChange={e => handleNumChange('numPoints', e.target.value)} className="w-full bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#00aaff] text-white" />
+                     <label className="text-[var(--t-secondary)]" htmlFor={fieldId('fins')}>Fins</label>
+                     <input id={fieldId('fins')} type="number" step="1" value={params.numPoints} onChange={e => handleNumChange('numPoints', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-white" />
                    </div>
                  </>
              )}
@@ -185,21 +185,21 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
           </div>
           
           {/* Right: Preview */}
-          <div className="w-2/3 flex flex-col bg-[#222]">
+          <div className="w-2/3 flex flex-col bg-[var(--s-sunken)]">
             <div className="flex-1 flex items-center justify-center p-8 relative">
                <svg viewBox="0 0 200 200" className="w-full h-full max-w-[400px] max-h-[400px]">
-                 <circle cx="100" cy="100" r="95" fill="#333" />
+                 <circle cx="100" cy="100" r="95" fill="var(--b-soft)" />
                   {params.grainType === 'BATES' || params.grainType === 'Tubular' ? (
-                    <circle cx="100" cy="100" r={Math.min(params.outerRadius, Math.max(0, params.innerRadius + currentY)) / params.outerRadius * 95} fill="#111" />
+                    <circle cx="100" cy="100" r={Math.min(params.outerRadius, Math.max(0, params.innerRadius + currentY)) / params.outerRadius * 95} fill="var(--s-canvas)" />
                   ) : params.grainType === 'RodAndTube' ? (
                     <>
-                      <circle cx="100" cy="100" r={Math.min(params.outerRadius, Math.max(0, params.innerRadius + currentY)) / params.outerRadius * 95} fill="#111" />
+                      <circle cx="100" cy="100" r={Math.min(params.outerRadius, Math.max(0, params.innerRadius + currentY)) / params.outerRadius * 95} fill="var(--s-canvas)" />
                       {params.rodRadius - currentY > 0 && (
-                        <circle cx="100" cy="100" r={Math.max(0, params.rodRadius - currentY) / params.outerRadius * 95} fill="#555" />
+                        <circle cx="100" cy="100" r={Math.max(0, params.rodRadius - currentY) / params.outerRadius * 95} fill="var(--b-control)" />
                       )}
                     </>
                   ) : params.grainType === 'MoonBurner' ? (
-                    <circle cx={100 + (params.offset / params.outerRadius) * 95} cy="100" r={Math.min(params.outerRadius + params.offset, Math.max(0, params.innerRadius + currentY)) / params.outerRadius * 95} fill="#111" />
+                    <circle cx={100 + (params.offset / params.outerRadius) * 95} cy="100" r={Math.min(params.outerRadius + params.offset, Math.max(0, params.innerRadius + currentY)) / params.outerRadius * 95} fill="var(--s-canvas)" />
                   ) : params.grainType === 'Finocyl' ? (
                     <path d={(() => {
                       const scale = 95 / params.outerRadius;
@@ -245,9 +245,9 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
                          path += `A ${rc} ${rc} 0 0 1 ${next_p1x} ${next_p1y} `;
                       }
                       return path + "Z";
-                    })()} fill="#111" />
+                    })()} fill="var(--s-canvas)" />
                   ) : params.grainType === 'CustomDXF' && dxfData ? (
-                    <circle cx="100" cy="100" r={Math.sqrt(dxfData.areaTable[Math.min(Math.floor(currentY / dxfData.dx), dxfData.areaTable.length - 1)] / Math.PI) / params.outerRadius * 95} fill="#111" />
+                    <circle cx="100" cy="100" r={Math.sqrt(dxfData.areaTable[Math.min(Math.floor(currentY / dxfData.dx), dxfData.areaTable.length - 1)] / Math.PI) / params.outerRadius * 95} fill="var(--s-canvas)" />
                   ) : (
                     <path d={(() => {
                       const scale = 95 / params.outerRadius;
@@ -262,12 +262,12 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
                         path += (i === 0 ? `M ${px} ${py} ` : `L ${px} ${py} `);
                       }
                       return path + "Z";
-                    })()} fill="#111" />
+                    })()} fill="var(--s-canvas)" />
                   )}
                </svg>
             </div>
-            <div className="bg-[#111] p-4 border-t border-[#444] space-y-4">
-              <div className="flex justify-between text-[#00aaff]">
+            <div className="bg-[var(--s-canvas)] p-4 border-t border-[var(--b-strong)] space-y-4">
+              <div className="flex justify-between text-[var(--a-accent)]">
                  <span>Current Web Regressed: {(currentY * 1000).toFixed(2)} mm</span>
                  <span>Max Web: {(maxWeb * 1000).toFixed(2)} mm</span>
               </div>
@@ -278,29 +278,29 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
                 step={maxWeb / 200 || 0.001}
                 value={currentY} 
                 onChange={(e) => setCurrentY(Number(e.target.value))}
-                className="w-full accent-[#00aaff]"
+                className="w-full accent-[var(--a-accent)]"
               />
               <div className="grid grid-cols-2 gap-4 text-sm mt-4">
-                 <div className="flex flex-col bg-[#222] p-2 rounded border border-[#333]">
-                   <span className="text-[#888]">Port Area</span>
+                 <div className="flex flex-col bg-[var(--s-sunken)] p-2 rounded border border-[var(--b-soft)]">
+                   <span className="text-[var(--t-secondary)]">Port Area</span>
                    <span className="text-white text-lg font-bold">{(stats.portArea * 10000).toFixed(2)} cm²</span>
                  </div>
-                 <div className="flex flex-col bg-[#222] p-2 rounded border border-[#333]">
-                   <span className="text-[#888]">Burning Area</span>
-                   <span className="text-[#00ff00] text-lg font-bold">{(stats.burnArea * 10000).toFixed(2)} cm²</span>
+                 <div className="flex flex-col bg-[var(--s-sunken)] p-2 rounded border border-[var(--b-soft)]">
+                   <span className="text-[var(--t-secondary)]">Burning Area</span>
+                   <span className="text-[var(--sem-ok)] text-lg font-bold">{(stats.burnArea * 10000).toFixed(2)} cm²</span>
                  </div>
               </div>
             </div>
           </div>
         </div>
         
-        <div className="p-3 border-t border-[#444] flex justify-end space-x-2 bg-[#1a1a1a]">
-          <button onClick={onClose} className="px-4 py-1.5 rounded border border-[#555] text-[#aaa] hover:bg-[#333] hover:text-white transition-colors">
+        <div className="p-3 border-t border-[var(--b-strong)] flex justify-end space-x-2 bg-[var(--s-sunken)]">
+          <button onClick={onClose} className="px-4 py-1.5 rounded border border-[var(--b-control)] text-[var(--t-secondary)] hover:bg-[var(--b-soft)] hover:text-white transition-colors">
             Cancel
           </button>
           <button 
             onClick={() => onApply(params)} 
-            className="px-4 py-1.5 rounded bg-[#00aaff] text-black font-bold hover:bg-[#0088cc] transition-colors flex items-center"
+            className="px-4 py-1.5 rounded bg-[var(--a-accent)] text-black font-bold hover:bg-[var(--a-accent-dim)] transition-colors flex items-center"
           >
             <Check size={14} className="mr-1" /> Apply Settings
           </button>

@@ -136,73 +136,73 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black bg-opacity-70 font-mono text-xs text-[#eee]">
-      <div className="bg-[#111] border border-[#444] shadow-2xl rounded w-[600px] flex flex-col p-4 space-y-4">
-        <div className="flex justify-between items-center text-[#ffaa00] font-bold text-sm border-b border-[#333] pb-2">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black bg-opacity-70 font-mono text-xs text-[var(--t-primary)]">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-[600px] flex flex-col p-4 space-y-4">
+        <div className="flex justify-between items-center text-[var(--sem-warn)] font-bold text-sm border-b border-[var(--b-soft)] pb-2">
           <span>Design Optimizer / Sweep</span>
           <button onClick={onClose} className="hover:text-red-500">✕</button>
         </div>
         
         <div className="flex space-x-4 items-end">
           <div className="flex flex-col space-y-1 flex-1">
-            <label className="text-[#888]" htmlFor={fieldId('sweep-parameter')}>Sweep Parameter</label>
-            <select id={fieldId('sweep-parameter')} value={paramToSweep} onChange={e => setParamToSweep(e.target.value as SweepParam)} className="bg-[#222] border border-[#555] px-2 py-1 outline-none focus:border-[#ffaa00]">
+            <label className="text-[var(--t-secondary)]" htmlFor={fieldId('sweep-parameter')}>Sweep Parameter</label>
+            <select id={fieldId('sweep-parameter')} value={paramToSweep} onChange={e => setParamToSweep(e.target.value as SweepParam)} className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-warn)]">
               <option value="throatDiameter">Throat Diameter (m)</option>
               <option value="length">Grain Length (m)</option>
             </select>
           </div>
           <div className="flex flex-col space-y-1 w-20">
-            <label className="text-[#888]" htmlFor={fieldId('min')}>Min</label>
-            <input id={fieldId('min')} type="number" step="any" value={sweepMin} onChange={e => setSweepMin(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
+            <label className="text-[var(--t-secondary)]" htmlFor={fieldId('min')}>Min</label>
+            <input id={fieldId('min')} type="number" step="any" value={sweepMin} onChange={e => setSweepMin(parseFloat(e.target.value))} className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1" />
           </div>
           <div className="flex flex-col space-y-1 w-20">
-            <label className="text-[#888]" htmlFor={fieldId('max')}>Max</label>
-            <input id={fieldId('max')} type="number" step="any" value={sweepMax} onChange={e => setSweepMax(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
+            <label className="text-[var(--t-secondary)]" htmlFor={fieldId('max')}>Max</label>
+            <input id={fieldId('max')} type="number" step="any" value={sweepMax} onChange={e => setSweepMax(parseFloat(e.target.value))} className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1" />
           </div>
           <div className="flex flex-col space-y-1 w-20">
-            <label className="text-[#888]" htmlFor={fieldId('steps')}>Steps</label>
-            <input id={fieldId('steps')} type="number" value={steps} onChange={e => setSteps(parseFloat(e.target.value))} className="bg-[#222] border border-[#555] px-2 py-1" />
+            <label className="text-[var(--t-secondary)]" htmlFor={fieldId('steps')}>Steps</label>
+            <input id={fieldId('steps')} type="number" value={steps} onChange={e => setSteps(parseFloat(e.target.value))} className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1" />
           </div>
           <div className="flex flex-col space-y-1 w-36">
-            <label className="text-[#888]" htmlFor="sweep-model">Solver</label>
+            <label className="text-[var(--t-secondary)]" htmlFor="sweep-model">Solver</label>
             <select
               id="sweep-model"
               value={sweepModel}
               onChange={e => setSweepModel(e.target.value as "0D" | "quasi1D")}
-              className="bg-[#222] border border-[#555] px-2 py-1"
+              className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1"
             >
               <option value="0D">0-D lumped</option>
               <option value="quasi1D">Quasi-1-D axial</option>
             </select>
           </div>
-          <button onClick={runSweep} disabled={isRunning} className="bg-[#ffaa00] text-black px-4 py-1 font-bold rounded flex items-center h-7 hover:bg-[#ffcc00] disabled:opacity-50">
+          <button onClick={runSweep} disabled={isRunning} className="bg-[var(--sem-warn)] text-black px-4 py-1 font-bold rounded flex items-center h-7 hover:bg-[var(--sem-warn)] disabled:opacity-50">
             {isRunning ? 'Running...' : <><Play size={12} className="mr-1"/> Run</>}
           </button>
         </div>
 
         {results.length > 0 && (
-          <div className="border border-[#333] rounded overflow-hidden">
+          <div className="border border-[var(--b-soft)] rounded overflow-hidden">
             <table className="w-full text-left">
-              <thead className="bg-[#222] text-[#888]">
+              <thead className="bg-[var(--s-sunken)] text-[var(--t-secondary)]">
                 <tr>
-                  <th className="p-1 border-b border-[#333] pl-2">{paramToSweep}</th>
-                  <th className="p-1 border-b border-[#333]">Max Pc (MPa)</th>
-                  <th className="p-1 border-b border-[#333]">Max Thrust (kN)</th>
-                  <th className="p-1 border-b border-[#333]">Initial Kn</th>
-                  <th className="p-1 border-b border-[#333]">Warnings</th>
-                  <th className="p-1 border-b border-[#333]">Action</th>
+                  <th className="p-1 border-b border-[var(--b-soft)] pl-2">{paramToSweep}</th>
+                  <th className="p-1 border-b border-[var(--b-soft)]">Max Pc (MPa)</th>
+                  <th className="p-1 border-b border-[var(--b-soft)]">Max Thrust (kN)</th>
+                  <th className="p-1 border-b border-[var(--b-soft)]">Initial Kn</th>
+                  <th className="p-1 border-b border-[var(--b-soft)]">Warnings</th>
+                  <th className="p-1 border-b border-[var(--b-soft)]">Action</th>
                 </tr>
               </thead>
-              <tbody className="bg-[#1a1a1a]">
+              <tbody className="bg-[var(--s-sunken)]">
                 {results.map((r, i) => (
-                  <tr key={i} className="hover:bg-[#333] transition-colors border-b border-[#222]">
-                    <td className="p-1 pl-2 font-bold text-[#00ffaa]">{r.val.toFixed(4)}</td>
-                    <td className={`p-1 ${r.maxPc > 10 ? 'text-red-400' : 'text-[#eee]'}`}>{r.maxPc.toFixed(2)}</td>
-                    <td className="p-1 text-[#eee]">{r.maxThrust.toFixed(2)}</td>
-                    <td className="p-1 text-[#eee]">{r.initialKn.toFixed(0)}</td>
+                  <tr key={i} className="hover:bg-[var(--b-soft)] transition-colors border-b border-[var(--s-sunken)]">
+                    <td className="p-1 pl-2 font-bold text-[var(--sem-ok)]">{r.val.toFixed(4)}</td>
+                    <td className={`p-1 ${r.maxPc > 10 ? 'text-red-400' : 'text-[var(--t-primary)]'}`}>{r.maxPc.toFixed(2)}</td>
+                    <td className="p-1 text-[var(--t-primary)]">{r.maxThrust.toFixed(2)}</td>
+                    <td className="p-1 text-[var(--t-primary)]">{r.initialKn.toFixed(0)}</td>
                     <td className="p-1 text-[10px] text-amber-500 max-w-[100px] truncate" title={r.warnings?.join('\n')}>{r.warnings?.length > 0 ? `${r.warnings.length}⚠️` : ''}</td>
                     <td className="p-1">
-                      <button onClick={() => { onApply({ ...currentConfig, [paramToSweep]: r.val }); onClose(); }} className="text-[#00aaff] hover:text-[#fff] text-[10px] bg-[#222] border border-[#444] px-1 rounded">Apply</button>
+                      <button onClick={() => { onApply({ ...currentConfig, [paramToSweep]: r.val }); onClose(); }} className="text-[var(--a-accent)] hover:text-[var(--t-primary)] text-[10px] bg-[var(--s-sunken)] border border-[var(--b-strong)] px-1 rounded">Apply</button>
                     </td>
                   </tr>
                 ))}

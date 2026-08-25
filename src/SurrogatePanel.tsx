@@ -154,7 +154,7 @@ function EnvelopeWarning({ design }: { design: RawDesign }) {
   const env = checkEnvelope(design);
   if (env.inside) return null;
   return (
-    <div className="border border-[#663333] bg-[#1a0d0d] rounded p-2 text-[10px] text-[#ffaaaa] leading-snug">
+    <div className="border border-[var(--sem-danger)] bg-[var(--sem-danger-wash)] rounded p-2 text-[10px] text-[var(--sem-danger)] leading-snug">
       <div className="flex items-center space-x-1 font-bold mb-1">
         <AlertTriangle className="w-3 h-3" />
         <span>OUTSIDE TRAINING ENVELOPE — surrogate values are extrapolation</span>
@@ -168,7 +168,7 @@ function EnvelopeWarning({ design }: { design: RawDesign }) {
       {env.violations.length > 4 && (
         <div>…and {env.violations.length - 4} more.</div>
       )}
-      <div className="mt-1 text-[#ff8888]">
+      <div className="mt-1 text-[var(--sem-danger)]">
         Use “Verify with full solve” — do not trust the prediction here.
       </div>
     </div>
@@ -365,14 +365,14 @@ export function SurrogatePanel({
 
   if (loadError) {
     return (
-      <div className="text-[#ff6666] font-mono text-xs p-6">
+      <div className="text-[var(--sem-danger)] font-mono text-xs p-6">
         Surrogate model failed to load: {loadError}
-        <div className="text-[#888] mt-2">Rebuild it with: npm run surrogate:rebuild</div>
+        <div className="text-[var(--t-secondary)] mt-2">Rebuild it with: npm run surrogate:rebuild</div>
       </div>
     );
   }
   if (!ready || !prediction) {
-    return <div className="text-[#666] italic font-mono text-xs p-6">Loading surrogate model…</div>;
+    return <div className="text-[var(--t-muted)] italic font-mono text-xs p-6">Loading surrogate model…</div>;
   }
 
   const info = surrogateInfo()!;
@@ -384,8 +384,8 @@ export function SurrogatePanel({
   return (
     <div className="w-full max-w-5xl space-y-6 mt-6 text-xs font-mono">
       {/* ---- provenance ---- */}
-      <div className="bg-[#111] border border-[#333] rounded p-3 text-[10px] text-[#888] leading-snug">
-        <span className="text-[#00aaff] font-bold">SURROGATE MODEL</span> — one Gaussian process
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] rounded p-3 text-[10px] text-[var(--t-secondary)] leading-snug">
+        <span className="text-[var(--a-accent)] font-bold">SURROGATE MODEL</span> — one Gaussian process
         covering all {info.grainKinds.length} grain geometries, trained on {String(info.dataset.trainRows)}{' '}
         solves of the same Rust core the Run button uses ({String(info.dataset.totalRows)} sampled,{' '}
         {String(info.dataset.testRows)} held out). It predicts from the grain's burn-back CURVES
@@ -395,7 +395,7 @@ export function SurrogatePanel({
           {TARGETS.map((t) => `${SHORT[t]} R²=${metrics[t].r2.toFixed(4)}`).join(', ')}.
           {kindMetrics && (
             <>
-              {' '}For <span className="text-[#00aaff]">{kind}</span> specifically: Pc R²=
+              {' '}For <span className="text-[var(--a-accent)]">{kind}</span> specifically: Pc R²=
               {kindMetrics.peak_pc.r2.toFixed(4)} / {kindMetrics.peak_pc.mape.toFixed(2)}% MAPE,
               It R²={kindMetrics.total_impulse.r2.toFixed(4)}, tb R²=
               {kindMetrics.burn_time.r2.toFixed(4)}.
@@ -405,15 +405,15 @@ export function SurrogatePanel({
       </div>
 
       {burnRateRegimes.length > 0 && (
-        <div className="bg-[#2a1a00] border border-[#886600] rounded p-3 text-[10px] text-[#ffcc66] leading-snug">
+        <div className="bg-[var(--sem-warn-wash)] border border-[var(--sem-warn)] rounded p-3 text-[10px] text-[var(--sem-warn)] leading-snug">
           <span className="font-bold">PIECEWISE BURN LAW — predictions below are approximate.</span>
-          <div className="mt-1 text-[#ddbb88]">
+          <div className="mt-1 text-[var(--sem-warn)]">
             This propellant uses a measured {burnRateRegimes.length}-band burn-rate law, but the
             surrogate is trained on single power-law solves and takes a={design.a.toExponential(3)},
             n={design.n.toFixed(4)} as its inputs. Those are the propellant's fallback coefficients,
             not the law the solver integrates, so everything on this tab — prediction, inverse
             design and Monte Carlo — describes a slightly different motor. Press{' '}
-            <span className="text-[#00ffaa]">Verify</span> against the real core, or run the full
+            <span className="text-[var(--sem-ok)]">Verify</span> against the real core, or run the full
             simulation, for a number you can size hardware from.
           </div>
         </div>
@@ -422,18 +422,18 @@ export function SurrogatePanel({
       <EnvelopeWarning design={design} />
 
       {/* ---- a. instant prediction ---- */}
-      <div className="bg-[#111] border border-[#333] p-4 rounded">
-        <div className="flex justify-between items-center border-b border-[#333] pb-2 mb-3">
-          <h3 className="font-bold text-[#00aaff] text-sm flex items-center space-x-2">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4 rounded">
+        <div className="flex justify-between items-center border-b border-[var(--b-soft)] pb-2 mb-3">
+          <h3 className="font-bold text-[var(--a-accent)] text-sm flex items-center space-x-2">
             <Zap className="w-4 h-4" />
             <span>INSTANT PREDICTION — {kind}</span>
           </h3>
           <div className="flex items-center space-x-3">
-            <span className="text-[#666] text-[10px]">{predictMs.toFixed(2)} ms</span>
+            <span className="text-[var(--t-muted)] text-[10px]">{predictMs.toFixed(2)} ms</span>
             <button
               onClick={runVerify}
               disabled={verifying}
-              className="border border-[#00aaff] text-[#00aaff] px-3 py-1 rounded hover:bg-[#00aaff] hover:text-black transition-colors disabled:opacity-50"
+              className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 rounded hover:bg-[var(--a-accent)] hover:text-black transition-colors disabled:opacity-50"
             >
               {verifying ? 'Solving…' : 'Verify with full solve'}
             </button>
@@ -441,7 +441,7 @@ export function SurrogatePanel({
         </div>
 
         <table className="w-full text-[11px]">
-          <thead className="text-[#888]">
+          <thead className="text-[var(--t-secondary)]">
             <tr>
               <th className="text-left py-1">Output</th>
               <th className="text-right py-1">Surrogate</th>
@@ -450,7 +450,7 @@ export function SurrogatePanel({
               {verify && <th className="text-right py-1">Δ</th>}
             </tr>
           </thead>
-          <tbody className="text-[#eee]">
+          <tbody className="text-[var(--t-primary)]">
             {TARGETS.map((t) => {
               const delta = verify ? (verify.predicted[t] - verify.truth[t]) / verify.truth[t] : 0;
               const covered =
@@ -458,15 +458,15 @@ export function SurrogatePanel({
                 verify.truth[t] >= prediction.lower[t] &&
                 verify.truth[t] <= prediction.upper[t];
               return (
-                <tr key={t} className="border-t border-[#222]">
+                <tr key={t} className="border-t border-[var(--s-sunken)]">
                   <td className="py-1">{LABEL[t]}</td>
-                  <td className="text-right text-[#ffaa00]">{FORMAT[t](prediction.mean[t])}</td>
-                  <td className="text-right text-[#888]">
+                  <td className="text-right text-[var(--sem-warn)]">{FORMAT[t](prediction.mean[t])}</td>
+                  <td className="text-right text-[var(--t-secondary)]">
                     {FORMAT[t](prediction.lower[t])} – {FORMAT[t](prediction.upper[t])}
                   </td>
-                  {verify && <td className="text-right text-[#00ff88]">{FORMAT[t](verify.truth[t])}</td>}
+                  {verify && <td className="text-right text-[var(--sem-ok)]">{FORMAT[t](verify.truth[t])}</td>}
                   {verify && (
-                    <td className={`text-right ${Math.abs(delta) < 0.05 ? 'text-[#00ff88]' : 'text-[#ffaa00]'}`}>
+                    <td className={`text-right ${Math.abs(delta) < 0.05 ? 'text-[var(--sem-ok)]' : 'text-[var(--sem-warn)]'}`}>
                       {(delta * 100).toFixed(2)}%{covered ? ' ✓' : ' !'}
                     </td>
                   )}
@@ -476,7 +476,7 @@ export function SurrogatePanel({
           </tbody>
         </table>
         {verify && (
-          <p className="text-[#666] text-[10px] mt-2">
+          <p className="text-[var(--t-muted)] text-[10px] mt-2">
             Full solve took {verify.ms.toFixed(0)} ms versus {predictMs.toFixed(2)} ms for the
             surrogate — a {(verify.ms / Math.max(predictMs, 1e-6)).toFixed(0)}× speedup. “✓” means
             the true value fell inside the predicted band.
@@ -485,44 +485,44 @@ export function SurrogatePanel({
       </div>
 
       {/* ---- b. inverse design ---- */}
-      <div className="bg-[#111] border border-[#333] p-4 rounded">
-        <h3 className="font-bold text-[#00aaff] text-sm border-b border-[#333] pb-2 mb-3">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4 rounded">
+        <h3 className="font-bold text-[var(--a-accent)] text-sm border-b border-[var(--b-soft)] pb-2 mb-3">
           INVERSE DESIGN — searching {kind} geometry
         </h3>
         <div className="flex flex-wrap items-end gap-4 mb-3">
           <label className="flex flex-col space-y-1">
-            <span className="text-[#888] text-[10px]">Total impulse ≤ (N·s)</span>
+            <span className="text-[var(--t-secondary)] text-[10px]">Total impulse ≤ (N·s)</span>
             <input
               type="number"
               value={targetImpulse}
               onChange={(e) => setTargetImpulse(parseFloat(e.target.value) || 0)}
-              className="bg-[#222] border border-[#555] px-2 py-1 w-28 text-[#eee]"
+              className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 w-28 text-[var(--t-primary)]"
             />
           </label>
           <label className="flex flex-col space-y-1">
-            <span className="text-[#888] text-[10px]">Peak Pc ≤ (MPa)</span>
+            <span className="text-[var(--t-secondary)] text-[10px]">Peak Pc ≤ (MPa)</span>
             <input
               type="number"
               value={targetMaxPc}
               onChange={(e) => setTargetMaxPc(parseFloat(e.target.value) || 0)}
-              className="bg-[#222] border border-[#555] px-2 py-1 w-24 text-[#eee]"
+              className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 w-24 text-[var(--t-primary)]"
             />
           </label>
           <button
             onClick={runSearch}
             disabled={searching}
-            className="bg-[#ffaa00] text-black px-4 py-1.5 font-bold rounded flex items-center hover:bg-[#ffcc00] disabled:opacity-50"
+            className="bg-[var(--sem-warn)] text-black px-4 py-1.5 font-bold rounded flex items-center hover:bg-[var(--sem-warn)] disabled:opacity-50"
           >
             <Play className="w-3 h-3 mr-1" /> {searching ? 'Searching…' : 'Find design'}
           </button>
           {candidates && (
-            <span className="text-[#666] text-[10px]">
+            <span className="text-[var(--t-muted)] text-[10px]">
               {candidates.length} distinct candidates in {searchMs.toFixed(0)} ms
             </span>
           )}
         </div>
 
-        <p className="text-[#666] text-[10px] mb-2 leading-snug">
+        <p className="text-[var(--t-muted)] text-[10px] mb-2 leading-snug">
           {shapeSpec.length > 0 ? (
             <>
               Free variables: length, casing radius, throat, expansion ratio, and this geometry's
@@ -541,7 +541,7 @@ export function SurrogatePanel({
         {candidates && candidates.length > 0 && (
           <>
             <table className="w-full text-[11px]">
-              <thead className="text-[#888]">
+              <thead className="text-[var(--t-secondary)]">
                 <tr>
                   <th className="text-left py-1">#</th>
                   <th className="text-right py-1">Length</th>
@@ -554,17 +554,17 @@ export function SurrogatePanel({
                   <th className="text-right py-1"></th>
                 </tr>
               </thead>
-              <tbody className="text-[#eee]">
+              <tbody className="text-[var(--t-primary)]">
                 {candidates.slice(0, 5).map((c, i) => (
-                  <tr key={i} className="border-t border-[#222] hover:bg-[#1a1a1a]">
+                  <tr key={i} className="border-t border-[var(--s-sunken)] hover:bg-[var(--s-sunken)]">
                     <td className="py-1">{i + 1}</td>
                     <td className="text-right">{(c.design.grain.length * 1000).toFixed(0)} mm</td>
-                    <td className="pl-3 text-[10px] text-[#bbb]">{describeShape(c.design.grain)}</td>
+                    <td className="pl-3 text-[10px] text-[var(--t-primary)]">{describeShape(c.design.grain)}</td>
                     <td className="text-right">{(c.design.throat_diameter * 1000).toFixed(1)} mm</td>
                     <td className="text-right">{c.design.expansion_ratio.toFixed(1)}</td>
-                    <td className="text-right text-[#ffaa00]">{c.predicted.total_impulse.toFixed(0)}</td>
-                    <td className="text-right text-[#ffaa00]">{(c.predicted.peak_pc / 1e6).toFixed(2)}</td>
-                    <td className={`text-right ${c.band > 0.1 ? 'text-[#ff6666]' : 'text-[#888]'}`}>
+                    <td className="text-right text-[var(--sem-warn)]">{c.predicted.total_impulse.toFixed(0)}</td>
+                    <td className="text-right text-[var(--sem-warn)]">{(c.predicted.peak_pc / 1e6).toFixed(2)}</td>
+                    <td className={`text-right ${c.band > 0.1 ? 'text-[var(--sem-danger)]' : 'text-[var(--t-secondary)]'}`}>
                       {(c.band * 100).toFixed(1)}%
                     </td>
                     <td className="text-right">
@@ -573,7 +573,7 @@ export function SurrogatePanel({
                           onApplyDesign(c.design);
                           addLog(`Applied surrogate candidate ${i + 1} (${kind}) to the design inputs.`);
                         }}
-                        className="text-[#00aaff] hover:text-white border border-[#444] px-1 rounded text-[10px]"
+                        className="text-[var(--a-accent)] hover:text-white border border-[var(--b-strong)] px-1 rounded text-[10px]"
                       >
                         Apply
                       </button>
@@ -584,12 +584,12 @@ export function SurrogatePanel({
             </table>
 
             {candidateTruth ? (
-              <div className="mt-3 border border-[#334433] bg-[#0d1a0d] rounded p-2 text-[10px]">
-                <div className="flex items-center space-x-1 text-[#00ff88] font-bold mb-1">
+              <div className="mt-3 border border-[var(--sem-ok)] bg-[var(--sem-ok-wash)] rounded p-2 text-[10px]">
+                <div className="flex items-center space-x-1 text-[var(--sem-ok)] font-bold mb-1">
                   <Check className="w-3 h-3" />
                   <span>CANDIDATE 1 VERIFIED AGAINST THE PHYSICS CORE</span>
                 </div>
-                <div className="text-[#aaddaa]">
+                <div className="text-[var(--sem-ok)]">
                   Impulse {candidateTruth.total_impulse.toFixed(0)} N·s (surrogate said{' '}
                   {candidates[0].predicted.total_impulse.toFixed(0)},{' '}
                   {(((candidates[0].predicted.total_impulse - candidateTruth.total_impulse) /
@@ -608,7 +608,7 @@ export function SurrogatePanel({
                     candidateTruth.peak_pc <= targetMaxPc * 1e6;
                   if (useless) {
                     return (
-                      <div className="mt-1 text-[#ff8888]">
+                      <div className="mt-1 text-[var(--sem-danger)]">
                         REJECT: the verified design delivers only{' '}
                         {candidateTruth.total_impulse.toFixed(0)} N·s. It satisfies the ceiling by
                         not working. Widen the bounds or relax the pressure limit.
@@ -616,7 +616,7 @@ export function SurrogatePanel({
                     );
                   }
                   return (
-                    <div className={`mt-1 ${meets ? 'text-[#88bb88]' : 'text-[#ff8888]'}`}>
+                    <div className={`mt-1 ${meets ? 'text-[var(--sem-ok)]' : 'text-[var(--sem-danger)]'}`}>
                       {meets
                         ? 'The verified design meets both constraints.'
                         : 'WARNING: the verified design misses a constraint the surrogate thought it met. Trust this row, not the one above.'}
@@ -625,12 +625,12 @@ export function SurrogatePanel({
                 })()}
               </div>
             ) : (
-              <p className="text-[#666] text-[10px] mt-2">Verifying candidate 1 against the full solver…</p>
+              <p className="text-[var(--t-muted)] text-[10px] mt-2">Verifying candidate 1 against the full solver…</p>
             )}
           </>
         )}
         {candidates && candidates.length === 0 && (
-          <p className="text-[#ff6666] text-[10px]">
+          <p className="text-[var(--sem-danger)] text-[10px]">
             No feasible {kind} design found inside the training envelope. Try relaxing the pressure
             limit or the impulse target.
           </p>
@@ -638,39 +638,39 @@ export function SurrogatePanel({
       </div>
 
       {/* ---- c. real-time Monte Carlo ---- */}
-      <div className="bg-[#111] border border-[#333] p-4 rounded">
-        <h3 className="font-bold text-[#00aaff] text-sm border-b border-[#333] pb-2 mb-3">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4 rounded">
+        <h3 className="font-bold text-[var(--a-accent)] text-sm border-b border-[var(--b-soft)] pb-2 mb-3">
           REAL-TIME MONTE CARLO
         </h3>
         <div className="flex flex-wrap items-end gap-4 mb-3">
           <label className="flex flex-col space-y-1">
-            <span className="text-[#888] text-[10px]">1σ dispersion (%)</span>
+            <span className="text-[var(--t-secondary)] text-[10px]">1σ dispersion (%)</span>
             <input type="number" value={mcSigma} onChange={(e) => setMcSigma(parseFloat(e.target.value) || 0)}
-              className="bg-[#222] border border-[#555] px-2 py-1 w-20 text-[#eee]" />
+              className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 w-20 text-[var(--t-primary)]" />
           </label>
           <label className="flex flex-col space-y-1">
-            <span className="text-[#888] text-[10px]">Samples</span>
+            <span className="text-[var(--t-secondary)] text-[10px]">Samples</span>
             <input type="number" value={mcSamples} onChange={(e) => setMcSamples(parseInt(e.target.value, 10) || 0)}
-              className="bg-[#222] border border-[#555] px-2 py-1 w-24 text-[#eee]" />
+              className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 w-24 text-[var(--t-primary)]" />
           </label>
           <label className="flex flex-col space-y-1">
-            <span className="text-[#888] text-[10px]">Output</span>
+            <span className="text-[var(--t-secondary)] text-[10px]">Output</span>
             <select value={mcTarget} onChange={(e) => setMcTarget(e.target.value as SurrogateTarget)}
-              className="bg-[#222] border border-[#555] px-2 py-1 text-[#eee]">
+              className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 text-[var(--t-primary)]">
               {TARGETS.map((t) => <option key={t} value={t}>{LABEL[t]}</option>)}
             </select>
           </label>
           <button onClick={runMonteCarlo}
-            className="bg-[#ffaa00] text-black px-4 py-1.5 font-bold rounded flex items-center hover:bg-[#ffcc00]">
+            className="bg-[var(--sem-warn)] text-black px-4 py-1.5 font-bold rounded flex items-center hover:bg-[var(--sem-warn)]">
             <Play className="w-3 h-3 mr-1" /> Run
           </button>
           {mcResult && (
             <>
-              <span className="text-[#666] text-[10px]">
+              <span className="text-[var(--t-muted)] text-[10px]">
                 {mcSamples.toLocaleString()} samples in {mcMs.toFixed(0)} ms
               </span>
               <button onClick={confirmMonteCarlo} disabled={confirming}
-                className="border border-[#00aaff] text-[#00aaff] px-3 py-1 rounded hover:bg-[#00aaff] hover:text-black disabled:opacity-50">
+                className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 rounded hover:bg-[var(--a-accent)] hover:text-black disabled:opacity-50">
                 {confirming ? 'Solving 40…' : 'Confirm with 40 full solves'}
               </button>
             </>
@@ -679,19 +679,19 @@ export function SurrogatePanel({
 
         {mcResult && (
           <>
-            <div className="h-48 border border-[#333] rounded bg-[#0c0c0c]">
+            <div className="h-48 border border-[var(--b-soft)] rounded bg-[var(--s-canvas)]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={mcHist} margin={{ top: 10, right: 20, bottom: 4, left: 0 }}>
-                  <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                  <XAxis dataKey="x" type="number" domain={['dataMin', 'dataMax']} stroke="#666"
-                    tick={{ fill: '#888', fontSize: 9 }}
+                  <CartesianGrid strokeDasharray="1 3" stroke="var(--b-soft)" />
+                  <XAxis dataKey="x" type="number" domain={['dataMin', 'dataMax']} stroke="var(--t-muted)"
+                    tick={{ fill: 'var(--t-secondary)', fontSize: 9 }}
                     tickFormatter={(v) => (mcTarget === 'peak_pc' ? (v / 1e6).toFixed(1) : v.toFixed(0))} />
-                  <YAxis stroke="#666" tick={{ fill: '#888', fontSize: 9 }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px' }}
+                  <YAxis stroke="var(--t-muted)" tick={{ fill: 'var(--t-secondary)', fontSize: 9 }} />
+                  <Tooltip contentStyle={{ backgroundColor: 'var(--s-canvas)', borderColor: 'var(--b-strong)', fontSize: '10px' }}
                     labelFormatter={(v: number | string) => FORMAT[mcTarget](Number(v))} />
-                  <Bar dataKey="count" fill="#00aaff" isAnimationActive={false} />
-                  <ReferenceLine x={mcResult[mcTarget].p05} stroke="#ffaa00" strokeDasharray="3 3" />
-                  <ReferenceLine x={mcResult[mcTarget].p95} stroke="#ffaa00" strokeDasharray="3 3" />
+                  <Bar dataKey="count" fill="var(--a-accent)" isAnimationActive={false} />
+                  <ReferenceLine x={mcResult[mcTarget].p05} stroke="var(--sem-warn)" strokeDasharray="3 3" />
+                  <ReferenceLine x={mcResult[mcTarget].p95} stroke="var(--sem-warn)" strokeDasharray="3 3" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -699,13 +699,13 @@ export function SurrogatePanel({
               {([['Mean', 'mean'], ['Std dev', 'sd'], ['5th pct', 'p05'], ['Median', 'p50'], ['95th pct', 'p95']] as const).map(
                 ([label, key]) => (
                   <div key={key}>
-                    <p className="text-[#888] text-[10px]">{label}</p>
-                    <p className="text-[#eee]">{FORMAT[mcTarget](mcResult[mcTarget][key])}</p>
+                    <p className="text-[var(--t-secondary)] text-[10px]">{label}</p>
+                    <p className="text-[var(--t-primary)]">{FORMAT[mcTarget](mcResult[mcTarget][key])}</p>
                   </div>
                 )
               )}
             </div>
-            <p className="text-[#666] text-[10px] mt-2 leading-snug">
+            <p className="text-[var(--t-muted)] text-[10px] mt-2 leading-snug">
               The spread here is manufacturing dispersion, not model error — the surrogate's own
               uncertainty on this design is ±{(prediction.relativeBand[mcTarget] * 100).toFixed(1)}%
               and is reported separately above, so a wide distribution is never confused with an
@@ -713,8 +713,8 @@ export function SurrogatePanel({
             </p>
 
             {mcConfirm && (
-              <div className="mt-3 border border-[#334433] bg-[#0d1a0d] rounded p-2 text-[10px]">
-                <div className="flex items-center space-x-1 text-[#00ff88] font-bold mb-1">
+              <div className="mt-3 border border-[var(--sem-ok)] bg-[var(--sem-ok-wash)] rounded p-2 text-[10px]">
+                <div className="flex items-center space-x-1 text-[var(--sem-ok)] font-bold mb-1">
                   <Check className="w-3 h-3" />
                   <span>CONFIRMED WITH {mcConfirm.n} FULL SOLVES ({mcConfirm.ms.toFixed(0)} ms)</span>
                 </div>
@@ -726,7 +726,7 @@ export function SurrogatePanel({
                   const dMean = ((mcResult[mcTarget].mean - mean) / mean) * 100;
                   const dSd = sd > 0 ? ((mcResult[mcTarget].sd - sd) / sd) * 100 : 0;
                   return (
-                    <div className="text-[#aaddaa]">
+                    <div className="text-[var(--sem-ok)]">
                       Physics mean {FORMAT[mcTarget](mean)} (surrogate {dMean >= 0 ? '+' : ''}
                       {dMean.toFixed(2)}%), physics σ {FORMAT[mcTarget](sd)} (surrogate{' '}
                       {dSd >= 0 ? '+' : ''}{dSd.toFixed(1)}%). The subsample uses the same

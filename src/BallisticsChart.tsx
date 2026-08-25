@@ -80,10 +80,10 @@ export interface BallisticsChartProps {
 
 /** Resolve a CSS custom property to a literal, which SVG attributes require. */
 function cssVar(name: string): string {
-  if (typeof window === 'undefined') return '#888';
+  if (typeof window === 'undefined') return 'var(--t-secondary)';
   const raw = name.startsWith('var(') ? name.slice(4, -1) : name;
   const v = getComputedStyle(document.documentElement).getPropertyValue(raw).trim();
-  return v || '#888';
+  return v || 'var(--t-secondary)';
 }
 
 export function BallisticsChart({ data, enabled, peakPc }: BallisticsChartProps) {

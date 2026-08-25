@@ -95,28 +95,28 @@ export function StructuralTab({
   }, [structural]);
 
   return (
-            <div className="flex-1 bg-black border border-[#555] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
+            <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
               <div className="absolute top-1 left-2 z-10 flex items-center space-x-4">
-                <span className="text-[#00aaff] text-[10px] font-mono">Structural & Erosion Analysis</span>
+                <span className="text-[var(--a-accent)] text-[10px] font-mono">Structural & Erosion Analysis</span>
                 <label className="flex items-center space-x-1 cursor-pointer">
-                  <input type="checkbox" checked={showFEA} onChange={e => setShowFEA(e.target.checked)} className="accent-[#00aaff]" />
-                  <span className="text-[10px] text-[#eee] font-mono">2D FEA Visualization Mode</span>
+                  <input type="checkbox" checked={showFEA} onChange={e => setShowFEA(e.target.checked)} className="accent-[var(--a-accent)]" />
+                  <span className="text-[10px] text-[var(--t-primary)] font-mono">2D FEA Visualization Mode</span>
                 </label>
               </div>
 
               {metrics && structural && results.length > 0 ? (
                 <div className="w-full max-w-4xl space-y-6 mt-6">
                   {/* Casing Integrity Panel */}
-                  <div className="bg-[#111] border border-[#333] p-5 rounded-md shadow-lg w-full">
-                    <div className="flex justify-between items-end border-b border-[#333] pb-2 mb-4">
-                      <h3 className="font-mono font-bold text-[#00aaff] text-sm tracking-wide">CASING INTEGRITY & BOLTED CLOSURE</h3>
+                  <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-5 rounded-md shadow-lg w-full">
+                    <div className="flex justify-between items-end border-b border-[var(--b-soft)] pb-2 mb-4">
+                      <h3 className="font-mono font-bold text-[var(--a-accent)] text-sm tracking-wide">CASING INTEGRITY & BOLTED CLOSURE</h3>
                       {metrics && (
                         <div className="flex space-x-2">
-                          <button onClick={onExportCasingSTL} disabled={isSimulating} className="flex items-center space-x-1 border border-[#666] rounded px-2 py-1 text-xs bg-[#222] text-[#eee] hover:bg-[#333] hover:text-[#fff] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .stl format for additive manufacturing">
+                          <button onClick={onExportCasingSTL} disabled={isSimulating} className="flex items-center space-x-1 border border-[var(--t-muted)] rounded px-2 py-1 text-xs bg-[var(--s-sunken)] text-[var(--t-primary)] hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .stl format for additive manufacturing">
                             <Download className="w-3 h-3" />
                             <span>AM (.stl)</span>
                           </button>
-                          <button onClick={onExportCasingSCAD} disabled={isSimulating} className="flex items-center space-x-1 border border-[#666] rounded px-2 py-1 text-xs bg-[#222] text-[#eee] hover:bg-[#333] hover:text-[#fff] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .scad format. OpenSCAD or FreeCAD can export this to STEP or Parasolid.">
+                          <button onClick={onExportCasingSCAD} disabled={isSimulating} className="flex items-center space-x-1 border border-[var(--t-muted)] rounded px-2 py-1 text-xs bg-[var(--s-sunken)] text-[var(--t-primary)] hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .scad format. OpenSCAD or FreeCAD can export this to STEP or Parasolid.">
                             <Download className="w-3 h-3" />
                             <span>CAD Base (.scad)</span>
                           </button>
@@ -126,9 +126,9 @@ export function StructuralTab({
                     
                     {showFEA ? (
                       <div className="flex flex-col items-center space-y-4">
-                        <p className="text-xs text-[#888] font-mono self-start">2D Axisymmetric FEA (von Mises Stress Distribution)</p>
+                        <p className="text-xs text-[var(--t-secondary)] font-mono self-start">2D Axisymmetric FEA (von Mises Stress Distribution)</p>
                         {/* Advanced SVG FEA Visualizer */}
-                        <div className="relative w-full h-40 border border-[#444] bg-[#222] rounded overflow-hidden flex flex-col items-center justify-center">
+                        <div className="relative w-full h-40 border border-[var(--b-strong)] bg-[var(--s-sunken)] rounded overflow-hidden flex flex-col items-center justify-center">
                           
                           {/* Color logic: Map vonMises / yieldStress to a color hue mapping */}
                           {(() => {
@@ -158,21 +158,21 @@ export function StructuralTab({
                                 </defs>
 
                                 {/* Centerline */}
-                                <line x1="0" y1="100" x2="800" y2="100" stroke="#555" strokeDasharray="10 5" strokeWidth="1" />
+                                <line x1="0" y1="100" x2="800" y2="100" stroke="var(--b-control)" strokeDasharray="10 5" strokeWidth="1" />
 
                                 {/* Motor Casing Top Half */}
-                                <rect x="100" y="40" width="500" height="15" fill="url(#feaGradient)" stroke="#111" strokeWidth="1" />
+                                <rect x="100" y="40" width="500" height="15" fill="url(#feaGradient)" stroke="var(--s-canvas)" strokeWidth="1" />
                                 
                                 {/* Motor Casing Bottom Half */}
-                                <rect x="100" y="145" width="500" height="15" fill="url(#feaGradient)" stroke="#111" strokeWidth="1" />
+                                <rect x="100" y="145" width="500" height="15" fill="url(#feaGradient)" stroke="var(--s-canvas)" strokeWidth="1" />
 
                                 {/* Forward Closure */}
-                                <path d="M 100 40 Q 50 40 50 100 Q 50 160 100 160 Z" fill={`hsl(${hueEdge - 20}, 90%, 45%)`} stroke="#111" strokeWidth="1" />
+                                <path d="M 100 40 Q 50 40 50 100 Q 50 160 100 160 Z" fill={`hsl(${hueEdge - 20}, 90%, 45%)`} stroke="var(--s-canvas)" strokeWidth="1" />
 
                                 {/* Aft Closure & Nozzle block */}
-                                <rect x="600" y="30" width="30" height="140" fill={`hsl(${hueEdge}, 90%, 45%)`} stroke="#111" strokeWidth="1" />
-                                <path d="M 630 80 L 700 60 L 750 20 L 750 35 L 700 85 L 630 95 Z" fill="url(#nozzleGradient)" stroke="#111" strokeWidth="1" />
-                                <path d="M 630 120 L 700 140 L 750 180 L 750 165 L 700 115 L 630 105 Z" fill="url(#nozzleGradient)" stroke="#111" strokeWidth="1" />
+                                <rect x="600" y="30" width="30" height="140" fill={`hsl(${hueEdge}, 90%, 45%)`} stroke="var(--s-canvas)" strokeWidth="1" />
+                                <path d="M 630 80 L 700 60 L 750 20 L 750 35 L 700 85 L 630 95 Z" fill="url(#nozzleGradient)" stroke="var(--s-canvas)" strokeWidth="1" />
+                                <path d="M 630 120 L 700 140 L 750 180 L 750 165 L 700 115 L 630 105 Z" fill="url(#nozzleGradient)" stroke="var(--s-canvas)" strokeWidth="1" />
                                 
                                 {/* Overlay Grid lines to indicate FEA mesh */}
                                 <pattern id="mesh" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -184,21 +184,21 @@ export function StructuralTab({
 
                                 {/* Labels */}
                                 <text x="350" y="30" fill="white" fontSize="11" fontFamily="monospace" textAnchor="middle">Bore Hoop (Lamé) ≈ {(structural.lame.inner.hoop / 1e6).toFixed(1)} MPa</text>
-                                <text x="100" y="25" fill="#ff4444" fontSize="11" fontFamily="monospace" textAnchor="end">Peak von Mises ≈ {(structural.maxVonMises / 1e6).toFixed(1)} MPa</text>
-                                <text x="640" y="20" fill="#ffff00" fontSize="11" fontFamily="monospace">Aft Closure Bending Moment</text>
+                                <text x="100" y="25" fill="var(--sem-danger)" fontSize="11" fontFamily="monospace" textAnchor="end">Peak von Mises ≈ {(structural.maxVonMises / 1e6).toFixed(1)} MPa</text>
+                                <text x="640" y="20" fill="var(--sem-warn)" fontSize="11" fontFamily="monospace">Aft Closure Bending Moment</text>
                               </svg>
                             );
                           })()}
                         </div>
                         {/* Legend */}
                         <div className="flex items-center space-x-2 text-[10px] font-mono w-full justify-between">
-                          <span className="text-[#888]">
+                          <span className="text-[var(--t-secondary)]">
                             Safety factor {structural.safetyFactor.toFixed(2)}x at the {structural.whereMax}.
                             Colours are indicative only &mdash; this is a schematic, not a mesh.
                           </span>
                           <div className="flex items-center space-x-2">
                             <span className="text-blue-400">Low</span>
-                            <div className="w-32 h-3 bg-gradient-to-r from-blue-500 via-green-500 via-yellow-500 to-red-500 rounded border border-[#555]"></div>
+                            <div className="w-32 h-3 bg-gradient-to-r from-blue-500 via-green-500 via-yellow-500 to-red-500 rounded border border-[var(--b-control)]"></div>
                             <span className="text-red-500">Yield</span>
                           </div>
                         </div>
@@ -208,42 +208,42 @@ export function StructuralTab({
                         {/* --- inputs governing the analysis --- */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
-                            <p className="text-[#888] mb-1">Peak Chamber Pressure:</p>
-                            <p className="text-[#ff4444] font-bold">{(metrics.maxPc / 1e6).toFixed(2)} MPa</p>
+                            <p className="text-[var(--t-secondary)] mb-1">Peak Chamber Pressure:</p>
+                            <p className="text-[var(--sem-danger)] font-bold">{(metrics.maxPc / 1e6).toFixed(2)} MPa</p>
                           </div>
                           <div>
-                            <p className="text-[#888] mb-1">Case Bore Radius:</p>
-                            <p className="text-[#eee]">{(outerRadius * 1000).toFixed(1)} mm</p>
+                            <p className="text-[var(--t-secondary)] mb-1">Case Bore Radius:</p>
+                            <p className="text-[var(--t-primary)]">{(outerRadius * 1000).toFixed(1)} mm</p>
                           </div>
                           <div>
-                            <p className="text-[#888] mb-1">Wall Thickness (analysed):</p>
-                            <p className="text-[#eee]">{(caseWallThickness * 1000).toFixed(2)} mm</p>
+                            <p className="text-[var(--t-secondary)] mb-1">Wall Thickness (analysed):</p>
+                            <p className="text-[var(--t-primary)]">{(caseWallThickness * 1000).toFixed(2)} mm</p>
                           </div>
                           <div>
-                            <p className="text-[#888] mb-1">Material:</p>
-                            <p className="text-[#eee]">{casingMaterial} &middot; {casingYieldStress} MPa yield</p>
+                            <p className="text-[var(--t-secondary)] mb-1">Material:</p>
+                            <p className="text-[var(--t-primary)]">{casingMaterial} &middot; {casingYieldStress} MPa yield</p>
                           </div>
                         </div>
 
                         {/* --- headline result --- */}
-                        <div className="border border-[#333] rounded p-3 bg-[#0c0c0c] grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="border border-[var(--b-soft)] rounded p-3 bg-[var(--s-canvas)] grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
-                            <p className="text-[#888] mb-1">Peak von Mises:</p>
-                            <p className="text-xl text-[#ffaa00] font-bold">{(structural.maxVonMises / 1e6).toFixed(1)} MPa</p>
+                            <p className="text-[var(--t-secondary)] mb-1">Peak von Mises:</p>
+                            <p className="text-xl text-[var(--sem-warn)] font-bold">{(structural.maxVonMises / 1e6).toFixed(1)} MPa</p>
                           </div>
                           <div>
-                            <p className="text-[#888] mb-1">Governing Location:</p>
-                            <p className="text-[#eee] leading-tight">{structural.whereMax}</p>
+                            <p className="text-[var(--t-secondary)] mb-1">Governing Location:</p>
+                            <p className="text-[var(--t-primary)] leading-tight">{structural.whereMax}</p>
                           </div>
                           <div>
-                            <p className="text-[#888] mb-1">Safety Factor:</p>
-                            <p className={`text-xl font-bold ${structural.safetyFactor < 1 ? 'text-[#ff4444]' : structural.safetyFactor < 1.5 ? 'text-[#ffaa00]' : 'text-[#00ff00]'}`}>
+                            <p className="text-[var(--t-secondary)] mb-1">Safety Factor:</p>
+                            <p className={`text-xl font-bold ${structural.safetyFactor < 1 ? 'text-[var(--sem-danger)]' : structural.safetyFactor < 1.5 ? 'text-[var(--sem-warn)]' : 'text-[var(--sem-ok)]'}`}>
                               {structural.safetyFactor.toFixed(2)}x
                             </p>
                           </div>
                           <div>
-                            <p className="text-[#888] mb-1">Margin of Safety:</p>
-                            <p className={`text-xl font-bold ${structural.marginOfSafety < 0 ? 'text-[#ff4444]' : 'text-[#00ff00]'}`}>
+                            <p className="text-[var(--t-secondary)] mb-1">Margin of Safety:</p>
+                            <p className={`text-xl font-bold ${structural.marginOfSafety < 0 ? 'text-[var(--sem-danger)]' : 'text-[var(--sem-ok)]'}`}>
                               {structural.marginOfSafety >= 0 ? '+' : ''}{structural.marginOfSafety.toFixed(3)}
                             </p>
                           </div>
@@ -251,12 +251,12 @@ export function StructuralTab({
 
                         {/* --- Lame through-wall distribution --- */}
                         <div>
-                          <p className="text-[#00aaff] font-bold mb-2 border-b border-[#333] pb-1">
+                          <p className="text-[var(--a-accent)] font-bold mb-2 border-b border-[var(--b-soft)] pb-1">
                             THICK-WALL (LAMÉ) STRESS DISTRIBUTION
                           </p>
                           <div className="overflow-x-auto">
                             <table className="w-full text-[11px]">
-                              <thead className="text-[#888]">
+                              <thead className="text-[var(--t-secondary)]">
                                 <tr>
                                   <th className="text-left py-1">Location</th>
                                   <th className="text-right py-1">Hoop σθ</th>
@@ -265,39 +265,39 @@ export function StructuralTab({
                                   <th className="text-right py-1">von Mises</th>
                                 </tr>
                               </thead>
-                              <tbody className="text-[#eee]">
-                                <tr className="border-t border-[#222]">
+                              <tbody className="text-[var(--t-primary)]">
+                                <tr className="border-t border-[var(--s-sunken)]">
                                   <td className="py-1">Inner wall (bore, r = {(outerRadius * 1000).toFixed(1)} mm)</td>
                                   <td className="text-right">{(structural.lame.inner.hoop / 1e6).toFixed(1)}</td>
                                   <td className="text-right">{(structural.lame.inner.radial / 1e6).toFixed(1)}</td>
                                   <td className="text-right">{(structural.lame.inner.axial / 1e6).toFixed(1)}</td>
-                                  <td className="text-right text-[#ffaa00]">{(structural.lame.inner.vonMises / 1e6).toFixed(1)}</td>
+                                  <td className="text-right text-[var(--sem-warn)]">{(structural.lame.inner.vonMises / 1e6).toFixed(1)}</td>
                                 </tr>
-                                <tr className="border-t border-[#222]">
+                                <tr className="border-t border-[var(--s-sunken)]">
                                   <td className="py-1">Outer wall (r = {((outerRadius + caseWallThickness) * 1000).toFixed(1)} mm)</td>
                                   <td className="text-right">{(structural.lame.outer.hoop / 1e6).toFixed(1)}</td>
                                   <td className="text-right">{(structural.lame.outer.radial / 1e6).toFixed(1)}</td>
                                   <td className="text-right">{(structural.lame.outer.axial / 1e6).toFixed(1)}</td>
-                                  <td className="text-right text-[#ffaa00]">{(structural.lame.outer.vonMises / 1e6).toFixed(1)}</td>
+                                  <td className="text-right text-[var(--sem-warn)]">{(structural.lame.outer.vonMises / 1e6).toFixed(1)}</td>
                                 </tr>
                               </tbody>
                             </table>
-                            <p className="text-[#666] text-[10px] mt-1">All values MPa. Hoop stress peaks at the bore and falls through the wall.</p>
+                            <p className="text-[var(--t-muted)] text-[10px] mt-1">All values MPa. Hoop stress peaks at the bore and falls through the wall.</p>
                           </div>
 
                           {lameChart.length > 0 && (
-                            <div className="h-40 mt-3 border border-[#333] rounded bg-[#0c0c0c]">
+                            <div className="h-40 mt-3 border border-[var(--b-soft)] rounded bg-[var(--s-canvas)]">
                               <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={lameChart} margin={{ top: 12, right: 20, bottom: 4, left: 0 }}>
-                                  <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                                  <XAxis dataKey="r_mm" type="number" domain={['dataMin', 'dataMax']} stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(1)} label={{ value: 'radius (mm)', position: 'insideBottom', offset: -2, fill: '#666', fontSize: 9 }} />
-                                  <YAxis stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} />
-                                  <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: number | string) => `${Number(v).toFixed(1)} MPa`} />
+                                  <CartesianGrid strokeDasharray="1 3" stroke="var(--b-soft)" />
+                                  <XAxis dataKey="r_mm" type="number" domain={['dataMin', 'dataMax']} stroke="var(--t-muted)" tick={{ fill: 'var(--t-secondary)', fontSize: 9 }} tickFormatter={(v) => v.toFixed(1)} label={{ value: 'radius (mm)', position: 'insideBottom', offset: -2, fill: 'var(--t-muted)', fontSize: 9 }} />
+                                  <YAxis stroke="var(--t-muted)" tick={{ fill: 'var(--t-secondary)', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} />
+                                  <Tooltip contentStyle={{ backgroundColor: 'var(--s-canvas)', borderColor: 'var(--b-strong)', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: number | string) => `${Number(v).toFixed(1)} MPa`} />
                                   <Legend wrapperStyle={{ fontSize: '9px' }} />
-                                  <Line type="monotone" dataKey="hoop" name="hoop" stroke="#00aaff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                  <Line type="monotone" dataKey="radial" name="radial" stroke="#ff00ff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                  <Line type="monotone" dataKey="axial" name="axial" stroke="#00ff88" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                  <Line type="monotone" dataKey="vonMises" name="von Mises" stroke="#ffaa00" strokeWidth={2} dot={false} isAnimationActive={false} />
+                                  <Line type="monotone" dataKey="hoop" name="hoop" stroke="var(--a-accent)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                                  <Line type="monotone" dataKey="radial" name="radial" stroke="var(--c-3)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                                  <Line type="monotone" dataKey="axial" name="axial" stroke="var(--sem-ok)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                                  <Line type="monotone" dataKey="vonMises" name="von Mises" stroke="var(--sem-warn)" strokeWidth={2} dot={false} isAnimationActive={false} />
                                 </LineChart>
                               </ResponsiveContainer>
                             </div>
@@ -305,20 +305,20 @@ export function StructuralTab({
 
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
                             <div>
-                              <p className="text-[#888] mb-1">Wall Regime:</p>
-                              <p className={structural.lame.thinWallApplicable ? 'text-[#00ff00]' : 'text-[#ffaa00]'}>
+                              <p className="text-[var(--t-secondary)] mb-1">Wall Regime:</p>
+                              <p className={structural.lame.thinWallApplicable ? 'text-[var(--sem-ok)]' : 'text-[var(--sem-warn)]'}>
                                 {structural.lame.thinWallApplicable ? 'Thin' : 'THICK'} &mdash; R_mean/t = {structural.lame.rMeanOverT.toFixed(1)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-[#888] mb-1">Thin-wall pR/t would give:</p>
-                              <p className="text-[#eee]">
+                              <p className="text-[var(--t-secondary)] mb-1">Thin-wall pR/t would give:</p>
+                              <p className="text-[var(--t-primary)]">
                                 {(structural.lame.thinWallHoop / 1e6).toFixed(1)} MPa ({(structural.lame.thinWallError * 100).toFixed(1)}% error)
                               </p>
                             </div>
                             <div>
-                              <p className="text-[#888] mb-1">Bore Growth at Peak P:</p>
-                              <p className="text-[#eee]">
+                              <p className="text-[var(--t-secondary)] mb-1">Bore Growth at Peak P:</p>
+                              <p className="text-[var(--t-primary)]">
                                 {(structural.boreRadialGrowth * 1e6).toFixed(1)} µm ({(structural.boreHoopStrain * 100).toFixed(4)}% strain)
                               </p>
                             </div>
@@ -327,64 +327,64 @@ export function StructuralTab({
 
                         {/* --- edge bending --- */}
                         <div>
-                          <p className="text-[#00aaff] font-bold mb-2 border-b border-[#333] pb-1">
+                          <p className="text-[var(--a-accent)] font-bold mb-2 border-b border-[var(--b-soft)] pb-1">
                             DISCONTINUITY STRESS AT THE CASE-TO-CLOSURE JUNCTION
                           </p>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
-                              <p className="text-[#888] mb-1">Peak Combined (von Mises):</p>
-                              <p className="text-xl text-[#ffaa00] font-bold">{(structural.edge.peak.vonMises / 1e6).toFixed(1)} MPa</p>
+                              <p className="text-[var(--t-secondary)] mb-1">Peak Combined (von Mises):</p>
+                              <p className="text-xl text-[var(--sem-warn)] font-bold">{(structural.edge.peak.vonMises / 1e6).toFixed(1)} MPa</p>
                             </div>
                             <div>
-                              <p className="text-[#888] mb-1">Axial Location:</p>
-                              <p className="text-[#eee]">
+                              <p className="text-[var(--t-secondary)] mb-1">Axial Location:</p>
+                              <p className="text-[var(--t-primary)]">
                                 {(structural.edge.peakLocation * 1000).toFixed(2)} mm from joint
-                                <span className="text-[#666]"> ({structural.edge.peakLocationOverChar.toFixed(2)}/β)</span>
+                                <span className="text-[var(--t-muted)]"> ({structural.edge.peakLocationOverChar.toFixed(2)}/β)</span>
                               </p>
                             </div>
                             <div>
-                              <p className="text-[#888] mb-1">Critical Surface:</p>
-                              <p className="text-[#eee]">{structural.edge.peakSurface === 'bore' ? 'Bore (inner)' : 'Outer'}</p>
+                              <p className="text-[var(--t-secondary)] mb-1">Critical Surface:</p>
+                              <p className="text-[var(--t-primary)]">{structural.edge.peakSurface === 'bore' ? 'Bore (inner)' : 'Outer'}</p>
                             </div>
                             <div>
-                              <p className="text-[#888] mb-1">Decay Length (3/β):</p>
-                              <p className="text-[#eee]">{(structural.edge.decayLength * 1000).toFixed(1)} mm</p>
+                              <p className="text-[var(--t-secondary)] mb-1">Decay Length (3/β):</p>
+                              <p className="text-[var(--t-primary)]">{(structural.edge.decayLength * 1000).toFixed(1)} mm</p>
                             </div>
                             <div>
-                              <p className="text-[#888] mb-1">β = [3(1&minus;ν²)/(R²t²)]<sup>1/4</sup>:</p>
-                              <p className="text-[#eee]">{structural.edge.beta.toFixed(1)} m⁻¹</p>
+                              <p className="text-[var(--t-secondary)] mb-1">β = [3(1&minus;ν²)/(R²t²)]<sup>1/4</sup>:</p>
+                              <p className="text-[var(--t-primary)]">{structural.edge.beta.toFixed(1)} m⁻¹</p>
                             </div>
                             <div>
-                              <p className="text-[#888] mb-1">Edge Moment M₀ = p/2β²:</p>
-                              <p className="text-[#eee]">{structural.edge.m0.toFixed(1)} N·m/m</p>
+                              <p className="text-[var(--t-secondary)] mb-1">Edge Moment M₀ = p/2β²:</p>
+                              <p className="text-[var(--t-primary)]">{structural.edge.m0.toFixed(1)} N·m/m</p>
                             </div>
                             <div>
-                              <p className="text-[#888] mb-1">Edge Shear Q₀ = &minus;p/β:</p>
-                              <p className="text-[#eee]">{(structural.edge.q0 / 1000).toFixed(1)} kN/m</p>
+                              <p className="text-[var(--t-secondary)] mb-1">Edge Shear Q₀ = &minus;p/β:</p>
+                              <p className="text-[var(--t-primary)]">{(structural.edge.q0 / 1000).toFixed(1)} kN/m</p>
                             </div>
                             <div>
-                              <p className="text-[#888] mb-1">Bending / Membrane Hoop:</p>
-                              <p className="text-[#eee]">{structural.edge.bendingToHoop.toFixed(2)}x</p>
+                              <p className="text-[var(--t-secondary)] mb-1">Bending / Membrane Hoop:</p>
+                              <p className="text-[var(--t-primary)]">{structural.edge.bendingToHoop.toFixed(2)}x</p>
                             </div>
                           </div>
 
                           {edgeChart.length > 0 && (
-                            <div className="h-40 mt-3 border border-[#333] rounded bg-[#0c0c0c]">
+                            <div className="h-40 mt-3 border border-[var(--b-soft)] rounded bg-[var(--s-canvas)]">
                               <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={edgeChart} margin={{ top: 12, right: 20, bottom: 4, left: 0 }}>
-                                  <CartesianGrid strokeDasharray="1 3" stroke="#333" />
-                                  <XAxis dataKey="x_mm" type="number" domain={['dataMin', 'dataMax']} stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} label={{ value: 'distance from joint (mm)', position: 'insideBottom', offset: -2, fill: '#666', fontSize: 9 }} />
-                                  <YAxis stroke="#666" tick={{ fill: '#888', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} />
-                                  <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#444', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: number | string) => `${Number(v).toFixed(1)} MPa`} />
+                                  <CartesianGrid strokeDasharray="1 3" stroke="var(--b-soft)" />
+                                  <XAxis dataKey="x_mm" type="number" domain={['dataMin', 'dataMax']} stroke="var(--t-muted)" tick={{ fill: 'var(--t-secondary)', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} label={{ value: 'distance from joint (mm)', position: 'insideBottom', offset: -2, fill: 'var(--t-muted)', fontSize: 9 }} />
+                                  <YAxis stroke="var(--t-muted)" tick={{ fill: 'var(--t-secondary)', fontSize: 9 }} tickFormatter={(v) => v.toFixed(0)} />
+                                  <Tooltip contentStyle={{ backgroundColor: 'var(--s-canvas)', borderColor: 'var(--b-strong)', fontSize: '10px', fontFamily: 'monospace' }} formatter={(v: number | string) => `${Number(v).toFixed(1)} MPa`} />
                                   <Legend wrapperStyle={{ fontSize: '9px' }} />
-                                  <Line type="monotone" dataKey="hoop" name="hoop" stroke="#00aaff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                  <Line type="monotone" dataKey="axial" name="axial" stroke="#00ff88" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                                  <Line type="monotone" dataKey="vonMises" name="von Mises" stroke="#ffaa00" strokeWidth={2} dot={false} isAnimationActive={false} />
+                                  <Line type="monotone" dataKey="hoop" name="hoop" stroke="var(--a-accent)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                                  <Line type="monotone" dataKey="axial" name="axial" stroke="var(--sem-ok)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                                  <Line type="monotone" dataKey="vonMises" name="von Mises" stroke="var(--sem-warn)" strokeWidth={2} dot={false} isAnimationActive={false} />
                                 </LineChart>
                               </ResponsiveContainer>
                             </div>
                           )}
-                          <p className="text-[#666] text-[10px] mt-1">
+                          <p className="text-[var(--t-muted)] text-[10px] mt-1">
                             Cylindrical-shell edge bending for a clamped junction. Membrane hoop stress is suppressed to
                             zero at the joint (the closure holds the radius) and recovers over ~{(structural.edge.decayLength * 1000).toFixed(0)} mm.
                           </p>
@@ -393,50 +393,50 @@ export function StructuralTab({
                         {/* --- bolted closure --- */}
                         {structural.bolts && (
                           <div>
-                            <p className="text-[#00aaff] font-bold mb-2 border-b border-[#333] pb-1">
+                            <p className="text-[var(--a-accent)] font-bold mb-2 border-b border-[var(--b-soft)] pb-1">
                               BOLTED CLOSURE &mdash; {structural.bolts.count} × ⌀{(structural.bolts.diameter * 1000).toFixed(1)} mm
                             </p>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                               <div>
-                                <p className="text-[#888] mb-1">Total Closure Load:</p>
-                                <p className="text-[#eee]">{(structural.bolts.totalForce / 1000).toFixed(2)} kN</p>
+                                <p className="text-[var(--t-secondary)] mb-1">Total Closure Load:</p>
+                                <p className="text-[var(--t-primary)]">{(structural.bolts.totalForce / 1000).toFixed(2)} kN</p>
                               </div>
                               <div>
-                                <p className="text-[#888] mb-1">Load per Bolt:</p>
-                                <p className="text-[#eee]">{(structural.bolts.forcePerBolt / 1000).toFixed(2)} kN</p>
+                                <p className="text-[var(--t-secondary)] mb-1">Load per Bolt:</p>
+                                <p className="text-[var(--t-primary)]">{(structural.bolts.forcePerBolt / 1000).toFixed(2)} kN</p>
                               </div>
                               <div>
-                                <p className="text-[#888] mb-1">Stress on Shank Area:</p>
-                                <p className="text-[#eee]">{(structural.bolts.nominalStress / 1e6).toFixed(1)} MPa (SF {structural.bolts.safetyFactorNominal.toFixed(2)})</p>
+                                <p className="text-[var(--t-secondary)] mb-1">Stress on Shank Area:</p>
+                                <p className="text-[var(--t-primary)]">{(structural.bolts.nominalStress / 1e6).toFixed(1)} MPa (SF {structural.bolts.safetyFactorNominal.toFixed(2)})</p>
                               </div>
                               <div>
-                                <p className="text-[#888] mb-1">Stress on Thread Area:</p>
-                                <p className={`font-bold ${structural.bolts.safetyFactorStressArea < 1.5 ? 'text-[#ff4444]' : 'text-[#00ff00]'}`}>
+                                <p className="text-[var(--t-secondary)] mb-1">Stress on Thread Area:</p>
+                                <p className={`font-bold ${structural.bolts.safetyFactorStressArea < 1.5 ? 'text-[var(--sem-danger)]' : 'text-[var(--sem-ok)]'}`}>
                                   {(structural.bolts.stressAreaStress / 1e6).toFixed(1)} MPa (SF {structural.bolts.safetyFactorStressArea.toFixed(2)})
                                 </p>
                               </div>
                               <div>
-                                <p className="text-[#888] mb-1">Flange Shear-Out:</p>
-                                <p className={`${structural.bolts.safetyFactorShearOut < 1.5 ? 'text-[#ff4444]' : 'text-[#00ff00]'}`}>
+                                <p className="text-[var(--t-secondary)] mb-1">Flange Shear-Out:</p>
+                                <p className={`${structural.bolts.safetyFactorShearOut < 1.5 ? 'text-[var(--sem-danger)]' : 'text-[var(--sem-ok)]'}`}>
                                   {(structural.bolts.shearOutStress / 1e6).toFixed(1)} MPa (SF {structural.bolts.safetyFactorShearOut.toFixed(2)})
                                 </p>
                               </div>
                               <div>
-                                <p className="text-[#888] mb-1">Bolt Edge Distance:</p>
-                                <p className="text-[#eee]">
+                                <p className="text-[var(--t-secondary)] mb-1">Bolt Edge Distance:</p>
+                                <p className="text-[var(--t-primary)]">
                                   {(structural.bolts.edgeDistance * 1000).toFixed(1)} mm
-                                  <span className="text-[#666]"> (min {(structural.bolts.minEdgeDistance * 1000).toFixed(1)})</span>
+                                  <span className="text-[var(--t-muted)]"> (min {(structural.bolts.minEdgeDistance * 1000).toFixed(1)})</span>
                                 </p>
                               </div>
                               <div className="col-span-2">
-                                <p className="text-[#888] mb-1">Min Thread Engagement:</p>
-                                <p className="text-[#eee]">
+                                <p className="text-[var(--t-secondary)] mb-1">Min Thread Engagement:</p>
+                                <p className="text-[var(--t-primary)]">
                                   {(structural.bolts.minEngagementSteel * 1000).toFixed(1)} mm into steel,
                                   {' '}{(structural.bolts.minEngagementAluminium * 1000).toFixed(1)} mm into aluminium
                                 </p>
                               </div>
                             </div>
-                            <p className="text-[#666] text-[10px] mt-2 leading-snug">
+                            <p className="text-[var(--t-muted)] text-[10px] mt-2 leading-snug">
                               Design to the THREAD tensile-stress area (≈74% of the shank), not the shank. Engagement
                               shorter than the values above lets the threads strip before the bolt yields, which is the
                               failure the tension numbers do not cover. Shear-out assumes two tear planes per bolt
@@ -447,20 +447,20 @@ export function StructuralTab({
 
                         {/* --- assumptions and warnings: the point of the exercise --- */}
                         {structural.warnings.length > 0 && (
-                          <div className="border border-[#663333] bg-[#1a0d0d] rounded p-3">
-                            <p className="text-[#ff6666] font-bold mb-2 text-[11px]">FLAGS</p>
+                          <div className="border border-[var(--sem-danger)] bg-[var(--sem-danger-wash)] rounded p-3">
+                            <p className="text-[var(--sem-danger)] font-bold mb-2 text-[11px]">FLAGS</p>
                             <ul className="space-y-1.5">
                               {structural.warnings.map((w, i) => (
-                                <li key={i} className="text-[#ffaaaa] text-[10px] leading-snug">• {w}</li>
+                                <li key={i} className="text-[var(--sem-danger)] text-[10px] leading-snug">• {w}</li>
                               ))}
                             </ul>
                           </div>
                         )}
-                        <div className="border border-[#333] rounded p-3 bg-[#0c0c0c]">
-                          <p className="text-[#888] font-bold mb-2 text-[11px]">ASSUMPTIONS</p>
+                        <div className="border border-[var(--b-soft)] rounded p-3 bg-[var(--s-canvas)]">
+                          <p className="text-[var(--t-secondary)] font-bold mb-2 text-[11px]">ASSUMPTIONS</p>
                           <ul className="space-y-1.5">
                             {structural.assumptions.map((a, i) => (
-                              <li key={i} className="text-[#777] text-[10px] leading-snug">• {a}</li>
+                              <li key={i} className="text-[var(--t-muted)] text-[10px] leading-snug">• {a}</li>
                             ))}
                           </ul>
                         </div>
@@ -469,24 +469,24 @@ export function StructuralTab({
                   </div>
                   
                   {/* Nozzle Erosion Panel */}
-                  <div className="bg-[#111] border border-[#333] p-5 rounded-md shadow-lg w-full">
-                    <h3 className="font-mono font-bold text-[#00aaff] mb-4 pb-2 border-b border-[#333] text-sm tracking-wide">NOZZLE EROSION (CONVECTIVE MODEL)</h3>
+                  <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-5 rounded-md shadow-lg w-full">
+                    <h3 className="font-mono font-bold text-[var(--a-accent)] mb-4 pb-2 border-b border-[var(--b-soft)] text-sm tracking-wide">NOZZLE EROSION (CONVECTIVE MODEL)</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-xs font-mono">
                       <div>
-                        <p className="text-[#888] mb-1">Throat Material:</p>
-                        <p className="text-[#eee]">{nozzleMaterial}</p>
+                        <p className="text-[var(--t-secondary)] mb-1">Throat Material:</p>
+                        <p className="text-[var(--t-primary)]">{nozzleMaterial}</p>
                       </div>
-                      <div className="col-span-2 md:col-span-3 text-[#888] text-[10px] leading-tight flex items-center">
+                      <div className="col-span-2 md:col-span-3 text-[var(--t-secondary)] text-[10px] leading-tight flex items-center">
                         Note: Convective ablation model driven by the selected throat material's thermal properties. Bartz heat-transfer coefficient scales as Pc^0.8 * Tf^0.5 * Dt^-0.2; recession begins once the surface reaches the material's oxidation temperature.
                       </div>
                       
-                      <div className="col-span-2 border-t border-[#333] pt-4 mt-2">
-                        <p className="text-[#888] mb-1">Initial Throat Diameter:</p>
-                        <p className="text-lg text-[#eee]">{(throatDiameter * 1000).toFixed(2)} mm</p>
+                      <div className="col-span-2 border-t border-[var(--b-soft)] pt-4 mt-2">
+                        <p className="text-[var(--t-secondary)] mb-1">Initial Throat Diameter:</p>
+                        <p className="text-lg text-[var(--t-primary)]">{(throatDiameter * 1000).toFixed(2)} mm</p>
                       </div>
-                      <div className="col-span-2 border-t border-[#333] pt-4 mt-2">
-                        <p className="text-[#888] mb-1">Final Throat Diameter:</p>
-                        <p className="text-xl text-[#ffaa00] font-bold">
+                      <div className="col-span-2 border-t border-[var(--b-soft)] pt-4 mt-2">
+                        <p className="text-[var(--t-secondary)] mb-1">Final Throat Diameter:</p>
+                        <p className="text-xl text-[var(--sem-warn)] font-bold">
                           {(Math.sqrt(4 * results[results.length - 1].ThroatArea / Math.PI) * 1000).toFixed(3)} mm
                         </p>
                       </div>
@@ -494,7 +494,7 @@ export function StructuralTab({
                   </div>
                 </div>
               ) : (
-                <div className="text-[#666] italic font-mono text-xs mt-6">
+                <div className="text-[var(--t-muted)] italic font-mono text-xs mt-6">
                   {metrics && results.length > 0
                     ? 'Loading the structural core...'
                     : 'Run a simulation to view structural analysis.'}

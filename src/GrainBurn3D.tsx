@@ -378,13 +378,13 @@ export function GrainBurn3D({ grain, results }: Props) {
     <div className="w-full max-w-5xl space-y-3 mt-4 text-xs font-mono">
       <div
         ref={mountRef}
-        className="w-full h-[420px] border border-[#333] rounded bg-[#0a0a0a] relative overflow-hidden"
+        className="w-full h-[420px] border border-[var(--b-soft)] rounded bg-[var(--s-canvas)] relative overflow-hidden"
       >
-        <div className="absolute top-2 left-2 z-10 text-[#666] text-[10px] pointer-events-none">
+        <div className="absolute top-2 left-2 z-10 text-[var(--t-muted)] text-[10px] pointer-events-none">
           drag to rotate &middot; scroll to zoom
         </div>
         {outline.burnedOut && (
-          <div className="absolute inset-0 flex items-center justify-center text-[#ffaa00] text-sm pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center text-[var(--sem-warn)] text-sm pointer-events-none">
             GRAIN CONSUMED
           </div>
         )}
@@ -394,14 +394,14 @@ export function GrainBurn3D({ grain, results }: Props) {
       <div className="flex items-center space-x-3">
         <button
           onClick={() => (progress >= 1 ? (setProgress(0), setPlaying(true)) : setPlaying(!playing))}
-          className="bg-[#ffaa00] text-black px-3 py-1.5 font-bold rounded flex items-center hover:bg-[#ffcc00]"
+          className="bg-[var(--sem-warn)] text-black px-3 py-1.5 font-bold rounded flex items-center hover:bg-[var(--sem-warn)]"
         >
           {playing ? <Pause className="w-3 h-3 mr-1" /> : <Play className="w-3 h-3 mr-1" />}
           {playing ? 'Pause' : 'Play'}
         </button>
         <button
           onClick={reset}
-          className="border border-[#555] text-[#aaa] px-2 py-1.5 rounded flex items-center hover:border-[#888]"
+          className="border border-[var(--b-control)] text-[var(--t-secondary)] px-2 py-1.5 rounded flex items-center hover:border-[var(--t-secondary)]"
         >
           <RotateCcw className="w-3 h-3" />
         </button>
@@ -415,9 +415,9 @@ export function GrainBurn3D({ grain, results }: Props) {
             setPlaying(false);
             setProgress(parseFloat(e.target.value));
           }}
-          className="flex-1 accent-[#ffaa00]"
+          className="flex-1 accent-[var(--sem-warn)]"
         />
-        <label className="flex items-center space-x-1 text-[#888] whitespace-nowrap">
+        <label className="flex items-center space-x-1 text-[var(--t-secondary)] whitespace-nowrap">
           <input
             type="checkbox"
             checked={showCasing}
@@ -428,55 +428,55 @@ export function GrainBurn3D({ grain, results }: Props) {
       </div>
 
       {/* --- readout --- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border border-[#333] rounded p-3 bg-[#111]">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border border-[var(--b-soft)] rounded p-3 bg-[var(--s-canvas)]">
         <div>
-          <p className="text-[#888] text-[10px]">{timeline ? 'Time' : 'Burn progress'}</p>
-          <p className="text-[#eee]">
+          <p className="text-[var(--t-secondary)] text-[10px]">{timeline ? 'Time' : 'Burn progress'}</p>
+          <p className="text-[var(--t-primary)]">
             {timeline ? `${current.t.toFixed(3)} s` : `${(progress * 100).toFixed(0)} %`}
           </p>
         </div>
         <div>
-          <p className="text-[#888] text-[10px]">Web regressed</p>
-          <p className="text-[#eee]">
+          <p className="text-[var(--t-secondary)] text-[10px]">Web regressed</p>
+          <p className="text-[var(--t-primary)]">
             {(current.y * 1000).toFixed(2)} / {(web * 1000).toFixed(2)} mm
           </p>
         </div>
         <div>
-          <p className="text-[#888] text-[10px]">Burning area (drawn)</p>
-          <p className="text-[#ffaa00]">{(drawnAb * 1e4).toFixed(1)} cm²</p>
+          <p className="text-[var(--t-secondary)] text-[10px]">Burning area (drawn)</p>
+          <p className="text-[var(--sem-warn)]">{(drawnAb * 1e4).toFixed(1)} cm²</p>
         </div>
         <div>
-          <p className="text-[#888] text-[10px]">Port area (drawn)</p>
-          <p className="text-[#ffaa00]">{(outline.area * 1e4).toFixed(2)} cm²</p>
+          <p className="text-[var(--t-secondary)] text-[10px]">Port area (drawn)</p>
+          <p className="text-[var(--sem-warn)]">{(outline.area * 1e4).toFixed(2)} cm²</p>
         </div>
         {current.row && (
           <>
             <div>
-              <p className="text-[#888] text-[10px]">Chamber pressure</p>
-              <p className="text-[#00ff88]">{(current.row.Pc / 1e6).toFixed(2)} MPa</p>
+              <p className="text-[var(--t-secondary)] text-[10px]">Chamber pressure</p>
+              <p className="text-[var(--sem-ok)]">{(current.row.Pc / 1e6).toFixed(2)} MPa</p>
             </div>
             <div>
-              <p className="text-[#888] text-[10px]">Thrust</p>
-              <p className="text-[#00ff88]">{(current.row.Thrust / 1000).toFixed(2)} kN</p>
+              <p className="text-[var(--t-secondary)] text-[10px]">Thrust</p>
+              <p className="text-[var(--sem-ok)]">{(current.row.Thrust / 1000).toFixed(2)} kN</p>
             </div>
             <div>
               {/* BATES is the only geometry with burning END FACES, and a
                   cross-section cannot show them -- so its solver total is
                   legitimately above the drawn lateral figure. Labelling it
                   stops that reading as a discrepancy. */}
-              <p className="text-[#888] text-[10px]">
+              <p className="text-[var(--t-secondary)] text-[10px]">
                 Solver burning area{endArea > 0 ? ' (incl. ends)' : ''}
               </p>
-              <p className="text-[#eee]">
+              <p className="text-[var(--t-primary)]">
                 {(analyticAb * 1e4).toFixed(1)} cm²
                 {endArea > 0 && (
-                  <span className="text-[#666]"> · {(lateral * 1e4).toFixed(1)} lateral</span>
+                  <span className="text-[var(--t-muted)]"> · {(lateral * 1e4).toFixed(1)} lateral</span>
                 )}
               </p>
             </div>
             <div>
-              <p className="text-[#888] text-[10px]">Solver port area</p>
-              <p className="text-[#eee]">{(analyticPort * 1e4).toFixed(2)} cm²</p>
+              <p className="text-[var(--t-secondary)] text-[10px]">Solver port area</p>
+              <p className="text-[var(--t-primary)]">{(analyticPort * 1e4).toFixed(2)} cm²</p>
             </div>
           </>
         )}
@@ -488,17 +488,17 @@ export function GrainBurn3D({ grain, results }: Props) {
         saying so is more useful than quietly showing two figures that disagree.
       */}
       {Math.abs(abGap) > 0.02 && !outline.burnedOut && (
-        <div className="border border-[#664422] bg-[#1a1206] rounded p-2 text-[10px] text-[#ffcc88] leading-snug">
+        <div className="border border-[var(--sem-warn)] bg-[var(--sem-warn-wash)] rounded p-2 text-[10px] text-[var(--sem-warn)] leading-snug">
           At this web the drawn burning area is {(abGap * 100).toFixed(1)}% from the value the
           solver used ({(lateral * 1e4).toFixed(1)} cm² lateral). The shape here comes from exact
-          polygon offsetting; <span className="text-[#ffddaa]">{grain.kind}</span>&apos;s analytic
+          polygon offsetting; <span className="text-[var(--sem-warn)]">{grain.kind}</span>&apos;s analytic
           model in engine.ts is an approximation — for Finocyl the fin slots are treated as sharp
           rectangles, which a real burn rounds off. The picture is the accurate one.
         </div>
       )}
 
       {!timeline && (
-        <p className="text-[#666] text-[10px]">
+        <p className="text-[var(--t-muted)] text-[10px]">
           Scrubbing web directly. Run a simulation to scrub in time instead, with pressure and
           thrust at each instant.
         </p>
