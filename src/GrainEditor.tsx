@@ -82,7 +82,7 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
   }, [grain, currentY, params.grainType, params.numSegments]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-70 font-mono text-xs text-[var(--t-primary)]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--scrim)] font-mono text-xs text-[var(--t-primary)]">
       <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-[800px] flex flex-col max-h-[90vh]">
         <div className="bg-[var(--s-sunken)] px-3 py-2 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-[var(--a-accent)]">
           <div className="flex items-center"><Settings size={14} className="mr-1" /> Grain Geometry Editor & Previewer</div>
@@ -295,12 +295,12 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
         </div>
         
         <div className="p-3 border-t border-[var(--b-strong)] flex justify-end space-x-2 bg-[var(--s-sunken)]">
-          <button onClick={onClose} className="px-4 py-1.5 rounded border border-[var(--b-control)] text-[var(--t-secondary)] hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] transition-colors">
+          <button onClick={onClose} className="px-4 py-1.5 rounded border border-[var(--b-control)] text-[var(--t-secondary)] hover:bg-[var(--s-raised)] hover:text-[var(--t-primary)] transition-colors">
             Cancel
           </button>
           <button 
             onClick={() => onApply(params)} 
-            className="px-4 py-1.5 rounded bg-[var(--a-accent)] text-black font-bold hover:bg-[var(--a-accent-dim)] transition-colors flex items-center"
+            className="px-4 py-1.5 rounded bg-[var(--a-accent)] text-[var(--t-inverse)] font-bold hover:bg-[var(--a-accent-dim)] transition-colors flex items-center"
           >
             <Check size={14} className="mr-1" /> Apply Settings
           </button>

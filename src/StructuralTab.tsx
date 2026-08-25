@@ -95,7 +95,7 @@ export function StructuralTab({
   }, [structural]);
 
   return (
-            <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
+            <div className="tab-scroll">
               <div className="absolute top-1 left-2 z-10 flex items-center space-x-4">
                 <span className="text-[var(--a-accent)] text-[10px] font-mono">Structural & Erosion Analysis</span>
                 <label className="flex items-center space-x-1 cursor-pointer">
@@ -105,18 +105,18 @@ export function StructuralTab({
               </div>
 
               {metrics && structural && results.length > 0 ? (
-                <div className="w-full max-w-4xl space-y-6 mt-6">
+                <div className="tab-doc">
                   {/* Casing Integrity Panel */}
                   <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-5 rounded-md shadow-lg w-full">
                     <div className="flex justify-between items-end border-b border-[var(--b-soft)] pb-2 mb-4">
                       <h3 className="font-mono font-bold text-[var(--a-accent)] text-sm tracking-wide">CASING INTEGRITY & BOLTED CLOSURE</h3>
                       {metrics && (
                         <div className="flex space-x-2">
-                          <button onClick={onExportCasingSTL} disabled={isSimulating} className="flex items-center space-x-1 border border-[var(--t-muted)] rounded px-2 py-1 text-xs bg-[var(--s-sunken)] text-[var(--t-primary)] hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .stl format for additive manufacturing">
+                          <button onClick={onExportCasingSTL} disabled={isSimulating} className="flex items-center space-x-1 border border-[var(--b-control)] rounded px-2 py-1 text-xs bg-[var(--s-sunken)] text-[var(--t-primary)] hover:bg-[var(--s-raised)] hover:text-[var(--t-primary)] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .stl format for additive manufacturing">
                             <Download className="w-3 h-3" />
                             <span>AM (.stl)</span>
                           </button>
-                          <button onClick={onExportCasingSCAD} disabled={isSimulating} className="flex items-center space-x-1 border border-[var(--t-muted)] rounded px-2 py-1 text-xs bg-[var(--s-sunken)] text-[var(--t-primary)] hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .scad format. OpenSCAD or FreeCAD can export this to STEP or Parasolid.">
+                          <button onClick={onExportCasingSCAD} disabled={isSimulating} className="flex items-center space-x-1 border border-[var(--b-control)] rounded px-2 py-1 text-xs bg-[var(--s-sunken)] text-[var(--t-primary)] hover:bg-[var(--s-raised)] hover:text-[var(--t-primary)] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Export .scad format. OpenSCAD or FreeCAD can export this to STEP or Parasolid.">
                             <Download className="w-3 h-3" />
                             <span>CAD Base (.scad)</span>
                           </button>
@@ -266,14 +266,14 @@ export function StructuralTab({
                                 </tr>
                               </thead>
                               <tbody className="text-[var(--t-primary)]">
-                                <tr className="border-t border-[var(--s-sunken)]">
+                                <tr className="border-t border-[var(--b-soft)]">
                                   <td className="py-1">Inner wall (bore, r = {(outerRadius * 1000).toFixed(1)} mm)</td>
                                   <td className="text-right">{(structural.lame.inner.hoop / 1e6).toFixed(1)}</td>
                                   <td className="text-right">{(structural.lame.inner.radial / 1e6).toFixed(1)}</td>
                                   <td className="text-right">{(structural.lame.inner.axial / 1e6).toFixed(1)}</td>
                                   <td className="text-right text-[var(--sem-warn)]">{(structural.lame.inner.vonMises / 1e6).toFixed(1)}</td>
                                 </tr>
-                                <tr className="border-t border-[var(--s-sunken)]">
+                                <tr className="border-t border-[var(--b-soft)]">
                                   <td className="py-1">Outer wall (r = {((outerRadius + caseWallThickness) * 1000).toFixed(1)} mm)</td>
                                   <td className="text-right">{(structural.lame.outer.hoop / 1e6).toFixed(1)}</td>
                                   <td className="text-right">{(structural.lame.outer.radial / 1e6).toFixed(1)}</td>
@@ -494,7 +494,7 @@ export function StructuralTab({
                   </div>
                 </div>
               ) : (
-                <div className="text-[var(--t-muted)] italic font-mono text-xs mt-6">
+                <div className="tab-empty">
                   {metrics && results.length > 0
                     ? 'Loading the structural core...'
                     : 'Run a simulation to view structural analysis.'}

@@ -78,7 +78,7 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-60 font-mono text-xs text-[var(--t-primary)]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--scrim)] font-mono text-xs text-[var(--t-primary)]">
       <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-[600px] flex flex-col max-h-[90vh]">
         <div className="bg-[var(--s-sunken)] px-3 py-2 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-[var(--sem-ok)]">
           <div className="flex items-center"><Settings size={14} className="mr-1" /> Propellant Editor</div>
@@ -103,7 +103,7 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
                   */
                  <div
                    key={p.id}
-                   className={`p-2 rounded flex justify-between items-center group ${selectedId === p.id ? 'bg-[var(--b-soft)] border border-[var(--b-control)]' : 'hover:bg-[var(--s-sunken)] border border-transparent'}`}
+                   className={`p-2 rounded flex justify-between items-center group ${selectedId === p.id ? 'bg-[var(--s-raised)] border border-[var(--b-control)]' : 'hover:bg-[var(--s-sunken)] border border-transparent'}`}
                  >
                    <button
                      type="button"
@@ -127,7 +127,7 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
                ))}
              </div>
              <div className="p-2 border-t border-[var(--b-strong)]">
-               <button onClick={handleAdd} className="w-full flex items-center justify-center py-1.5 bg-[var(--s-sunken)] hover:bg-[var(--b-soft)] border border-[var(--b-control)] rounded text-[var(--sem-ok)]">
+               <button onClick={handleAdd} className="w-full flex items-center justify-center py-1.5 bg-[var(--s-sunken)] hover:bg-[var(--s-raised)] border border-[var(--b-control)] rounded text-[var(--sem-ok)]">
                  <Plus size={14} className="mr-1" /> Add Propellant
                </button>
              </div>
@@ -186,13 +186,13 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
         </div>
         
         <div className="p-3 border-t border-[var(--b-strong)] flex justify-end space-x-2 bg-[var(--s-sunken)]">
-          <button onClick={onClose} className="px-4 py-1.5 rounded border border-[var(--b-control)] text-[var(--t-secondary)] hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] transition-colors">
+          <button onClick={onClose} className="px-4 py-1.5 rounded border border-[var(--b-control)] text-[var(--t-secondary)] hover:bg-[var(--s-raised)] hover:text-[var(--t-primary)] transition-colors">
             Close
           </button>
           <button 
             disabled={!selectedProp}
             onClick={() => { if(selectedProp) onApply(selectedProp); }} 
-            className="px-4 py-1.5 rounded bg-[var(--sem-ok)] text-black font-bold hover:bg-[var(--sem-ok)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="px-4 py-1.5 rounded bg-[var(--sem-ok)] text-[var(--t-inverse)] font-bold hover:brightness-110 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             <Check size={14} className="mr-1" /> Apply to Engine
           </button>

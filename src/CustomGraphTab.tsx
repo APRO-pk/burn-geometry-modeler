@@ -9,129 +9,175 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
+import { Checkbox, FieldGroup } from './ui/primitives';
+import { SERIES } from './BallisticsChart';
 
 /**
- * Custom Graph: plot any recorded channel against any other.
+ * Custom Graph: plot any channel against any x-axis.
  *
- * The axis selection is state that ONLY this view uses, so it lives here rather
- * than in AppDesktop -- it was two more entries in a component that had 88.
- * The data itself is computed once upstream and shared with the other charts.
+ * The distinction from the Ballistics trace is the X AXIS. That view is always
+ * against time, which is what you want for a thrust curve; this one plots
+ * against regression depth or remaining web, which is how you see whether a
+ * grain is progressive independently of how fast it happens to be burning.
+ *
+ * Channels come from the same SERIES list the main trace uses, so a channel is
+ * the same name and the same colour wherever it appears. This file previously
+ * kept its own parallel list with its own palette, which meant chamber pressure
+ * was blue in one tab and something else in the other.
+ *
+ * The axis selection is state only this view uses, so it lives here.
  */
+
+/** What the horizontal axis can be, and the column each reads from. */
+const X_AXES = [
+  { label: 'Time', key: 'Time', unit: 's' },
+  { label: 'Regression depth', key: 'Regression_mm', unit: 'mm' },
+  { label: 'Web remaining', key: 'Web_mm', unit: 'mm' },
+] as const;
+
+type XAxisKey = (typeof X_AXES)[number]['label'];
+
 export interface CustomGraphTabProps {
-  /** One row per timestep, with every plottable channel already in display units. */
+  /** One row per timestep, with every plottable channel in display units. */
   chartData: Array<Record<string, number>>;
   /** BATES segment count, shown alongside the trace. */
   numSegments: number;
 }
 
 export function CustomGraphTab({ chartData, numSegments }: CustomGraphTabProps) {
-  const [customXAxis, setCustomXAxis] = useState<string>('Time');
-  const [customYAxes, setCustomYAxes] = useState<string[]>(['Kn', 'Pc_MPa', 'Thrust_N']);
+  const [xAxis, setXAxis] = useState<XAxisKey>('Time');
+  const [enabled, setEnabled] = useState<string[]>(['Kn', 'Pc_MPa', 'Thrust_kN']);
+
+  const x = X_AXES.find((a) => a.label === xAxis) ?? X_AXES[0];
+  const active = SERIES.filter((s) => enabled.includes(s.key));
 
   return (
-            <div className="flex-1 flex bg-[var(--s-sunken)]">
-              {/* Graph Controls Sidebar */}
-              <div className="w-48 bg-[var(--s-raised)] border-r border-[var(--s-canvas)] px-2 py-3 flex flex-col space-y-4 overflow-y-auto">
-                
-                {/* X Axis Selector */}
-                <div className="border border-[var(--b-strong)] rounded p-2 bg-[var(--s-sunken)]">
-                  <div className="text-[var(--t-secondary)] text-[10px] font-bold mb-2 uppercase border-b border-[var(--b-control)] pb-1">X Axis</div>
-                  <div className="flex flex-col space-y-1 text-[11px] text-[var(--t-primary)]">
-                    {['Time', 'Regression Depth', 'Web'].map(opt => (
-                      <label key={opt} className="flex items-center space-x-2 cursor-pointer hover:text-[var(--t-primary)]">
-                        <input type="radio" checked={customXAxis === opt} onChange={() => setCustomXAxis(opt)} className="accent-[var(--a-accent)]" />
-                        <span>{opt}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Y Axis Selector */}
-                <div className="border border-[var(--b-strong)] rounded p-2 flex-1 bg-[var(--s-sunken)] flex flex-col overflow-hidden">
-                  <div className="text-[var(--t-secondary)] text-[10px] font-bold mb-2 uppercase border-b border-[var(--b-control)] pb-1 flex-none">Y Axis</div>
-                  <div className="flex flex-col space-y-1 text-[11px] text-[var(--t-primary)] overflow-y-auto pr-1 flex-1">
-                    {[
-                      { label: 'Kn', key: 'Kn', color: 'var(--sem-warn)' },
-                      { label: 'Chamber Pressure', key: 'Pc_MPa', color: 'var(--sem-ok)' },
-                      { label: 'Thrust', key: 'Thrust_N', color: 'var(--c-3)' },
-                      { label: 'Propellant Mass', key: 'PropellantMass_kg', color: 'var(--c-5)' },
-                      { label: 'Volume Loading', key: 'VolumeLoading_pct', color: 'var(--c-1)' },
-                      { label: 'Mass Flow', key: 'MassFlow_kg_s', color: 'var(--c-2)' },
-                      { label: 'Mass Flux', key: 'PortMassFlux_kg_sm2', color: 'var(--c-6)' },
-                      { label: 'Regression Depth', key: 'Regression_mm', color: 'var(--sem-warn)' },
-                      { label: 'Web', key: 'Web_mm', color: 'var(--c-6)' },
-                      { label: 'Nozzle Exit Pressure', key: 'NozzleExitPressure_MPa', color: 'var(--c-1)' },
-                      { label: 'Change in Throat Diameter', key: 'ChangeInThroatDiameter_mm', color: 'var(--c-3)' },
-                      { label: 'Core Mach Number', key: 'CoreMachNumber', color: 'var(--t-primary)' },
-                    ].map(opt => (
-                      <label key={opt.key} className="flex items-center space-x-2 cursor-pointer hover:text-[var(--t-primary)]">
-                        <input type="checkbox" checked={customYAxes.includes(opt.key)} onChange={(e) => {
-                          if (e.target.checked) setCustomYAxes([...customYAxes, opt.key]);
-                          else setCustomYAxes(customYAxes.filter(k => k !== opt.key));
-                        }} className="accent-[var(--a-accent)]" />
-                        <div className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: opt.color }}></div>
-                        <span className="truncate" title={opt.label}>{opt.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Grains Selector */}
-                <div className="border border-[var(--b-strong)] rounded p-2 bg-[var(--s-sunken)]">
-                  <div className="text-[var(--t-secondary)] text-[10px] font-bold mb-2 uppercase border-b border-[var(--b-control)] pb-1">Grains</div>
-                  <div className="flex flex-col space-y-1 text-[11px] text-[var(--t-primary)]">
-                    <label className="flex items-center space-x-2 cursor-pointer hover:text-[var(--t-primary)]">
-                      <input type="checkbox" checked={true} readOnly className="accent-[var(--a-accent)]" />
-                      <span>Grain 1..{numSegments}</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
+    <div className="cg-split">
+      <aside className="cg-side" aria-label="Graph controls">
+        <FieldGroup title="X axis">
+          {/*
+            * A fieldset, because these are one choice among several -- a bare
+            * stack of radios gives a screen reader no idea what they belong to.
+            */}
+          <fieldset className="cg-fieldset">
+            <legend className="cg-legend">Plot against</legend>
+            {X_AXES.map((a) => (
+              <label key={a.label} className="ui-check">
+                <input
+                  type="radio"
+                  name="cg-x-axis"
+                  value={a.label}
+                  checked={xAxis === a.label}
+                  onChange={() => setXAxis(a.label)}
+                />
+                <span className="ui-check-label">
+                  {a.label} <span style={{ color: 'var(--t-muted)' }}>({a.unit})</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        </FieldGroup>
 
-              {/* Main Graph View */}
-              <div className="flex-1 bg-black relative p-2 flex flex-col border border-[var(--b-control)]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 10, right: 20, bottom: 20, left: -20 }}>
-                    <CartesianGrid strokeDasharray="1 3" stroke="var(--b-soft)" />
-                    <XAxis 
-                      dataKey={customXAxis === 'Time' ? 'Time' : customXAxis === 'Regression Depth' ? 'Regression_mm' : 'Web_mm'} 
-                      type="number" 
-                      domain={['dataMin', 'dataMax']} 
-                      stroke="var(--t-muted)" 
-                      tick={{fill: 'var(--t-secondary)', fontSize: 10}} 
-                      tickFormatter={(v) => v.toFixed(2)} 
-                      label={{ value: customXAxis, position: 'insideBottom', offset: -15, fill: 'var(--t-secondary)', fontSize: 12 }} 
-                    />
-                    
-                    <YAxis stroke="var(--t-muted)" tick={{fill: 'var(--t-secondary)', fontSize: 10}} domain={['auto', 'auto']} tickFormatter={(v) => v >= 1000 ? (v/1000).toFixed(1)+'k' : v.toFixed(1)} />
-                    
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--s-canvas)', borderColor: 'var(--b-strong)', fontSize: '11px', fontFamily: 'monospace' }} />
-                    
-                    {/* Lines */}
-                    {[
-                      { label: 'Kn', key: 'Kn', color: 'var(--sem-warn)' },
-                      { label: 'Chamber Pressure', key: 'Pc_MPa', color: 'var(--sem-ok)' },
-                      { label: 'Thrust', key: 'Thrust_N', color: 'var(--c-3)' },
-                      { label: 'Propellant Mass', key: 'PropellantMass_kg', color: 'var(--c-5)' },
-                      { label: 'Volume Loading', key: 'VolumeLoading_pct', color: 'var(--c-1)' },
-                      { label: 'Mass Flow', key: 'MassFlow_kg_s', color: 'var(--c-2)' },
-                      { label: 'Mass Flux', key: 'PortMassFlux_kg_sm2', color: 'var(--c-6)' },
-                      { label: 'Regression Depth', key: 'Regression_mm', color: 'var(--sem-warn)' },
-                      { label: 'Web', key: 'Web_mm', color: 'var(--c-6)' },
-                      { label: 'Nozzle Exit Pressure', key: 'NozzleExitPressure_MPa', color: 'var(--c-1)' },
-                      { label: 'Change in Throat Diameter', key: 'ChangeInThroatDiameter_mm', color: 'var(--c-3)' },
-                      { label: 'Core Mach Number', key: 'CoreMachNumber', color: 'var(--t-primary)' },
-                    ]
-                      .filter(opt => customYAxes.includes(opt.key))
-                      .map(opt => (
-                        <Line key={opt.key} name={opt.label} type="stepAfter" dataKey={opt.key} stroke={opt.color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                      ))
-                    }
-                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace', color: 'var(--t-primary)' }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+        <FieldGroup title="Channels">
+          {SERIES.map((s) => (
+            <Checkbox
+              key={s.key}
+              checked={enabled.includes(s.key)}
+              swatch={s.color}
+              label={
+                <>
+                  {s.label}{' '}
+                  <span style={{ color: 'var(--t-muted)' }}>
+                    {s.unit === s.label ? '' : `(${s.unit})`}
+                  </span>
+                </>
+              }
+              onChange={(on) =>
+                setEnabled((prev) => (on ? [...prev, s.key] : prev.filter((k) => k !== s.key)))
+              }
+            />
+          ))}
+        </FieldGroup>
+
+        <FieldGroup title="Grains" defaultOpen={false}>
+          <p className="unc-note">
+            All {numSegments} segment{numSegments === 1 ? '' : 's'} are plotted together. The
+            solver treats a BATES stack as one burning surface, so there is no per-segment trace
+            to separate.
+          </p>
+        </FieldGroup>
+      </aside>
+
+      <div className="chart-frame">
+        <div className="chart-caption">
+          {active.length
+            ? `${active.length} channel${active.length === 1 ? '' : 's'} against ${x.label.toLowerCase()}`
+            : 'No channels selected'}
+        </div>
+        {!chartData.length ? (
+          <div className="tab-empty">Run a simulation to plot a trace.</div>
+        ) : !active.length ? (
+          <div className="tab-empty">Select at least one channel from the left.</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 24, right: 22, bottom: 22, left: 0 }}>
+              <CartesianGrid strokeDasharray="2 4" stroke="var(--c-grid)" />
+              <XAxis
+                dataKey={x.key}
+                type="number"
+                domain={['dataMin', 'dataMax']}
+                stroke="var(--c-axis)"
+                tick={{ fill: 'var(--t-muted)', fontSize: 10 }}
+                tickFormatter={(v: number) => v.toFixed(2)}
+                label={{
+                  value: `${x.label} (${x.unit})`,
+                  position: 'insideBottom',
+                  offset: -14,
+                  fill: 'var(--t-muted)',
+                  fontSize: 10,
+                }}
+              />
+              <YAxis
+                stroke="var(--c-axis)"
+                tick={{ fill: 'var(--t-muted)', fontSize: 10 }}
+                domain={['auto', 'auto']}
+                tickFormatter={(v: number) =>
+                  Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(1)
+                }
+              />
+              <Tooltip
+                contentStyle={{
+                  background: 'var(--s-raised)',
+                  border: '1px solid var(--b-strong)',
+                  borderRadius: 3,
+                  color: 'var(--t-primary)',
+                  fontSize: 11,
+                  fontFamily: 'var(--font-mono)',
+                }}
+              />
+              <Legend
+                verticalAlign="top"
+                height={20}
+                iconType="plainline"
+                wrapperStyle={{ fontSize: 11 }}
+              />
+              {active.map((s) => (
+                <Line
+                  key={s.key}
+                  type="monotone"
+                  dataKey={s.key}
+                  name={s.unit === s.label ? s.label : `${s.label} (${s.unit})`}
+                  stroke={s.color}
+                  strokeWidth={1.6}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
   );
 }
 

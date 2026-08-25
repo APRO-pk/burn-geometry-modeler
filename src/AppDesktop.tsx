@@ -19,7 +19,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  ReferenceLine
 } from 'recharts';
 import { Play, Terminal, Download, Calculator, Settings, Upload, Undo, Redo, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import { processDXF } from './dxfProcessor';
@@ -2071,7 +2072,7 @@ export default function AppDesktop() {
       )}
 
       {showPreferences && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--scrim)]">
           <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-96 flex flex-col font-mono text-[var(--t-primary)]">
             <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--sem-warn)]">
               <div className="flex items-center"><Settings size={14} className="mr-1" /> Preferences</div>
@@ -2125,7 +2126,7 @@ export default function AppDesktop() {
       )}
 
       {showUnitConverter && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--scrim)]">
           <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-80 flex flex-col font-mono text-[var(--t-primary)]">
             <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--a-accent)]">
               <div className="flex items-center"><Calculator size={14} className="mr-1" /> Unit Converter</div>
@@ -2700,7 +2701,7 @@ export default function AppDesktop() {
 
             {/* TAB: GEOMETRY */}
             {activeTab === 'geometry' && (
-              <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-center">
+              <div className="chart-frame" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div className="absolute top-1 left-2 z-10 text-[var(--c-6)] text-[10px] font-mono">Grain Cross-Section Regression</div>
                 <div className="w-full h-full flex items-center justify-center p-8">
                   <svg viewBox="0 0 200 200" className="w-full h-full max-w-[500px] max-h-[500px] bg-[var(--s-sunken)] rounded-full border border-[var(--b-strong)] shadow-2xl">
@@ -2814,17 +2815,84 @@ export default function AppDesktop() {
 
             {/* TAB: THERMO */}
             {activeTab === 'thermo' && (
-              <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col">
-                <div className="absolute top-1 left-2 z-10 text-[var(--sem-warn)] text-[10px] font-mono">Burn Rate vs. Chamber Pressure</div>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={burnRateData} margin={{ top: 20, right: 20, bottom: 20, left: 10 }}>
-                    <CartesianGrid strokeDasharray="1 3" stroke="var(--b-soft)" />
-                    <XAxis dataKey="pressure" type="number" domain={['dataMin', 'dataMax']} stroke="var(--t-muted)" tick={{fill: 'var(--t-secondary)', fontSize: 10}} label={{ value: 'Pressure (MPa)', position: 'insideBottom', offset: -10, fill: 'var(--t-secondary)', fontSize: 10 }} />
-                    <YAxis stroke="var(--t-muted)" tick={{fill: 'var(--t-secondary)', fontSize: 10}} label={{ value: 'Burn Rate (mm/s)', angle: -90, position: 'insideLeft', fill: 'var(--t-secondary)', fontSize: 10 }} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--s-canvas)', borderColor: 'var(--b-strong)', color: 'var(--sem-warn)', fontSize: '11px', fontFamily: 'monospace' }} itemStyle={{ color: 'var(--sem-warn)' }} />
-                    <Line type="monotone" dataKey="burnRate" stroke="var(--sem-warn)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="tab-fill">
+                <div className="chart-frame">
+                  <div className="chart-caption">
+                    Burn rate against chamber pressure
+                    {burnRateRegimes.length > 0 && ' — measured piecewise law'}
+                  </div>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={burnRateData} margin={{ top: 26, right: 24, bottom: 24, left: 12 }}>
+                      <CartesianGrid strokeDasharray="2 4" stroke="var(--c-grid)" />
+                      <XAxis
+                        dataKey="pressure" type="number" domain={['dataMin', 'dataMax']}
+                        stroke="var(--c-axis)" tick={{ fill: 'var(--t-muted)', fontSize: 10 }}
+                        label={{ value: 'Chamber pressure (MPa)', position: 'insideBottom', offset: -12, fill: 'var(--t-muted)', fontSize: 10 }}
+                      />
+                      <YAxis
+                        stroke="var(--c-axis)" tick={{ fill: 'var(--t-muted)', fontSize: 10 }}
+                        label={{ value: 'Burn rate (mm/s)', angle: -90, position: 'insideLeft', fill: 'var(--t-muted)', fontSize: 10 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'var(--s-raised)',
+                          border: '1px solid var(--b-strong)',
+                          borderRadius: 3,
+                          color: 'var(--t-primary)',
+                          fontSize: 11,
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                        labelFormatter={(v: number | string) => `${Number(v).toFixed(2)} MPa`}
+                      />
+                      {/*
+                        * Band boundaries, when the propellant carries a measured
+                        * piecewise law. The curve steps at each of these, and a
+                        * reader who cannot see where the bands are would read
+                        * those steps as noise rather than as the data.
+                        */}
+                      {burnRateRegimes.slice(1).map((r) => (
+                        <ReferenceLine
+                          key={r.from_pressure}
+                          x={r.from_pressure / 1e6}
+                          stroke="var(--b-control)"
+                          strokeDasharray="2 3"
+                        />
+                      ))}
+                      <Line type="monotone" dataKey="burnRate" name="Burn rate" stroke="var(--c-4)" strokeWidth={1.6} dot={false} isAnimationActive={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <section className="sec">
+                  <header className="sec-head">Burn law in force</header>
+                  <div className="kv">
+                    <div className="kv-row">
+                      <span className="kv-key">Propellant</span>
+                      <span className="kv-val">{propellantName}</span>
+                    </div>
+                    <div className="kv-row">
+                      <span className="kv-key">Law</span>
+                      <span className="kv-val">
+                        {burnRateRegimes.length
+                          ? `${burnRateRegimes.length} measured bands`
+                          : 'Single power law'}
+                      </span>
+                    </div>
+                    <div className="kv-row">
+                      <span className="kv-key">Coefficient a</span>
+                      <span className="kv-val">{a.toExponential(3)}</span>
+                    </div>
+                    <div className="kv-row">
+                      <span className="kv-key">Exponent n</span>
+                      <span className="kv-val">{n.toFixed(4)}</span>
+                    </div>
+                  </div>
+                  <p className="sec-note">
+                    {burnRateRegimes.length
+                      ? `Bands cover ${(burnRateRegimes[0].from_pressure / 1e6).toFixed(2)}–${(burnRateRegimes[burnRateRegimes.length - 1].to_pressure / 1e6).toFixed(2)} MPa. Outside that range the single a/n above is extrapolated from the nearest band. Piecewise fits do not join up, so the curve steps at each boundary.`
+                      : 'A single Saint-Robert law is monotonic for n > 0, which cannot reproduce the non-monotonic burn rate measured for the sugar propellants. Selecting KNDX or KNSB from the library loads their measured bands.'}
+                  </p>
+                </section>
               </div>
             )}
 
@@ -2846,6 +2914,7 @@ export default function AppDesktop() {
             {/* TAB: MATERIALS */}
             {activeTab === 'materials' && (
               <MaterialsTab
+                propellantName={propellantName}
                 density={density}
                 a={a}
                 n={n}
@@ -2883,7 +2952,7 @@ export default function AppDesktop() {
             {/* TAB: STATISTICS */}
             {/* TAB: 3D BURN */}
             {activeTab === 'burn3d' && (
-              <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
+              <div className="chart-frame" style={{ overflowY: "auto", padding: "var(--gap-lg)" }}>
                 <div className="absolute top-1 left-2 z-10 text-[var(--a-accent)] text-[10px] font-mono">
                   Live Grain Burn-Back
                 </div>
@@ -2903,12 +2972,9 @@ export default function AppDesktop() {
 
             {/* TAB: SURROGATE */}
             {activeTab === 'surrogate' && (
-              <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
-                <div className="absolute top-1 left-2 z-10 text-[var(--a-accent)] text-[10px] font-mono">
-                  Physics-Trained Surrogate
-                </div>
+              <div className="tab-scroll">
                 {grainType === 'CustomDXF' && !dxfData ? (
-                  <div className="text-[var(--t-muted)] italic font-mono text-xs mt-6 max-w-lg text-center">
+                  <div className="tab-empty">
                     Load a DXF profile first — the surrogate predicts from the grain's burn-back
                     curves, and a Custom DXF grain has none until its cross-section is traced.
                   </div>
@@ -3125,8 +3191,8 @@ export default function AppDesktop() {
       </div>
 
       {/* QStatusBar */}
-      <div className="h-6 flex-none bg-[var(--s-raised)] border-t border-[var(--t-primary)] flex items-center px-3 z-20">
-        <span className="text-[11px] text-[var(--b-control)] font-medium">{statusMsg}</span>
+      <div className="h-6 flex-none bg-[var(--s-raised)] border-t border-[var(--b-strong)] flex items-center px-3 z-20">
+        <span className="text-[11px] text-[var(--t-secondary)] font-medium">{statusMsg}</span>
       </div>
 
     </div>

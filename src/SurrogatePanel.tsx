@@ -365,14 +365,14 @@ export function SurrogatePanel({
 
   if (loadError) {
     return (
-      <div className="text-[var(--sem-danger)] font-mono text-xs p-6">
+      <div className="tab-empty" style={{ color: "var(--sem-danger)", fontStyle: "normal" }}>
         Surrogate model failed to load: {loadError}
         <div className="text-[var(--t-secondary)] mt-2">Rebuild it with: npm run surrogate:rebuild</div>
       </div>
     );
   }
   if (!ready || !prediction) {
-    return <div className="text-[var(--t-muted)] italic font-mono text-xs p-6">Loading surrogate model…</div>;
+    return <div className="tab-empty">Loading surrogate model…</div>;
   }
 
   const info = surrogateInfo()!;
@@ -382,7 +382,7 @@ export function SurrogatePanel({
   const mcHist = mcResult ? histogram(mcResult[mcTarget].values, 44) : [];
 
   return (
-    <div className="w-full max-w-5xl space-y-6 mt-6 text-xs font-mono">
+    <div className="tab-doc">
       {/* ---- provenance ---- */}
       <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] rounded p-3 text-[10px] text-[var(--t-secondary)] leading-snug">
         <span className="text-[var(--a-accent)] font-bold">SURROGATE MODEL</span> — one Gaussian process
@@ -433,7 +433,7 @@ export function SurrogatePanel({
             <button
               onClick={runVerify}
               disabled={verifying}
-              className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 rounded hover:bg-[var(--a-accent)] hover:text-black transition-colors disabled:opacity-50"
+              className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 rounded hover:bg-[var(--a-accent)] hover:text-[var(--t-inverse)] transition-colors disabled:opacity-50"
             >
               {verifying ? 'Solving…' : 'Verify with full solve'}
             </button>
@@ -458,7 +458,7 @@ export function SurrogatePanel({
                 verify.truth[t] >= prediction.lower[t] &&
                 verify.truth[t] <= prediction.upper[t];
               return (
-                <tr key={t} className="border-t border-[var(--s-sunken)]">
+                <tr key={t} className="border-t border-[var(--b-soft)]">
                   <td className="py-1">{LABEL[t]}</td>
                   <td className="text-right text-[var(--sem-warn)]">{FORMAT[t](prediction.mean[t])}</td>
                   <td className="text-right text-[var(--t-secondary)]">
@@ -511,7 +511,7 @@ export function SurrogatePanel({
           <button
             onClick={runSearch}
             disabled={searching}
-            className="bg-[var(--sem-warn)] text-black px-4 py-1.5 font-bold rounded flex items-center hover:bg-[var(--sem-warn)] disabled:opacity-50"
+            className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1.5 font-bold rounded flex items-center hover:brightness-110 disabled:opacity-50"
           >
             <Play className="w-3 h-3 mr-1" /> {searching ? 'Searching…' : 'Find design'}
           </button>
@@ -556,7 +556,7 @@ export function SurrogatePanel({
               </thead>
               <tbody className="text-[var(--t-primary)]">
                 {candidates.slice(0, 5).map((c, i) => (
-                  <tr key={i} className="border-t border-[var(--s-sunken)] hover:bg-[var(--s-sunken)]">
+                  <tr key={i} className="border-t border-[var(--b-soft)] hover:bg-[var(--s-sunken)]">
                     <td className="py-1">{i + 1}</td>
                     <td className="text-right">{(c.design.grain.length * 1000).toFixed(0)} mm</td>
                     <td className="pl-3 text-[10px] text-[var(--t-primary)]">{describeShape(c.design.grain)}</td>
@@ -661,7 +661,7 @@ export function SurrogatePanel({
             </select>
           </label>
           <button onClick={runMonteCarlo}
-            className="bg-[var(--sem-warn)] text-black px-4 py-1.5 font-bold rounded flex items-center hover:bg-[var(--sem-warn)]">
+            className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1.5 font-bold rounded flex items-center hover:brightness-110">
             <Play className="w-3 h-3 mr-1" /> Run
           </button>
           {mcResult && (
@@ -670,7 +670,7 @@ export function SurrogatePanel({
                 {mcSamples.toLocaleString()} samples in {mcMs.toFixed(0)} ms
               </span>
               <button onClick={confirmMonteCarlo} disabled={confirming}
-                className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 rounded hover:bg-[var(--a-accent)] hover:text-black disabled:opacity-50">
+                className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 rounded hover:bg-[var(--a-accent)] hover:text-[var(--t-inverse)] disabled:opacity-50">
                 {confirming ? 'Solving 40…' : 'Confirm with 40 full solves'}
               </button>
             </>

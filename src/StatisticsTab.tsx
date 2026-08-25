@@ -7,9 +7,15 @@ import type { BurnRateRegime } from './wasmCore';
  * Motor Statistics: the summary table, and the model-uncertainty budget that
  * says how much of it to believe.
  *
- * Read-only. Every value is derived from the last run, so this component owns
- * no state and needs no callbacks.
+ * Read-only. Every value derives from the last run, so this component owns no
+ * state and needs no callbacks.
+ *
+ * The rows are DATA rather than hand-written markup. Fourteen near-identical
+ * blocks of JSX had already drifted -- different separators, one row missing
+ * its bottom rule, imperial units on some and not others -- and a list makes
+ * adding a metric a one-line change instead of a copy-paste.
  */
+
 export interface StatisticsTabProps {
   metrics: MotorMetrics | null;
   throatDiameter: number;
@@ -33,6 +39,25 @@ export interface StatisticsTabProps {
   nozzleMaterial: string;
 }
 
+interface Row {
+  key: string;
+  value: string;
+  /** A converted or secondary reading, shown smaller beside the value. */
+  sub?: string;
+  tone?: 'ok' | 'warn' | 'danger';
+  hint?: string;
+}
+
+/**
+ * NAR/TRA impulse class. Each class doubles from 2.5 N·s at A, so the letter is
+ * log2 of the ratio; clamped at Z rather than running off the alphabet.
+ */
+function designation(totalImpulse: number): string {
+  if (!(totalImpulse > 0)) return '—';
+  const i = Math.floor(Math.log2(totalImpulse / 2.5));
+  return String.fromCharCode(65 + Math.max(0, Math.min(25, i)));
+}
+
 export function StatisticsTab({
   metrics,
   throatDiameter,
@@ -45,96 +70,132 @@ export function StatisticsTab({
   erosiveFraction,
   nozzleMaterial,
 }: StatisticsTabProps) {
-  return (
-            <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
-              <div className="absolute top-1 left-2 z-10 text-[var(--sem-ok)] text-[10px] font-mono">Motor Statistics & Summary</div>
-              
-              {metrics ? (
-                <div className="w-full max-w-4xl space-y-4 mt-6">
-                  <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-5 rounded-md shadow-lg text-[var(--t-primary)]">
-                    <div className="text-[12px] uppercase font-bold text-[var(--t-secondary)] border-b border-[var(--b-control)] pb-2 mb-4 tracking-wider">Comprehensive Performance Data</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-sm font-mono">
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Motor Designation:</span>
-                        <span className="text-[var(--t-primary)]">{(metrics.totalImpulse > 0 && metrics.totalImpulse < 100000) ? 
-                          String.fromCharCode(65 + Math.min(25, Math.floor(Math.log2(metrics.totalImpulse / 2.5)))) : 'M'} ({(metrics.volumeLoading * 100).toFixed(0)}%)</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Average Pressure:</span>
-                        <span className="text-[var(--t-primary)]">{(metrics.avgPc / 6894.76).toFixed(2)} psi / {(metrics.avgPc / 1e6).toFixed(2)} MPa</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Propellant Mass:</span>
-                        <span className="text-[var(--t-primary)]">{(metrics.propMass * 2.20462).toFixed(2)} lb / {metrics.propMass.toFixed(2)} kg</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Impulse:</span>
-                        <span className="text-[var(--t-primary)]">{metrics.totalImpulse.toFixed(2)} Ns</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Peak Pressure:</span>
-                        <span className="text-[var(--t-primary)]">{(metrics.maxPc / 6894.76).toFixed(2)} psi / {(metrics.maxPc / 1e6).toFixed(2)} MPa</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Propellant Length:</span>
-                        <span className="text-[var(--t-primary)]">{(grainLength * 39.3701).toFixed(2)} in / {(grainLength * 1000).toFixed(1)} mm</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Delivered ISP:</span>
-                        <span className="text-[var(--t-primary)]">{metrics.isp.toFixed(2)} s</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Initial Kn:</span>
-                        <span className="text-[var(--t-primary)]">{metrics.initialKn.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Port/Throat Ratio:</span>
-                        <span className="text-[var(--t-primary)]">{metrics.portThroatRatio.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Burn Time:</span>
-                        <span className="text-[var(--t-primary)]">{metrics.actionTime.toFixed(2)} s</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Peak Kn:</span>
-                        <span className="text-[var(--t-primary)]">{metrics.peakKn.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Peak Mass Flux:</span>
-                        <span className="text-[var(--t-primary)]">{(metrics.peakMassFlux * 0.00142233).toFixed(2)} lb/(in²·s)</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Volume Loading:</span>
-                        <span className="text-[var(--t-primary)]">{(metrics.volumeLoading * 100).toFixed(2)}%</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--b-strong)] pb-1">
-                        <span className="text-[var(--t-secondary)]">Thrust Coefficient:</span>
-                        <span className="text-[var(--t-primary)]">{(metrics.maxThrust / (metrics.maxPc * Math.PI * Math.pow(throatDiameter/2, 2))).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
+  if (!metrics) {
+    return <div className="tab-empty">Run a simulation to view motor statistics.</div>;
+  }
 
-                  {/*
-                    * Every number above is printed to several significant
-                    * figures. This says how many of them mean anything.
-                    */}
-                  <ModelUncertaintyPanel
-                    grainKind={grainKind}
-                    n={n}
-                    hasBurnRateRegimes={burnRateRegimes.length > 0}
-                    propellantName={propellantName}
-                    erosiveModel={erosiveModel}
-                    erosiveFraction={erosiveFraction}
-                    hasNozzleMaterial={!!nozzleMaterial}
-                    peakPressurePa={metrics.maxPc}
-                    totalImpulseNs={metrics.totalImpulse}
-                    burnTimeS={metrics.actionTime}
-                  />
-                </div>
-              ) : (
-                <div className="text-[var(--t-muted)] italic font-mono text-xs">Run a simulation to view motor statistics.</div>
-              )}
-            </div>
+  const throatArea = Math.PI * (throatDiameter / 2) ** 2;
+  const cf = metrics.maxThrust / (metrics.maxPc * throatArea);
+
+  const performance: Row[] = [
+    {
+      key: 'Motor designation',
+      value: `${designation(metrics.totalImpulse)} (${(metrics.volumeLoading * 100).toFixed(0)}%)`,
+      hint: 'NAR/TRA impulse class, and volume loading',
+    },
+    { key: 'Total impulse', value: `${metrics.totalImpulse.toFixed(0)} N·s` },
+    { key: 'Delivered Isp', value: `${metrics.isp.toFixed(1)} s` },
+    { key: 'Burn time', value: `${metrics.actionTime.toFixed(3)} s` },
+    {
+      key: 'Peak thrust',
+      value: `${(metrics.maxThrust / 1000).toFixed(2)} kN`,
+      sub: `${(metrics.maxThrust * 0.224809).toFixed(0)} lbf`,
+    },
+    { key: 'Average thrust', value: `${(metrics.avgThrust / 1000).toFixed(2)} kN` },
+  ];
+
+  const pressure: Row[] = [
+    {
+      key: 'Peak pressure',
+      value: `${(metrics.maxPc / 1e6).toFixed(2)} MPa`,
+      sub: `${(metrics.maxPc / 6894.76).toFixed(0)} psi`,
+    },
+    {
+      key: 'Average pressure',
+      value: `${(metrics.avgPc / 1e6).toFixed(2)} MPa`,
+      sub: `${(metrics.avgPc / 6894.76).toFixed(0)} psi`,
+    },
+    { key: 'Initial Kn', value: metrics.initialKn.toFixed(1) },
+    {
+      key: 'Peak Kn',
+      value: metrics.peakKn.toFixed(1),
+      // Above ~400 the chamber is running far from where these models were
+      // calibrated, and the solver raises a stability warning of its own.
+      tone: metrics.peakKn > 400 ? 'warn' : undefined,
+      hint: metrics.peakKn > 400 ? 'Very high; risk of over-pressure' : undefined,
+    },
+    {
+      key: 'Port / throat ratio',
+      value: metrics.portThroatRatio.toFixed(2),
+      tone: metrics.portThroatRatio < 2 ? 'warn' : undefined,
+      hint:
+        metrics.portThroatRatio < 2
+          ? 'Below 2, erosive burning dominates — and that model is uncalibrated here'
+          : undefined,
+    },
+    {
+      key: 'Peak mass flux',
+      value: `${metrics.peakMassFlux.toFixed(1)} kg/m²s`,
+    },
+  ];
+
+  const geometry: Row[] = [
+    {
+      key: 'Propellant mass',
+      value: `${metrics.propMass.toFixed(3)} kg`,
+      sub: `${(metrics.propMass * 2.20462).toFixed(2)} lb`,
+    },
+    {
+      key: 'Propellant length',
+      value: `${(grainLength * 1000).toFixed(1)} mm`,
+      sub: `${(grainLength * 39.3701).toFixed(2)} in`,
+    },
+    { key: 'Volume loading', value: `${(metrics.volumeLoading * 100).toFixed(2)} %` },
+    {
+      key: 'Throat diameter',
+      value: `${(throatDiameter * 1000).toFixed(2)} mm`,
+      sub: `${(throatDiameter * 39.3701).toFixed(3)} in`,
+    },
+    { key: 'Thrust coefficient', value: cf.toFixed(3) },
+    {
+      key: 'Required wall',
+      value: `${(metrics.requiredThickness * 1000).toFixed(2)} mm`,
+      hint: 'Thin-wall sizing rule; see the Structural tab for the real stress state',
+    },
+  ];
+
+  const section = (title: string, rows: Row[]) => (
+    <section className="sec">
+      <header className="sec-head">{title}</header>
+      <div className="kv">
+        {rows.map((r) => (
+          <div className="kv-row" key={r.key} title={r.hint}>
+            <span className="kv-key">{r.key}</span>
+            <span className={`kv-val ${r.tone ? `is-${r.tone}` : ''}`}>
+              {r.value}
+              {r.sub && <span className="kv-sub">{r.sub}</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+
+  return (
+    <div className="tab-scroll">
+      <div className="tab-doc">
+        {section('Performance', performance)}
+        {section('Chamber & flow', pressure)}
+        {section('Geometry & mass', geometry)}
+
+        {/*
+          * Every number above is printed to several significant figures. This
+          * says how many of them mean anything.
+          */}
+        <ModelUncertaintyPanel
+          grainKind={grainKind}
+          n={n}
+          hasBurnRateRegimes={burnRateRegimes.length > 0}
+          propellantName={propellantName}
+          erosiveModel={erosiveModel}
+          erosiveFraction={erosiveFraction}
+          hasNozzleMaterial={!!nozzleMaterial}
+          peakPressurePa={metrics.maxPc}
+          totalImpulseNs={metrics.totalImpulse}
+          burnTimeS={metrics.actionTime}
+        />
+      </div>
+    </div>
   );
 }
 

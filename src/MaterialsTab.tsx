@@ -1,15 +1,23 @@
 import React from 'react';
+import { Button } from './ui/primitives';
 
 /**
  * Material Properties: a read-only summary of the propellant, casing and nozzle
- * materials currently applied, plus save/load of material sets.
+ * currently applied, with save/load of individual material sets.
  *
- * The values are edited in the Motor Parameters dock on the left; this view
- * only displays them, so it takes no setters.
+ * The values are edited in the Motor Parameters dock; this view only displays
+ * them, so it takes no setters.
+ *
+ * Three cards previously repeated the same markup with slightly different
+ * headings, colours and grid gaps. They are one component now, which is why
+ * they finally line up.
  */
+
 export type MaterialKind = 'propellant' | 'casing' | 'nozzle';
 
 export interface MaterialsTabProps {
+  /** Library name, used to say whether the burn law has been measured. */
+  propellantName: string;
   density: number;
   a: number;
   n: number;
@@ -23,12 +31,67 @@ export interface MaterialsTabProps {
   nozzleMaterial: string;
   nozzleThermalConductivity: number;
   nozzleSpecificHeat: number;
-  /** Save/load one material set at a time -- propellant, casing or nozzle. */
+  /** Save/load one material set at a time. */
   onSaveMaterial: (type: MaterialKind) => void;
   onLoadMaterial: (type: MaterialKind) => void;
 }
 
+interface Prop {
+  key: string;
+  value: string;
+  /** Marks a value with no measured backing in this repository. */
+  unvalidated?: boolean;
+}
+
+function MaterialCard({
+  title,
+  subtitle,
+  kind,
+  props,
+  onSave,
+  onLoad,
+  note,
+}: {
+  title: string;
+  subtitle?: string;
+  kind: MaterialKind;
+  props: Prop[];
+  onSave: (k: MaterialKind) => void;
+  onLoad: (k: MaterialKind) => void;
+  note?: React.ReactNode;
+}) {
+  return (
+    <section className="sec">
+      <header className="sec-head">
+        <span>{title}</span>
+        <span style={{ display: 'flex', gap: 4 }}>
+          <Button variant="ghost" onClick={() => onSave(kind)}>
+            Save
+          </Button>
+          <Button variant="ghost" onClick={() => onLoad(kind)}>
+            Load
+          </Button>
+        </span>
+      </header>
+      {subtitle && <div className="mat-subtitle">{subtitle}</div>}
+      <div className="kv" style={{ gridTemplateColumns: '1fr' }}>
+        {props.map((p) => (
+          <div className="kv-row" key={p.key}>
+            <span className="kv-key">{p.key}</span>
+            <span className={`kv-val ${p.unvalidated ? 'is-warn' : ''}`}>
+              {p.value}
+              {p.unvalidated && <span className="kv-sub">unvalidated</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+      {note && <p className="sec-note">{note}</p>}
+    </section>
+  );
+}
+
 export function MaterialsTab({
+  propellantName,
   density,
   a,
   n,
@@ -43,76 +106,80 @@ export function MaterialsTab({
   onSaveMaterial,
   onLoadMaterial,
 }: MaterialsTabProps) {
+  /*
+   * Only the sugar propellants have been measured against strand-burner data.
+   * Same test the uncertainty budget uses, so the two cannot disagree about
+   * whether a propellant is validated.
+   */
+  const propellantMeasured = /KNSB|KNDX|sorbitol|dextrose/i.test(propellantName);
+
   return (
-            <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col items-center justify-start overflow-y-auto custom-scrollbar p-6">
-              <div className="absolute top-1 left-2 z-10 text-[var(--a-accent)] text-[10px] font-mono">Material Properties Library</div>
+    <div className="tab-scroll">
+      <div className="tab-doc">
+        <div className="mat-grid">
+          <MaterialCard
+            title="Propellant"
+            subtitle={propellantName}
+            kind="propellant"
+            onSave={onSaveMaterial}
+            onLoad={onLoadMaterial}
+            props={[
+              { key: 'Density', value: `${density} kg/m³` },
+              { key: 'Burn coefficient a', value: a.toExponential(3) },
+              { key: 'Pressure exponent n', value: n.toFixed(4) },
+              { key: 'Molecular weight', value: `${molWeight} kg/mol` },
+              { key: 'Flame temperature', value: `${flameTemp} K` },
+            ]}
+            note={
+              propellantMeasured
+                ? undefined
+                : 'Burn rate for this propellant has not been checked against measurement in this repository. See MODEL_UNCERTAINTY.md.'
+            }
+          />
 
-              <div className="w-full max-w-4xl space-y-6 mt-6">
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Casing Overview Card */}
-                  <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4 rounded-md shadow-lg relative">
-                    <h3 className="font-mono font-bold text-[var(--a-accent)] mb-4 pb-2 border-b border-[var(--b-soft)] text-sm tracking-wide">CASING ALLOY</h3>
-                    <p className="font-mono text-[var(--t-primary)] font-bold mb-4">{casingMaterial}</p>
-                    <div className="grid grid-cols-2 gap-y-2 text-xs font-mono">
-                      <div className="text-[var(--t-secondary)]">Yield Str:</div>
-                      <div className="text-[var(--sem-ok)] font-bold">{casingYieldStress} MPa</div>
-                      <div className="text-[var(--t-secondary)]">Young's Mod:</div>
-                      <div className="text-[var(--sem-ok)] font-bold">{casingYoungsModulus} GPa</div>
-                    </div>
-                    <div className="absolute top-2 right-2 flex space-x-1">
-                      <button onClick={() => onSaveMaterial('casing')} className="text-[10px] bg-[var(--s-sunken)] text-[var(--t-secondary)] border border-[var(--b-strong)] px-1 hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] rounded">Save</button>
-                      <button onClick={() => onLoadMaterial('casing')} className="text-[10px] bg-[var(--s-sunken)] text-[var(--t-secondary)] border border-[var(--b-strong)] px-1 hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] rounded">Load</button>
-                    </div>
-                  </div>
-                  
-                  {/* Propellant Overview Card */}
-                  <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4 rounded-md shadow-lg relative">
-                    <h3 className="font-mono font-bold text-[var(--c-6)] mb-4 pb-2 border-b border-[var(--b-soft)] text-sm tracking-wide">PROPELLANT</h3>
-                    <div className="grid grid-cols-2 gap-y-2 text-xs font-mono">
-                      <div className="text-[var(--t-secondary)]">Density:</div>
-                      <div className="text-[var(--sem-ok)] font-bold">{density} kg/m³</div>
-                      <div className="text-[var(--t-secondary)]">Burn Coeff(a):</div>
-                      <div className="text-[var(--sem-ok)] font-bold">{a}</div>
-                      <div className="text-[var(--t-secondary)]">Burn Exp(n):</div>
-                      <div className="text-[var(--sem-ok)] font-bold">{n}</div>
-                      <div className="text-[var(--t-secondary)]">Flame Temp:</div>
-                      <div className="text-[var(--sem-ok)] font-bold">{flameTemp} K</div>
-                      <div className="text-[var(--t-secondary)]">Mol Wt:</div>
-                      <div className="text-[var(--sem-ok)] font-bold">{molWeight} kg/mol</div>
-                    </div>
-                    <div className="absolute top-2 right-2 flex space-x-1">
-                      <button onClick={() => onSaveMaterial('propellant')} className="text-[10px] bg-[var(--s-sunken)] text-[var(--t-secondary)] border border-[var(--b-strong)] px-1 hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] rounded">Save</button>
-                      <button onClick={() => onLoadMaterial('propellant')} className="text-[10px] bg-[var(--s-sunken)] text-[var(--t-secondary)] border border-[var(--b-strong)] px-1 hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] rounded">Load</button>
-                    </div>
-                  </div>
+          <MaterialCard
+            title="Casing alloy"
+            subtitle={casingMaterial}
+            kind="casing"
+            onSave={onSaveMaterial}
+            onLoad={onLoadMaterial}
+            props={[
+              { key: 'Yield strength', value: `${casingYieldStress} MPa` },
+              { key: "Young's modulus", value: `${casingYoungsModulus} GPa` },
+              {
+                key: "Poisson's ratio",
+                value: casingMaterial === 'Steel 4130' ? '0.29' : '0.33',
+              },
+            ]}
+            note="Composite cases are analysed with isotropic relations, which a laminate is not. Treat those results as indicative."
+          />
 
-                  {/* Nozzle Overview Card */}
-                  <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4 rounded-md shadow-lg relative">
-                    <h3 className="font-mono font-bold text-[var(--sem-warn)] mb-4 pb-2 border-b border-[var(--b-soft)] text-sm tracking-wide">NOZZLE RESIN</h3>
-                    <p className="font-mono text-[var(--t-primary)] font-bold mb-4">{nozzleMaterial}</p>
-                    <div className="grid grid-cols-2 gap-y-2 text-xs font-mono">
-                      <div className="text-[var(--t-secondary)]">Thermal Cond:</div>
-                      <div className="text-[var(--sem-ok)] font-bold">{nozzleMaterial === 'Custom' ? nozzleThermalConductivity : (nozzleMaterial === 'Graphite' ? 100 : 1.2)} W/m-K</div>
-                      <div className="text-[var(--t-secondary)]">Specific Heat:</div>
-                      <div className="text-[var(--sem-ok)] font-bold">{nozzleMaterial === 'Custom' ? nozzleSpecificHeat : (nozzleMaterial === 'Graphite' ? 710 : 1300)} J/kg-K</div>
-                      <div className="col-span-2 mt-4 text-[9px] text-[var(--b-control)] leading-tight">
-                        Advanced properties (Phase Change Enthalpy, Oxidation Temps) are mapped internally based on selection.
-                      </div>
-                    </div>
-                    <div className="absolute top-2 right-2 flex space-x-1">
-                      <button onClick={() => onSaveMaterial('nozzle')} className="text-[10px] bg-[var(--s-sunken)] text-[var(--t-secondary)] border border-[var(--b-strong)] px-1 hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] rounded">Save</button>
-                      <button onClick={() => onLoadMaterial('nozzle')} className="text-[10px] bg-[var(--s-sunken)] text-[var(--t-secondary)] border border-[var(--b-strong)] px-1 hover:bg-[var(--b-soft)] hover:text-[var(--t-primary)] rounded">Load</button>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-8 text-[11px] text-[var(--t-secondary)] font-mono p-4 border border-[var(--b-soft)] rounded bg-[var(--s-canvas)]">
-                  <span className="font-bold text-[var(--t-secondary)]">SYSTEM LOG:</span> Material parameters are currently modified directly via the main Motor Parameters dock on the left, or loaded via entire Config '.json' files. The application's thermodynamic erosion models automatically resolve advanced material properties behind-the-scenes when defined combinations (e.g., Graphite, Phenolic) are requested.
-                </div>
+          <MaterialCard
+            title="Nozzle"
+            subtitle={nozzleMaterial}
+            kind="nozzle"
+            onSave={onSaveMaterial}
+            onLoad={onLoadMaterial}
+            props={[
+              { key: 'Thermal conductivity', value: `${nozzleThermalConductivity} W/m·K` },
+              { key: 'Specific heat', value: `${nozzleSpecificHeat} J/kg·K` },
+              { key: 'Erosion model', value: 'Simplified Bartz', unvalidated: true },
+            ]}
+            note="The erosion coefficient is roughly 7x the real Bartz correlation and has no calibration here. Use it to compare materials, not to predict a recession depth."
+          />
+        </div>
 
-              </div>
-            </div>
+        <section className="sec">
+          <header className="sec-head">Where these values are edited</header>
+          <p className="sec-note" style={{ borderTop: 0 }}>
+            Material parameters are set in the Motor Parameters dock on the left, or loaded whole
+            from a configuration file. The thermodynamic erosion model resolves the detailed
+            properties behind the scenes for the named combinations — Graphite and Phenolic —
+            and exposes them for editing only when the material is set to Custom.
+          </p>
+        </section>
+      </div>
+    </div>
   );
 }
 

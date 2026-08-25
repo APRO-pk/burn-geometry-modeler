@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { Play } from 'lucide-react';
+import { Button } from './ui/primitives';
 import { useFieldIds } from './useFieldIds';
 import {
   ResponsiveContainer,
@@ -44,58 +46,152 @@ export function MonteCarloTab({
   onRun,
 }: MonteCarloTabProps) {
   const fieldId = useFieldIds();
+
+  /*
+   * What the sweep actually told you.
+   *
+   * A scatter plot shows the shape of the spread but not its size, and "how
+   * much does peak pressure move" is the question a dispersion sweep exists to
+   * answer. Both are cheap to compute from the same rows.
+   */
+  const summary = useMemo(() => {
+    if (results.length < 2) return null;
+    const stat = (pick: (r: (typeof results)[number]) => number) => {
+      const xs = results.map(pick).sort((a, b) => a - b);
+      const mean = xs.reduce((s, v) => s + v, 0) / xs.length;
+      const sd = Math.sqrt(xs.reduce((s, v) => s + (v - mean) ** 2, 0) / (xs.length - 1));
+      return { mean, sd, min: xs[0], max: xs[xs.length - 1] };
+    };
+    return { pc: stat((r) => r.maxPc), thrust: stat((r) => r.maxThrust) };
+  }, [results]);
+
   return (
-            <div className="flex-1 flex flex-col space-y-1">
-              <div className="flex-none bg-[var(--s-raised)] border border-[var(--t-primary)] p-2 flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <label className="text-xs text-[var(--b-strong)] font-bold" htmlFor={fieldId('runs')}>Runs:</label>
-                  <input id={fieldId('runs')} type="number" value={runs} onChange={e => onRunsChange(Number(e.target.value))} className="border border-[var(--t-primary)] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-16 text-xs" />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <label className="text-xs text-[var(--b-strong)] font-bold" htmlFor={fieldId('variance')}>Variance (%):</label>
-                  <input id={fieldId('variance')} type="number" value={variance} onChange={e => onVarianceChange(Number(e.target.value))} className="border border-[var(--t-primary)] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-16 text-xs" />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <label htmlFor="mc-solver" className="text-xs text-[var(--b-strong)] font-bold">Solver:</label>
-                  <select
-                    id="mc-solver"
-                    value={solverModel}
-                    onChange={e => onSolverModelChange(e.target.value as SolverModelType)}
-                    className="border border-[var(--t-primary)] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none text-xs"
-                  >
-                    <option value="0D">0-D lumped (fast)</option>
-                    <option value="quasi1D">Quasi-1-D axial</option>
-                  </select>
-                </div>
-                <button onClick={onRun} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-[var(--t-primary)] text-xs font-bold rounded shadow-sm">
-                  Run Analysis
-                </button>
-                {solverModel === 'quasi1D' && (
-                  <span className="text-[10px] text-[var(--sem-warn)] leading-snug max-w-xs">
-                    {runs} axially resolved solves at {stationCount} stations each. Slower, but
-                    it is the only way to see whether axial resolution changes your dispersion.
-                  </span>
-                )}
-              </div>
-              <div className="flex-1 bg-black border border-[var(--b-control)] relative flex flex-col">
-                <div className="absolute top-1 left-2 z-10 text-[var(--a-accent)] text-[10px] font-mono">Monte Carlo: Max Pressure vs Max Thrust</div>
-                {results.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 10 }}>
-                      <CartesianGrid strokeDasharray="1 3" stroke="var(--b-soft)" />
-                      <XAxis dataKey="maxPc" type="number" name="Max Pressure" unit=" MPa" stroke="var(--t-muted)" tick={{fill: 'var(--t-secondary)', fontSize: 10}} domain={['auto', 'auto']} label={{ value: 'Max Pressure (MPa)', position: 'insideBottom', offset: -10, fill: 'var(--t-secondary)', fontSize: 10 }} />
-                      <YAxis dataKey="maxThrust" type="number" name="Max Thrust" unit=" kN" stroke="var(--t-muted)" tick={{fill: 'var(--t-secondary)', fontSize: 10}} domain={['auto', 'auto']} label={{ value: 'Max Thrust (kN)', angle: -90, position: 'insideLeft', fill: 'var(--t-secondary)', fontSize: 10 }} />
-                      <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: 'var(--s-canvas)', borderColor: 'var(--b-strong)', color: 'var(--a-accent)', fontSize: '11px', fontFamily: 'monospace' }} />
-                      <Scatter name="Runs" data={results} fill="var(--a-accent)" />
-                    </ScatterChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-[var(--b-control)] font-mono text-xs">
-                    Run analysis to view distribution
-                  </div>
-                )}
-              </div>
+    <div className="tab-fill">
+      <div className="mc-bar">
+        <div className="mc-ctl">
+          <label className="mc-label" htmlFor={fieldId('runs')}>Runs</label>
+          <input
+            id={fieldId('runs')}
+            type="number"
+            value={runs}
+            onChange={(e) => onRunsChange(Number(e.target.value))}
+            className="ui-input ui-input-num"
+            style={{ width: 64 }}
+          />
+        </div>
+        <div className="mc-ctl">
+          <label className="mc-label" htmlFor={fieldId('variance')}>Variance</label>
+          <input
+            id={fieldId('variance')}
+            type="number"
+            value={variance}
+            onChange={(e) => onVarianceChange(Number(e.target.value))}
+            className="ui-input ui-input-num"
+            style={{ width: 58 }}
+          />
+          <span className="mc-unit">%</span>
+        </div>
+        <div className="mc-ctl">
+          <label className="mc-label" htmlFor={fieldId('solver')}>Solver</label>
+          <select
+            id={fieldId('solver')}
+            value={solverModel}
+            onChange={(e) => onSolverModelChange(e.target.value as SolverModelType)}
+            className="ui-input ui-select"
+          >
+            <option value="0D">0-D lumped (fast)</option>
+            <option value="quasi1D">Quasi-1-D axial</option>
+          </select>
+        </div>
+        <Button variant="primary" icon={<Play size={12} />} onClick={onRun}>
+          Run Analysis
+        </Button>
+        {solverModel === 'quasi1D' && (
+          <span className="mc-warn">
+            {runs} axially resolved solves at {stationCount} stations each. Slower, but the only
+            way to see whether axial resolution changes your dispersion.
+          </span>
+        )}
+      </div>
+
+      {summary && (
+        <section className="sec">
+          <header className="sec-head">
+            Dispersion over {results.length} runs, ±{variance}% on a, density, throat and igniter
+          </header>
+          <div className="kv">
+            <div className="kv-row">
+              <span className="kv-key">Peak pressure, mean</span>
+              <span className="kv-val">
+                {summary.pc.mean.toFixed(2)} MPa
+                <span className="kv-sub">σ {summary.pc.sd.toFixed(2)}</span>
+              </span>
             </div>
+            <div className="kv-row">
+              <span className="kv-key">Peak pressure, range</span>
+              <span className="kv-val">
+                {summary.pc.min.toFixed(2)} – {summary.pc.max.toFixed(2)} MPa
+              </span>
+            </div>
+            <div className="kv-row">
+              <span className="kv-key">Peak thrust, mean</span>
+              <span className="kv-val">
+                {summary.thrust.mean.toFixed(2)} kN
+                <span className="kv-sub">σ {summary.thrust.sd.toFixed(2)}</span>
+              </span>
+            </div>
+            <div className="kv-row">
+              <span className="kv-key">Peak thrust, range</span>
+              <span className="kv-val">
+                {summary.thrust.min.toFixed(2)} – {summary.thrust.max.toFixed(2)} kN
+              </span>
+            </div>
+          </div>
+          <p className="sec-note">
+            Input variation only. This is what the perturbations you specified do to the model —
+            it does not include the model&apos;s own error, which the Statistics tab reports
+            separately and which is usually larger.
+          </p>
+        </section>
+      )}
+
+      <div className="chart-frame">
+        <div className="chart-caption">Peak pressure against peak thrust, one point per run</div>
+        {results.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 24, right: 24, bottom: 24, left: 10 }}>
+              <CartesianGrid strokeDasharray="2 4" stroke="var(--c-grid)" />
+              <XAxis
+                dataKey="maxPc" type="number" name="Max Pressure" unit=" MPa"
+                stroke="var(--c-axis)" tick={{ fill: 'var(--t-muted)', fontSize: 10 }}
+                domain={['auto', 'auto']}
+                label={{ value: 'Peak pressure (MPa)', position: 'insideBottom', offset: -12, fill: 'var(--t-muted)', fontSize: 10 }}
+              />
+              <YAxis
+                dataKey="maxThrust" type="number" name="Max Thrust" unit=" kN"
+                stroke="var(--c-axis)" tick={{ fill: 'var(--t-muted)', fontSize: 10 }}
+                domain={['auto', 'auto']}
+                label={{ value: 'Peak thrust (kN)', angle: -90, position: 'insideLeft', fill: 'var(--t-muted)', fontSize: 10 }}
+              />
+              <Tooltip
+                cursor={{ strokeDasharray: '3 3' }}
+                contentStyle={{
+                  background: 'var(--s-raised)',
+                  border: '1px solid var(--b-strong)',
+                  borderRadius: 3,
+                  color: 'var(--t-primary)',
+                  fontSize: 11,
+                  fontFamily: 'var(--font-mono)',
+                }}
+              />
+              <Scatter name="Runs" data={results} fill="var(--c-1)" fillOpacity={0.75} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="tab-empty">Run the analysis to view the distribution.</div>
+        )}
+      </div>
+    </div>
   );
 }
 

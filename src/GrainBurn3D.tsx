@@ -394,14 +394,14 @@ export function GrainBurn3D({ grain, results }: Props) {
       <div className="flex items-center space-x-3">
         <button
           onClick={() => (progress >= 1 ? (setProgress(0), setPlaying(true)) : setPlaying(!playing))}
-          className="bg-[var(--sem-warn)] text-black px-3 py-1.5 font-bold rounded flex items-center hover:bg-[var(--sem-warn)]"
+          className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-3 py-1.5 font-bold rounded flex items-center hover:brightness-110"
         >
           {playing ? <Pause className="w-3 h-3 mr-1" /> : <Play className="w-3 h-3 mr-1" />}
           {playing ? 'Pause' : 'Play'}
         </button>
         <button
           onClick={reset}
-          className="border border-[var(--b-control)] text-[var(--t-secondary)] px-2 py-1.5 rounded flex items-center hover:border-[var(--t-secondary)]"
+          className="border border-[var(--b-control)] text-[var(--t-secondary)] px-2 py-1.5 rounded flex items-center hover:border-[var(--b-control)]"
         >
           <RotateCcw className="w-3 h-3" />
         </button>

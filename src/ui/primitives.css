@@ -497,3 +497,276 @@
   font-weight: 600;
   color: var(--t-primary);
 }
+
+/* ======================================================================
+ * Tab content layout
+ * ======================================================================
+ *
+ * Every analysis tab was laying itself out differently: some centred a
+ * max-w-4xl column, some filled the width, margins ranged from mt-6 to none,
+ * and section headings were variously a bordered div, an absolutely positioned
+ * caption, or bold text. The result read as seven small applications sharing a
+ * window.
+ *
+ * These are the shared bones. A tab uses .tab-scroll if it is a document and
+ * .tab-fill if it is a single canvas.
+ */
+
+/* A scrolling column of sections, for tabs that read as a document. */
+.tab-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--gap-lg);
+}
+.tab-doc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+  /*
+   * Wide enough for a two-column readout, narrow enough that a line of prose
+   * stays readable on a 4K monitor.
+   */
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* A tab that is one chart or viewport edge to edge. */
+.tab-fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+/* ---- section ---- */
+
+.sec {
+  background: var(--s-panel);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  min-height: var(--row-h);
+  padding: 3px var(--gap-lg);
+  background: var(--s-raised);
+  border-bottom: 1px solid var(--b-strong);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+}
+.sec-body {
+  padding: var(--gap-lg);
+}
+.sec-body.is-flush {
+  padding: 0;
+}
+.sec-note {
+  margin: 0;
+  padding: 8px var(--gap-lg);
+  border-top: 1px solid var(--b-soft);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--t-muted);
+}
+
+/* ---- key/value readouts ---- */
+
+/*
+ * The dominant content of these tabs. Auto-fit rather than a fixed column
+ * count, so one component serves the two-column statistics grid and the
+ * four-column material summary without either hardcoding a breakpoint.
+ */
+.kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1px;
+  background: var(--b-soft);
+  border: 1px solid var(--b-soft);
+}
+.kv-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap);
+  padding: 5px 10px;
+  background: var(--s-panel);
+}
+.kv-key {
+  font-size: var(--fs-sm);
+  color: var(--t-secondary);
+  white-space: nowrap;
+}
+.kv-val {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--t-primary);
+  text-align: right;
+}
+.kv-val.is-ok {
+  color: var(--sem-ok);
+}
+.kv-val.is-warn {
+  color: var(--sem-warn);
+}
+.kv-val.is-danger {
+  color: var(--sem-danger);
+}
+/* A secondary unit or band after the value. */
+.kv-sub {
+  margin-left: 6px;
+  font-size: var(--fs-xs);
+  color: var(--t-muted);
+}
+
+/* ---- chart frame ---- */
+
+.chart-frame {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  background: var(--s-canvas);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+}
+.chart-caption {
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  z-index: 5;
+  font-size: var(--fs-xs);
+  color: var(--t-secondary);
+  pointer-events: none;
+}
+
+/* ---- empty state ---- */
+
+.tab-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t-muted);
+  font-size: var(--fs-sm);
+  font-style: italic;
+}
+
+/* ---- table ---- */
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.ui-table th {
+  position: sticky;
+  top: 0;
+  background: var(--s-raised);
+  border-bottom: 1px solid var(--b-strong);
+  padding: 4px 8px;
+  text-align: left;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+  white-space: nowrap;
+}
+.ui-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--b-soft);
+  font-family: var(--font-mono);
+  color: var(--t-primary);
+}
+.ui-table tbody tr:hover td {
+  background: var(--s-hover);
+}
+.ui-table td.is-num,
+.ui-table th.is-num {
+  text-align: right;
+}
+
+/* ---- Monte Carlo control bar ---- */
+
+.mc-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-lg);
+  padding: var(--gap);
+  background: var(--s-panel);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+  flex-wrap: wrap;
+}
+.mc-ctl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mc-label {
+  font-size: var(--fs-sm);
+  color: var(--t-secondary);
+  white-space: nowrap;
+}
+.mc-unit {
+  font-size: var(--fs-xs);
+  color: var(--t-muted);
+}
+.mc-warn {
+  flex: 1;
+  min-width: 200px;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--sem-warn);
+}
+
+/* ---- Custom Graph: control sidebar beside a chart ---- */
+
+.cg-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--gap);
+}
+.cg-side {
+  flex: none;
+  width: 210px;
+  overflow-y: auto;
+  background: var(--s-panel);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+}
+.cg-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.cg-legend {
+  padding: 0 0 3px;
+  font-size: var(--fs-xs);
+  color: var(--t-muted);
+}
+
+/* ---- Materials cards ---- */
+
+.mat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--gap-lg);
+}
+.mat-subtitle {
+  padding: 6px var(--gap-lg) 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--t-primary);
+}

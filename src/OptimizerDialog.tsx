@@ -136,7 +136,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black bg-opacity-70 font-mono text-xs text-[var(--t-primary)]">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[var(--scrim)] font-mono text-xs text-[var(--t-primary)]">
       <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-[600px] flex flex-col p-4 space-y-4">
         <div className="flex justify-between items-center text-[var(--sem-warn)] font-bold text-sm border-b border-[var(--b-soft)] pb-2">
           <span>Design Optimizer / Sweep</span>
@@ -175,7 +175,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
               <option value="quasi1D">Quasi-1-D axial</option>
             </select>
           </div>
-          <button onClick={runSweep} disabled={isRunning} className="bg-[var(--sem-warn)] text-black px-4 py-1 font-bold rounded flex items-center h-7 hover:bg-[var(--sem-warn)] disabled:opacity-50">
+          <button onClick={runSweep} disabled={isRunning} className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1 font-bold rounded flex items-center h-7 hover:brightness-110 disabled:opacity-50">
             {isRunning ? 'Running...' : <><Play size={12} className="mr-1"/> Run</>}
           </button>
         </div>
@@ -195,7 +195,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
               </thead>
               <tbody className="bg-[var(--s-sunken)]">
                 {results.map((r, i) => (
-                  <tr key={i} className="hover:bg-[var(--b-soft)] transition-colors border-b border-[var(--s-sunken)]">
+                  <tr key={i} className="hover:bg-[var(--s-raised)] transition-colors border-b border-[var(--b-soft)]">
                     <td className="p-1 pl-2 font-bold text-[var(--sem-ok)]">{r.val.toFixed(4)}</td>
                     <td className={`p-1 ${r.maxPc > 10 ? 'text-red-400' : 'text-[var(--t-primary)]'}`}>{r.maxPc.toFixed(2)}</td>
                     <td className="p-1 text-[var(--t-primary)]">{r.maxThrust.toFixed(2)}</td>

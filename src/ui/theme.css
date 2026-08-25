@@ -32,6 +32,9 @@
   --s-sunken: #101216;
   /* Plot canvases, which sit darker than their panel so traces read cleanly. */
   --s-canvas: #0c0e11;
+  /* Behind a modal. Dark enough to recede, translucent enough to keep context. */
+  --scrim: #000000a8;
+
   /* Hover and selection washes, layered over whatever is beneath. */
   --s-hover: #ffffff0d;
   --s-active: #ffffff1a;
