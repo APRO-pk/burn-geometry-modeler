@@ -287,17 +287,22 @@ const InputBox = ({
  * same ordering -- a second copy inline would be a list that could silently
  * disagree with itself about which tab comes next.
  */
+/*
+ * Labels are short on purpose. Ten tabs with names like "Material Properties"
+ * overflowed the strip once both docks were open, and a tab you have to scroll
+ * to find is a tab you forget exists. The qualifier lives in the tooltip.
+ */
 const TAB_DEFS = [
-  { id: 'ballistics', label: 'Internal Ballistics' },
-  { id: 'statistics', label: 'Motor Statistics' },
+  { id: 'ballistics', label: 'Ballistics' },
+  { id: 'statistics', label: 'Statistics' },
   { id: 'extended_graphs', label: 'Custom Graph' },
-  { id: 'geometry', label: 'Grain Geometry' },
-  { id: 'thermo', label: 'Propellant Thermo' },
-  { id: 'materials', label: 'Material Properties' },
+  { id: 'geometry', label: 'Geometry' },
+  { id: 'thermo', label: 'Thermo' },
+  { id: 'materials', label: 'Materials' },
   { id: 'montecarlo', label: 'Monte Carlo' },
-  { id: 'structural', label: 'Structural Analysis' },
-  { id: 'surrogate', label: 'Surrogate (fast)' },
-  { id: 'burn3d', label: '3D Burn' },
+  { id: 'structural', label: 'Structural' },
+  { id: 'surrogate', label: 'Surrogate' },
+  { id: 'burn3d', label: '3-D Burn' },
 ] as const;
 
 export type TabId = (typeof TAB_DEFS)[number]['id'];
@@ -2209,17 +2214,17 @@ export default function AppDesktop() {
           <div className="sh-dock-scroll">
             
             {/* QGroupBox: Propellant Data */}
-            <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-2 bg-[#fafafa]">
-              <div className="absolute -top-2.5 left-2 bg-[#fafafa] px-1 text-[10px] font-bold text-[#666] uppercase flex items-center space-x-2">
+            <div className="ui-groupbox">
+              <div className="ui-groupbox-title">
                 <span>Propellant Data</span>
-                <button onClick={() => setShowPropellantEditor(true)} className="text-[#0056b3] hover:underline decoration-[#0056b3] lowercase font-normal">(library)</button>
+                <button onClick={() => setShowPropellantEditor(true)} className="ui-link">(library)</button>
               </div>
-              <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
+              <div className="ui-fields">
                 <InputBox label="Density" value={density} onChange={setDensity} suffix="kg/m³" unitCat="Density" issues={issuesFor.get('density')} />
                 <InputBox label="Burn Coeff (a)" value={a} onChange={setBurnCoeffA} suffix="" issues={issuesFor.get('a')} />
                 <InputBox label="Pressure Exp (n)" value={n} onChange={setBurnExponentN} suffix="" issues={issuesFor.get('n')} />
                 {burnRateRegimes.length > 0 && (
-                  <div className="col-span-2 text-[10px] text-[#00ffaa] leading-snug -mt-0.5 mb-0.5">
+                  <div className="ui-note is-accent">
                     Measured {burnRateRegimes.length}-band burn law active
                     ({(burnRateRegimes[0].from_pressure / 1e6).toFixed(2)}–
                     {(burnRateRegimes[burnRateRegimes.length - 1].to_pressure / 1e6).toFixed(2)} MPa).
@@ -2229,9 +2234,9 @@ export default function AppDesktop() {
                 <InputBox label="Mol Wt" value={molWeight} onChange={setMolWeight} suffix="kg/mol" />
                 <InputBox label="T_ref" value={T_ref} onChange={setTRef} suffix="K" unitCat="Temperature" />
                 <InputBox label="σ_p" value={sigma_p} onChange={setSigmaP} suffix="1/K" />
-                <div className="col-span-2 flex items-center justify-end space-x-2 mt-1 border-t border-[#eee] pt-1">
-                  <span className="text-[#888] text-[10px]">Erosive Burning Model</span>
-                  <select value={erosiveModel} onChange={e => setErosiveModel(e.target.value as 'None' | 'Lenoir-Robillard' | 'JPL')} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none font-mono text-right text-[10px]">
+                <div className="ui-row" style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--b-soft)" }}>
+                  <span className="ui-row-label">Erosive Burning Model</span>
+                  <select value={erosiveModel} onChange={e => setErosiveModel(e.target.value as 'None' | 'Lenoir-Robillard' | 'JPL')} className="ui-input ui-select">
                     <option value="None">None</option>
                     <option value="Lenoir-Robillard">Lenoir-Robillard</option>
                     <option value="JPL">JPL Linear</option>
@@ -2241,17 +2246,17 @@ export default function AppDesktop() {
             </div>
 
             {/* QGroupBox: Solver Model */}
-            <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-3 bg-[#fafafa]">
-              <div className="absolute -top-2.5 left-2 bg-[#fafafa] px-1 text-[10px] font-bold text-[#666] uppercase">
+            <div className="ui-groupbox">
+              <div className="ui-groupbox-title">
                 Solver Model
               </div>
-              <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
-                <div className="col-span-2 flex items-center justify-between space-x-2">
-                  <span className="text-[#888] text-[10px]">Spatial Model</span>
+              <div className="ui-fields">
+                <div className="ui-row">
+                  <span className="ui-row-label">Spatial Model</span>
                   <select
                     value={solverModel}
                     onChange={e => setSolverModel(e.target.value as SolverModelType)}
-                    className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none font-mono text-right text-[10px]"
+                    className="ui-input ui-select"
                   >
                     <option value="0D">0-D lumped chamber (fast)</option>
                     <option value="quasi1D">Quasi-1-D axial port</option>
@@ -2260,7 +2265,7 @@ export default function AppDesktop() {
                 {solverModel === 'quasi1D' && (
                   <InputBox label="Axial Stations" value={stationCount} onChange={setStationCount} suffix="" />
                 )}
-                <div className="col-span-2 text-[9px] text-[#888] leading-snug border-t border-[#eee] pt-1">
+                <div className="ui-note is-divided">
                   {solverModel === 'quasi1D' ? (
                     <>
                       Resolves pressure, mass flux and erosive burning along the port, so the aft end
@@ -2278,14 +2283,14 @@ export default function AppDesktop() {
             </div>
 
             {/* QGroupBox: Grain Geometry */}
-            <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-3 bg-[#fafafa]">
-              <div className="absolute -top-2.5 left-2 bg-[#fafafa] px-1 text-[10px] font-bold text-[#666] uppercase flex items-center space-x-2">
+            <div className="ui-groupbox">
+              <div className="ui-groupbox-title">
                 <span>Grain Geometry</span>
-                <button onClick={() => setShowGrainEditor(true)} className="text-[#0056b3] hover:underline decoration-[#0056b3] lowercase font-normal">(preview / edit)</button>
+                <button onClick={() => setShowGrainEditor(true)} className="ui-link">(preview / edit)</button>
               </div>
-              <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
-                <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs" htmlFor={fieldId('type')}>Type</label>
-                <select id={fieldId('type')} value={grainType} onChange={e => setGrainType(e.target.value as GrainType)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
+              <div className="ui-fields">
+                <label className="ui-field-label" htmlFor={fieldId('type')}>Type</label>
+                <select id={fieldId('type')} value={grainType} onChange={e => setGrainType(e.target.value as GrainType)} className="ui-input ui-select">
                   <option value="BATES">BATES</option>
                   <option value="Tubular">Tubular</option>
                   <option value="Star">Star</option>
@@ -2299,17 +2304,17 @@ export default function AppDesktop() {
                 <InputBox label="Outer Rad" value={outerRadius} onChange={setOuterRadius} suffix="mm" unitCat="Length" issues={issuesFor.get('outerRadius')} />
                 
                 {grainType === 'CustomDXF' && (
-                  <div className="col-span-2 pt-1 border-t border-[#eee] mt-1 space-y-1">
+                  <div className="ui-block is-divided">
                     {/*
                       * A heading, not a label: the real control here is the
                       * button below, since the file input itself is hidden and
                       * only ever opened through it. Marking this a <label> made
                       * screen readers look for a form field it named.
                       */}
-                    <p className="flex items-center text-[#444] text-xs" id="dxf-upload-heading">Upload DXF Cross Section</p>
+                    <p className="ui-note" id="dxf-upload-heading">Upload DXF Cross Section</p>
                     <div className="flex items-center space-x-2">
                        <input type="file" accept=".dxf" className="hidden" ref={dxfFileInputRef} onChange={handleDXFUpload} />
-                       <button type="button" aria-describedby="dxf-upload-heading" onClick={() => dxfFileInputRef.current?.click()} className="flex-1 p-1 hover:bg-[#e0e0e0] border border-[#ccc] rounded flex items-center justify-center text-xs text-[#333]">
+                       <button type="button" aria-describedby="dxf-upload-heading" onClick={() => dxfFileInputRef.current?.click()} className="ui-btn" style={{ flex: 1 }}>
                          <Upload size={14} className="mr-1" /> Load .DXF
                        </button>
                        <span className="text-[10px] text-[#666] truncate max-w-[100px]">{dxfFilename || 'No file'}</span>
@@ -2344,8 +2349,8 @@ export default function AppDesktop() {
                   </>
                 )}
                 
-                <div className="col-span-2 flex justify-end mt-2 pt-2 border-t border-[#eee]">
-                  <button onClick={handleExportSTL} disabled={isSimulating} className="flex items-center space-x-1 border border-[#aaa] rounded px-2 py-1 text-xs bg-white text-[#333] hover:bg-[#e8f4f8] hover:text-[#0056b3] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <div className="ui-block is-divided">
+                  <button onClick={handleExportSTL} disabled={isSimulating} className="ui-btn">
                     <Download className="w-3.5 h-3.5" />
                     <span>Export 3D Solid Grain (.stl)</span>
                   </button>
@@ -2354,9 +2359,9 @@ export default function AppDesktop() {
             </div>
 
             {/* QGroupBox: Nozzle & Thermo */}
-            <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-3 bg-[#fafafa]">
-              <span className="absolute -top-2.5 left-2 bg-[#fafafa] px-1 text-[10px] font-bold text-[#666] uppercase">Nozzle & Thermo</span>
-              <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
+            <div className="ui-groupbox">
+              <span className="ui-groupbox-title">Nozzle & Thermo</span>
+              <div className="ui-fields">
                 <InputBox label="Throat Diam" value={throatDiameter} onChange={setThroatDiameter} suffix="mm" unitCat="Length" issues={issuesFor.get('throatDiameter')} />
                 <InputBox label="Exp Ratio" value={expansionRatio} onChange={setExpansionRatio} suffix="" issues={issuesFor.get('expansionRatio')} />
                 <InputBox label="Gamma (γ)" value={gamma} onChange={setGamma} suffix="" issues={issuesFor.get('gamma')} />
@@ -2366,8 +2371,8 @@ export default function AppDesktop() {
                 <InputBox label="C* Efficiency" value={cStarEff} onChange={setCStarEff} step={0.01} suffix="" />
                 <InputBox label="Cf Efficiency" value={cfEff} onChange={setCfEff} step={0.01} suffix="" />
 
-                <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs" htmlFor={fieldId('material')}>Material</label>
-                <select id={fieldId('material')} value={nozzleMaterial} onChange={e => setNozzleMaterial(e.target.value as NozzleMaterialName)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
+                <label className="ui-field-label" htmlFor={fieldId('material')}>Material</label>
+                <select id={fieldId('material')} value={nozzleMaterial} onChange={e => setNozzleMaterial(e.target.value as NozzleMaterialName)} className="ui-input ui-select">
                   <option value="Graphite">Graphite</option>
                   <option value="Phenolic">Phenolic</option>
                   <option value="Custom">Custom</option>
@@ -2388,14 +2393,14 @@ export default function AppDesktop() {
             </div>
 
             {/* QGroupBox: Igniter & Casing */}
-            <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-3 bg-[#fafafa]">
-              <span className="absolute -top-2.5 left-2 bg-[#fafafa] px-1 text-[10px] font-bold text-[#666] uppercase">Igniter & Casing</span>
-              <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
+            <div className="ui-groupbox">
+              <span className="ui-groupbox-title">Igniter & Casing</span>
+              <div className="ui-fields">
                 <InputBox label="Igniter Mass" value={igniterMass} onChange={setIgniterMass} suffix="kg" unitCat="Mass" />
                 <InputBox label="Igniter Area" value={igniterSurfaceArea} onChange={setIgniterSurfaceArea} suffix="m²" unitCat="Area" />
                 
-                <label className="flex items-center justify-end pr-1 text-[#444] text-right leading-tight text-xs" htmlFor={fieldId('casing-alloy')}>Casing Alloy</label>
-                <select id={fieldId('casing-alloy')} value={casingMaterial} onChange={e => handleCasingChange(e.target.value)} className="border border-[#bbb] px-1 py-0.5 rounded bg-white focus:border-blue-500 outline-none w-full font-mono text-right text-xs">
+                <label className="ui-field-label" htmlFor={fieldId('casing-alloy')}>Casing Alloy</label>
+                <select id={fieldId('casing-alloy')} value={casingMaterial} onChange={e => handleCasingChange(e.target.value)} className="ui-input ui-select">
                   <option value="Al 6061-T6">Al 6061-T6</option>
                   <option value="Steel 4130">Steel 4130</option>
                   <option value="Carbon Composite">Carbon Composite</option>
@@ -2411,24 +2416,24 @@ export default function AppDesktop() {
 
                 <InputBox label="Wall Thick" value={caseWallThickness} onChange={setCaseWallThickness} suffix="mm" unitCat="Length" />
                 {metrics && (
-                  <div className="col-span-2 text-[9px] text-[#888] leading-snug -mt-0.5">
+                  <div className="ui-note">
                     Thin-wall pR/t sizing at SF 1.5 asks for {(metrics.requiredThickness * 1000).toFixed(2)} mm.
                     That rule ignores the closure junction, so check the Structural tab before trusting it.
                   </div>
                 )}
 
-                <div className="col-span-2 border-t border-[#eee] mt-1 pt-1 mb-1 font-bold text-[#666] text-[10px] text-center uppercase">Bolted Closure</div>
+                <div className="ui-subhead">Bolted Closure</div>
                 <InputBox label="Num Bolts" value={numBolts} onChange={setNumBolts} suffix="" />
                 <InputBox label="Bolt Diam" value={boltDiameter} onChange={setBoltDiameter} suffix="mm" unitCat="Length" />
                 <InputBox label="Bolt Yield" value={boltYieldStress * 1e6} onChange={(v: number) => setBoltYieldStress(v/1e6)} suffix="MPa" unitCat="Pressure" />
                 <InputBox label="Edge Dist" value={caseBoltEdgeDistance} onChange={setCaseBoltEdgeDistance} suffix="mm" unitCat="Length" />
                 
-                <div className="col-span-2 flex flex-col justify-end mt-2 pt-2 border-t border-[#eee] space-y-1">
-                  <button onClick={handleExportCasingSTL} disabled={isSimulating} className="flex items-center justify-center space-x-1 border border-[#aaa] rounded px-2 py-1 text-xs bg-white text-[#333] hover:bg-[#e8f4f8] hover:text-[#0056b3] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="High-fidelity manufacturing STL">
+                <div className="ui-block is-divided">
+                  <button onClick={handleExportCasingSTL} disabled={isSimulating} className="ui-btn" title="High-fidelity manufacturing STL">
                     <Download className="w-3.5 h-3.5" />
                     <span>Export Additive Assembly (.stl)</span>
                   </button>
-                  <button onClick={handleExportCasingSCAD} disabled={isSimulating} className="flex items-center justify-center space-x-1 border border-[#aaa] rounded px-2 py-1 text-xs bg-white text-[#333] hover:bg-[#e8f4f8] hover:text-[#0056b3] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Use FreeCAD/OpenSCAD to convert this into STEP or Parasolid.">
+                  <button onClick={handleExportCasingSCAD} disabled={isSimulating} className="ui-btn" title="Use FreeCAD/OpenSCAD to convert this into STEP or Parasolid.">
                     <Download className="w-3.5 h-3.5" />
                     <span>Export CAD Source (.scad)</span>
                   </button>
@@ -2438,20 +2443,20 @@ export default function AppDesktop() {
 
             {/* QGroupBox: Results Summary */}
             {metrics && (
-              <div className="border border-[#ccc] rounded pt-3 pb-2 px-2 relative mt-3 bg-[#e8f4f8]">
+              <div className="ui-groupbox is-result">
                 <span className="absolute -top-2.5 left-2 bg-[#e8f4f8] px-1 text-[10px] font-bold text-[#0056b3] uppercase">Results Summary</span>
-                <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-xs">
-                  <div className="text-[#444] text-right pr-1">Max Thrust:</div><div className="font-mono font-bold text-[#000]">{(metrics.maxThrust/1000).toFixed(2)} kN</div>
-                  <div className="text-[#444] text-right pr-1">Max Press:</div><div className="font-mono font-bold text-[#000]">{(metrics.maxPc/1e6).toFixed(2)} MPa</div>
-                  <div className="text-[#444] text-right pr-1">Total Imp:</div><div className="font-mono font-bold text-[#000]">{(metrics.totalImpulse/1000).toFixed(1)} kNs</div>
-                  <div className="text-[#444] text-right pr-1">Isp:</div><div className="font-mono font-bold text-[#000]">{metrics.isp.toFixed(1)} s</div>
-                  <div className="text-[#444] text-right pr-1">Action Time:</div><div className="font-mono font-bold text-[#000]">{metrics.actionTime.toFixed(2)} s</div>
-                  <div className="text-[#444] text-right pr-1">Case SF:</div>
+                <div className="ui-fields">
+                  <div className="ui-kv-key">Max Thrust:</div><div className="ui-kv-val">{(metrics.maxThrust/1000).toFixed(2)} kN</div>
+                  <div className="ui-kv-key">Max Press:</div><div className="ui-kv-val">{(metrics.maxPc/1e6).toFixed(2)} MPa</div>
+                  <div className="ui-kv-key">Total Imp:</div><div className="ui-kv-val">{(metrics.totalImpulse/1000).toFixed(1)} kNs</div>
+                  <div className="ui-kv-key">Isp:</div><div className="ui-kv-val">{metrics.isp.toFixed(1)} s</div>
+                  <div className="ui-kv-key">Action Time:</div><div className="ui-kv-val">{metrics.actionTime.toFixed(2)} s</div>
+                  <div className="ui-kv-key">Case SF:</div>
                   <div className={`font-mono font-bold ${structural && structural.safetyFactor < 1.5 ? 'text-[#cc0000]' : 'text-[#000]'}`}>
                     {structural ? `${structural.safetyFactor.toFixed(2)}x` : '--'}
                   </div>
-                  <div className="text-[#444] text-right pr-1">Bore Growth:</div>
-                  <div className="font-mono font-bold text-[#000]">
+                  <div className="ui-kv-key">Bore Growth:</div>
+                  <div className="ui-kv-val">
                     {structural ? `${(structural.boreRadialGrowth * 1e6).toFixed(0)} µm` : '--'}
                   </div>
                 </div>

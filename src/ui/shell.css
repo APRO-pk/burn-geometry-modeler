@@ -162,7 +162,7 @@
 .sh-tabs {
   display: flex;
   align-items: flex-end;
-  gap: 1px;
+  gap: 0;
   height: 26px;
   flex: none;
   padding: 0 4px;
@@ -180,7 +180,12 @@
   align-items: center;
   gap: 5px;
   height: 22px;
-  padding: 0 12px;
+  /*
+   * Tight padding so ten tabs fit beside two open docks at a typical window
+   * width. The strip still scrolls if it has to -- a narrow window or a widened
+   * dock -- and arrow keys walk the whole set regardless of what is visible.
+   */
+  padding: 0 8px;
   background: none;
   border: 1px solid transparent;
   border-bottom: 0;

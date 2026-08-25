@@ -356,3 +356,144 @@
 .ui-group-body {
   padding: var(--gap-sm) var(--gap) var(--gap);
 }
+
+/*
+ * A stack of Fields.
+ *
+ * Each .ui-field lays out its own label and control, so its parent must not
+ * also be a grid -- when it was, two self-contained fields were packed into one
+ * two-column parent row and each was crushed to half width, clipping the value.
+ */
+.ui-fields {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * Rows that pair a label with something that is not a Field -- a bare select,
+ * a button. Same geometry as .ui-field so the dock stays aligned.
+ */
+.ui-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 0 var(--gap);
+  margin-bottom: var(--gap-sm);
+}
+.ui-row > label,
+.ui-row > .ui-row-label {
+  font-size: var(--fs-sm);
+  color: var(--t-secondary);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Explanatory text inside a parameter group. */
+.ui-note {
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--t-muted);
+  margin: 2px 0 4px;
+}
+.ui-note.is-accent {
+  color: var(--sem-ok);
+}
+.ui-note.is-divided,
+.ui-block.is-divided {
+  border-top: 1px solid var(--b-soft);
+  padding-top: 6px;
+  margin-top: 6px;
+}
+
+/* A full-width block inside a parameter group: buttons, file pickers. */
+.ui-block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ui-subhead {
+  margin: 8px 0 5px;
+  padding-top: 6px;
+  border-top: 1px solid var(--b-soft);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-muted);
+  text-align: center;
+}
+
+/*
+ * Group box with a notched title, the way a Qt QGroupBox draws one.
+ *
+ * Kept rather than replaced with a plain header, because the notch reads as
+ * "these controls belong together" without spending a full row on a heading --
+ * which matters in a dock holding forty inputs.
+ */
+.ui-groupbox {
+  position: relative;
+  margin-top: 12px;
+  padding: 10px 8px 6px;
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+  background: var(--s-panel);
+}
+
+.ui-groupbox-title {
+  position: absolute;
+  top: -7px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 5px;
+  /* Matches the dock body so the border appears to break around the label. */
+  background: var(--s-panel);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+}
+
+.ui-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--a-accent);
+  cursor: pointer;
+}
+.ui-link:hover {
+  text-decoration: underline;
+}
+
+/* The quick-results box in the dock: an accented group box. */
+.ui-groupbox.is-result {
+  background: var(--a-accent-wash);
+  border-color: var(--a-accent-dim);
+}
+.ui-groupbox.is-result .ui-groupbox-title {
+  background: var(--s-panel);
+  color: var(--a-accent);
+}
+
+.ui-kv-key {
+  text-align: right;
+  padding-right: 5px;
+  color: var(--t-secondary);
+  font-size: var(--fs-sm);
+}
+.ui-kv-val {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--t-primary);
+}
