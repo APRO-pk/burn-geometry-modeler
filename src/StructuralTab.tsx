@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Download } from './ui/icons';
 import {
   ResponsiveContainer,
   LineChart,
@@ -9,7 +10,6 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { Download } from 'lucide-react';
 import { Button } from './ui/primitives';
 import type { StructuralResult } from './wasmCore';
 import type { MotorMetrics } from './motorMetrics';
@@ -54,6 +54,21 @@ const MPa = (pa: number) => (pa / 1e6).toFixed(1);
 const mm = (m: number) => (m * 1000).toFixed(2);
 
 /** Safety factors below 1.5 are the reason this tab exists. */
+/**
+ * Stress bands for the schematic, low to high.
+ *
+ * Five steps rather than a continuous ramp: the underlying analysis is
+ * closed-form at two locations, so a smooth fill would claim a resolution the
+ * numbers do not have.
+ */
+const FEA_BANDS = [
+  'var(--c-1)',
+  'var(--c-6)',
+  'var(--sem-warn)',
+  'var(--sem-danger)',
+  'var(--sem-danger)',
+];
+
 const sfTone = (sf: number) => (sf < 1 ? 'is-danger' : sf < 1.5 ? 'is-warn' : 'is-ok');
 
 function Rows({ rows }: { rows: Array<{ k: string; v: React.ReactNode; tone?: string }> }) {
@@ -159,7 +174,7 @@ export function StructuralTab({
               { k: 'Material', v: `${casingMaterial}` },
               {
                 k: 'Wall regime',
-                v: `${s.lame.thinWallApplicable ? 'Thin' : 'Thick'} — R/t = ${s.lame.rMeanOverT.toFixed(1)}`,
+                v: `${s.lame.thinWallApplicable ? 'Thin' : 'Thick'}: R/t = ${s.lame.rMeanOverT.toFixed(1)}`,
               },
               {
                 k: 'Bore growth at peak',
@@ -174,16 +189,21 @@ export function StructuralTab({
             <header className="sec-head">Stress schematic</header>
             <div className="sec-body">
               <svg viewBox="0 0 700 200" className="fea-svg" role="img" aria-label="Axisymmetric stress schematic">
-                <defs>
-                  <linearGradient id="feaGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="var(--c-1)" />
-                    <stop offset="60%" stopColor="var(--sem-warn)" />
-                    <stop offset="100%" stopColor="var(--sem-danger)" />
-                  </linearGradient>
-                </defs>
+                {/*
+                  * Discrete bands, not a gradient fill.
+                  *
+                  * A smooth ramp implies the stress was computed continuously
+                  * along the wall, which it was not -- this is a schematic of a
+                  * closed-form result at two locations. Stepped blocks are
+                  * honest about being a diagram, and read at a glance.
+                  */}
                 <line x1="60" y1="100" x2="640" y2="100" stroke="var(--b-control)" strokeDasharray="6 4" />
-                <rect x="100" y="40" width="500" height="15" fill="url(#feaGradient)" />
-                <rect x="100" y="145" width="500" height="15" fill="url(#feaGradient)" />
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <g key={i}>
+                    <rect x={100 + i * 100} y={40} width={100} height={15} fill={FEA_BANDS[i]} />
+                    <rect x={100 + i * 100} y={145} width={100} height={15} fill={FEA_BANDS[i]} />
+                  </g>
+                ))}
                 <rect x="590" y="30" width="22" height="140" fill="var(--sem-danger)" />
                 <rect x="88" y="30" width="22" height="140" fill="var(--c-1)" />
                 <text x="350" y="30" fill="var(--t-secondary)" fontSize="11" textAnchor="middle" fontFamily="var(--font-mono)">
@@ -194,7 +214,7 @@ export function StructuralTab({
                 </text>
               </svg>
               <p className="sec-note" style={{ borderTop: 0, padding: '6px 0 0' }}>
-                Indicative only — a schematic, not a mesh. The numbers come from the closed-form
+                Indicative only. A schematic, not a mesh. The numbers come from the closed-form
                 analysis; the colours do not.
               </p>
             </div>
@@ -251,7 +271,7 @@ export function StructuralTab({
                 <Tooltip
                   contentStyle={{
                     background: 'var(--s-raised)', border: '1px solid var(--b-strong)',
-                    borderRadius: 3, fontSize: 11, fontFamily: 'var(--font-mono)',
+                    borderRadius: 0, fontSize: 11, fontFamily: 'var(--font-mono)',
                   }}
                   formatter={(v: number | string) => `${Number(v).toFixed(1)} MPa`}
                 />
@@ -283,7 +303,7 @@ export function StructuralTab({
         {/* ---- bolts ---- */}
         <section className="sec">
           <header className="sec-head">
-            Bolted closure — {s.bolts.count} × ⌀{mm(s.bolts.diameter)} mm
+            Bolted closure: {s.bolts.count} × ⌀{mm(s.bolts.diameter)} mm
           </header>
           <Rows
             rows={[
@@ -317,7 +337,7 @@ export function StructuralTab({
           />
           <p className="sec-note">
             Design to the thread stress area (≈74% of the shank), not the shank. Shorter
-            engagement than shown lets the threads strip before the bolt yields — a failure the
+            engagement than shown lets the threads strip before the bolt yields, a failure the
             tension numbers do not cover.
           </p>
         </section>
@@ -325,7 +345,7 @@ export function StructuralTab({
         {/* ---- nozzle ---- */}
         {throat && (
           <section className="sec">
-            <header className="sec-head">Nozzle throat erosion — {nozzleMaterial}</header>
+            <header className="sec-head">Nozzle throat erosion: {nozzleMaterial}</header>
             <Rows
               rows={[
                 { k: 'Initial throat', v: `${mm(throat.initial)} mm` },
@@ -342,7 +362,7 @@ export function StructuralTab({
             />
             <p className="sec-note" style={{ color: 'var(--sem-warn)' }}>
               Order of magnitude only. The heat-transfer coefficient is roughly 7× the real Bartz
-              correlation and uncalibrated here — compare materials with it, do not size hardware.
+              correlation and uncalibrated here. Compare materials with it; do not size hardware.
             </p>
           </section>
         )}

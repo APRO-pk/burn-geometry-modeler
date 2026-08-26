@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { ChevronDown, ChevronUp, Close, Download, Grain, Play, Redo, Settings, Sweep, Terminal, Undo, Upload} from './ui/icons';
 import { useFieldIds } from './useFieldIds';
 import {
   grainFromUi,
@@ -22,7 +23,6 @@ import {
   ResponsiveContainer,
   ReferenceLine
 } from 'recharts';
-import { Play, Terminal, Download, Calculator, Settings, Upload, Undo, Redo, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import { processDXF } from './dxfProcessor';
 import { PropellantEditor, PropellantData } from './PropellantEditor';
 import { GrainEditor } from './GrainEditor';
@@ -2073,10 +2073,10 @@ export default function AppDesktop() {
 
       {showPreferences && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--scrim)]">
-          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-96 flex flex-col font-mono text-[var(--t-primary)]">
+          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-96 flex flex-col font-mono text-[var(--t-primary)]">
             <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--sem-warn)]">
               <div className="flex items-center"><Settings size={14} className="mr-1" /> Preferences</div>
-              <button onClick={() => setShowPreferences(false)} className="hover:text-red-500">✕</button>
+              <button onClick={() => setShowPreferences(false)} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
             </div>
             <div className="p-4 space-y-4 text-xs">
               {/*
@@ -2089,7 +2089,7 @@ export default function AppDesktop() {
                 * move between them; they only happened to behave exclusively
                 * because the click handlers set the same state.
                 */}
-              <fieldset className="border border-[var(--b-strong)] rounded p-3">
+              <fieldset className="border border-[var(--b-strong)] p-3">
                 <legend className="mb-2 font-bold text-[var(--t-secondary)] uppercase px-1">Unit System</legend>
                 <div className="flex space-x-4 mb-3">
                   <label className="flex items-center space-x-1 cursor-pointer">
@@ -2111,7 +2111,7 @@ export default function AppDesktop() {
                         <select 
                           value={imperialPrefs[cat]} 
                           onChange={e => setImperialPrefs({...imperialPrefs, [cat]: e.target.value})}
-                          className="bg-[var(--s-sunken)] border border-[var(--b-strong)] rounded px-2 py-0.5 outline-none focus:border-blue-500"
+                          className="bg-[var(--s-sunken)] border border-[var(--b-strong)] px-2 py-0.5 outline-none focus:border-[var(--a-accent)]"
                         >
                           {IMPERIAL_OPTIONS[cat].map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
@@ -2127,10 +2127,10 @@ export default function AppDesktop() {
 
       {showUnitConverter && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--scrim)]">
-          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-80 flex flex-col font-mono text-[var(--t-primary)]">
+          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-80 flex flex-col font-mono text-[var(--t-primary)]">
             <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--a-accent)]">
-              <div className="flex items-center"><Calculator size={14} className="mr-1" /> Unit Converter</div>
-              <button onClick={() => setShowUnitConverter(false)} className="hover:text-red-500">✕</button>
+              <div className="flex items-center"><Grain size={14} className="mr-1" /> Unit Converter</div>
+              <button onClick={() => setShowUnitConverter(false)} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
             </div>
             <div className="p-4 space-y-4 text-xs">
               <div>
@@ -2142,7 +2142,7 @@ export default function AppDesktop() {
                   if(m === 'Pressure') { setUcUnit1('psi'); setUcUnit2('MPa'); }
                   if(m === 'Mass') { setUcUnit1('lbm'); setUcUnit2('kg'); }
                   if(m === 'Temp') { setUcUnit1('F'); setUcUnit2('C'); }
-                }} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] rounded px-2 py-1 outline-none focus:border-[var(--a-accent)]">
+                }} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] px-2 py-1 outline-none focus:border-[var(--a-accent)]">
                   <option value="Length">Length</option>
                   <option value="Pressure">Pressure</option>
                   <option value="Mass">Mass</option>
@@ -2151,8 +2151,8 @@ export default function AppDesktop() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <input type="number" step="any" value={ucVal1} onChange={e => setUcVal1(e.target.value)} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--sem-ok)] rounded px-2 py-1 mb-1 font-mono text-right outline-none focus:border-[var(--a-accent)]" />
-                  <select value={ucUnit1} onChange={e => setUcUnit1(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] rounded px-2 py-1 outline-none focus:border-[var(--a-accent)]">
+                  <input type="number" step="any" value={ucVal1} onChange={e => setUcVal1(e.target.value)} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--sem-ok)] px-2 py-1 mb-1 font-mono text-right outline-none focus:border-[var(--a-accent)]" />
+                  <select value={ucUnit1} onChange={e => setUcUnit1(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] px-2 py-1 outline-none focus:border-[var(--a-accent)]">
                     {ucMode === 'Length' && ['m','cm','mm','in','ft'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Pressure' && ['Pa','kPa','MPa','psi','bar','atm'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Mass' && ['kg','g','lbm'].map(u => <option key={u} value={u}>{u}</option>)}
@@ -2160,8 +2160,8 @@ export default function AppDesktop() {
                   </select>
                 </div>
                 <div>
-                  <input type="text" readOnly value={getUcConvertedMode()} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--a-accent)] rounded px-2 py-1 mb-1 font-mono text-right font-bold outline-none" />
-                  <select value={ucUnit2} onChange={e => setUcUnit2(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] rounded px-2 py-1 outline-none focus:border-[var(--a-accent)]">
+                  <input type="text" readOnly value={getUcConvertedMode()} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--a-accent)] px-2 py-1 mb-1 font-mono text-right font-bold outline-none" />
+                  <select value={ucUnit2} onChange={e => setUcUnit2(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] px-2 py-1 outline-none focus:border-[var(--a-accent)]">
                     {ucMode === 'Length' && ['m','cm','mm','in','ft'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Pressure' && ['Pa','kPa','MPa','psi','bar','atm'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Mass' && ['kg','g','lbm'].map(u => <option key={u} value={u}>{u}</option>)}
@@ -2252,7 +2252,7 @@ export default function AppDesktop() {
         >
           {isSimulating ? 'Running…' : 'Run'}
         </Button>
-        <Button icon={<Zap size={12} />} onClick={() => setShowOptimizer(true)} disabled={isSimulating}>
+        <Button icon={<Sweep size={12} />} onClick={() => setShowOptimizer(true)} disabled={isSimulating}>
           Sweep
         </Button>
         <ToolbarSep />
@@ -2262,7 +2262,7 @@ export default function AppDesktop() {
         <Button variant="ghost" icon={<Settings size={12} />} onClick={() => setShowPropellantEditor(true)}>
           Propellant
         </Button>
-        <Button variant="ghost" icon={<Calculator size={12} />} onClick={() => setShowGrainEditor(true)}>
+        <Button variant="ghost" icon={<Grain size={12} />} onClick={() => setShowGrainEditor(true)}>
           Grain
         </Button>
 
@@ -2351,7 +2351,7 @@ export default function AppDesktop() {
                 {burnRateRegimes.length > 0 && (
                   <div className="ui-note is-accent">
                     Measured {burnRateRegimes.length}-band burn law active
-                    ({(burnRateRegimes[0].from_pressure / 1e6).toFixed(2)}–
+                    ({(burnRateRegimes[0].from_pressure / 1e6).toFixed(2)} to
                     {(burnRateRegimes[burnRateRegimes.length - 1].to_pressure / 1e6).toFixed(2)} MPa).
                     a/n above apply only outside that range; editing either drops the bands.
                   </div>
@@ -2615,13 +2615,13 @@ export default function AppDesktop() {
                               : 'is-ok'
                       }`}
                     >
-                      {structural ? `${structural.safetyFactor.toFixed(2)}×` : '—'}
+                      {structural ? `${structural.safetyFactor.toFixed(2)}×` : 'n/a'}
                     </span>
                   </div>
                   <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
                     <span className="kv-key">Bore growth</span>
                     <span className="kv-val">
-                      {structural ? `${(structural.boreRadialGrowth * 1e6).toFixed(0)} µm` : '—'}
+                      {structural ? `${(structural.boreRadialGrowth * 1e6).toFixed(0)} µm` : 'n/a'}
                     </span>
                   </div>
                 </div>
@@ -2655,13 +2655,25 @@ export default function AppDesktop() {
             className="sh-tabpanel"
           >
             
+            {/*
+              * Working overlay.
+              *
+              * Was a rotating ring with pulsing text, which is the spinner every
+              * consumer web app ships. An instrument reports progress on a bar:
+              * indeterminate here, because the solver cannot say how many steps
+              * remain until it has taken them, but at least it is the right
+              * shape for the job and does not throb.
+              */}
             {isSimulating && (
-              <div className="absolute inset-0 z-50 bg-[var(--s-canvas)] bg-opacity-80 flex flex-col items-center justify-center font-mono">
-                <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-[var(--a-accent)] mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <div className="text-[var(--a-accent)] text-sm animate-pulse tracking-widest font-bold">SOLVING MESH & THERMO MODELS...</div>
+              <div className="busy" role="status" aria-live="polite">
+                <div className="busy-label">
+                  {solverModel === 'quasi1D'
+                    ? `Solving quasi-1-D, ${stationCount} stations`
+                    : 'Solving 0-D lumped chamber'}
+                </div>
+                <div className="busy-track">
+                  <div className="busy-fill" />
+                </div>
               </div>
             )}
 
@@ -2712,7 +2724,7 @@ export default function AppDesktop() {
                 {stations && axialData.length > 0 && (
                   <div className="bal-axial">
                     <div className="bal-axial-title">
-                      Axial profile at peak pressure — head end (x=0) to nozzle
+                      Axial profile at peak pressure: head end (x=0) to nozzle
                     </div>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={axialData} margin={{ top: 24, right: 34, bottom: 16, left: 0 }}>
@@ -2732,7 +2744,7 @@ export default function AppDesktop() {
                           contentStyle={{
                             background: 'var(--s-raised)',
                             border: '1px solid var(--b-strong)',
-                            borderRadius: 3,
+                            borderRadius: 0,
                             fontSize: 11,
                             fontFamily: 'var(--font-mono)',
                           }}
@@ -2759,7 +2771,7 @@ export default function AppDesktop() {
               <div className="chart-frame" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div className="chart-caption">Grain cross-section regression</div>
                 <div className="w-full h-full flex items-center justify-center p-8">
-                  <svg viewBox="0 0 200 200" className="w-full h-full max-w-[500px] max-h-[500px] bg-[var(--s-sunken)] rounded-full border border-[var(--b-strong)] shadow-2xl">
+                  <svg viewBox="0 0 200 200" className="w-full h-full max-w-[500px] max-h-[500px] bg-[var(--s-sunken)] border border-[var(--b-strong)]">
                     <circle cx="100" cy="100" r={(outerRadius / outerRadius) * 95} fill="var(--b-control)" />
                     {grainType === 'BATES' || grainType === 'Tubular' ? (
                       <circle cx="100" cy="100" r={Math.min(outerRadius, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="var(--s-canvas)" />
@@ -2846,7 +2858,7 @@ export default function AppDesktop() {
                     )}
                   </svg>
                 </div>
-                <div className="absolute bottom-4 left-4 right-4 flex flex-col space-y-2 bg-[var(--s-canvas)] p-3 rounded border border-[var(--b-soft)]">
+                <div className="absolute bottom-4 left-4 right-4 flex flex-col space-y-2 bg-[var(--s-canvas)] p-3 border border-[var(--b-soft)]">
                   <div className="flex justify-between text-[var(--c-6)] text-[10px] font-mono px-2">
                     <span>Burn Area: {(results[visualizerIndex]?.Ab * 10000 || 0).toFixed(1)} cm²</span>
                     <span>Port Area: {(results[visualizerIndex]?.PortArea * 10000 || 0).toFixed(1)} cm²</span>
@@ -2874,7 +2886,7 @@ export default function AppDesktop() {
                 <div className="chart-frame">
                   <div className="chart-caption">
                     Burn rate against chamber pressure
-                    {burnRateRegimes.length > 0 && ' — measured piecewise law'}
+                    {burnRateRegimes.length > 0 && ': measured piecewise law'}
                   </div>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={burnRateData} margin={{ top: 26, right: 24, bottom: 24, left: 12 }}>
@@ -2892,7 +2904,7 @@ export default function AppDesktop() {
                         contentStyle={{
                           background: 'var(--s-raised)',
                           border: '1px solid var(--b-strong)',
-                          borderRadius: 3,
+                          borderRadius: 0,
                           color: 'var(--t-primary)',
                           fontSize: 11,
                           fontFamily: 'var(--font-mono)',
@@ -2944,7 +2956,7 @@ export default function AppDesktop() {
                   </div>
                   <p className="sec-note">
                     {burnRateRegimes.length
-                      ? `Bands cover ${(burnRateRegimes[0].from_pressure / 1e6).toFixed(2)}–${(burnRateRegimes[burnRateRegimes.length - 1].to_pressure / 1e6).toFixed(2)} MPa. Outside that range the single a/n above is extrapolated from the nearest band. Piecewise fits do not join up, so the curve steps at each boundary.`
+                      ? `Bands cover ${(burnRateRegimes[0].from_pressure / 1e6).toFixed(2)} to ${(burnRateRegimes[burnRateRegimes.length - 1].to_pressure / 1e6).toFixed(2)} MPa. Outside that range the single a/n above is extrapolated from the nearest band. Piecewise fits do not join up, so the curve steps at each boundary.`
                       : 'A single Saint-Robert law is monotonic for n > 0, which cannot reproduce the non-monotonic burn rate measured for the sugar propellants. Selecting KNDX or KNSB from the library loads their measured bands.'}
                   </p>
                 </section>
@@ -3028,7 +3040,7 @@ export default function AppDesktop() {
               <div className="tab-scroll">
                 {grainType === 'CustomDXF' && !dxfData ? (
                   <div className="tab-empty">
-                    Load a DXF profile first — the surrogate predicts from the grain's burn-back
+                    Load a DXF profile first. The surrogate predicts from the grain's burn-back
                     curves, and a Custom DXF grain has none until its cross-section is traced.
                   </div>
                 ) : (
@@ -3120,7 +3132,7 @@ export default function AppDesktop() {
                     </div>
                   ))}
                   <p className="unc-note">
-                    Measured model error, propagated. A floor on the error, not a bound — batch,
+                    Measured model error, propagated. A floor on the error, not a bound. Batch,
                     casting and machining variation are invisible to any solver.
                   </p>
                   <Button variant="ghost" onClick={() => setActiveTab('statistics')}>
@@ -3198,7 +3210,7 @@ export default function AppDesktop() {
               tone={metrics.portThroatRatio < 2 ? 'warn' : 'default'}
               hint={
                 metrics.portThroatRatio < 2
-                  ? 'Below 2, erosive burning dominates — and that model is uncalibrated here.'
+                  ? 'Below 2, erosive burning dominates, and that model is uncalibrated here.'
                   : undefined
               }
             />
@@ -3206,7 +3218,7 @@ export default function AppDesktop() {
           </>
         ) : (
           <div className="sh-status-msg">
-            {statusMsg || 'No results — press Run to simulate this design.'}
+            {statusMsg || 'No results: press Run to simulate this design.'}
           </div>
         )}
       </StatusBar>

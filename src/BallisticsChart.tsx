@@ -118,7 +118,7 @@ export function BallisticsChart({ data, enabled, peakPc }: BallisticsChartProps)
     <div className="bc-wrap">
       {unplotted.length > 0 && (
         <div className="bc-note" role="status">
-          {unplotted.join(', ')} not plotted — a chart carries two scales legibly, and these
+          {unplotted.join(', ')} not plotted. A chart carries two scales legibly, and these
           would need a third. Deselect another channel to see them.
         </div>
       )}
@@ -155,7 +155,7 @@ export function BallisticsChart({ data, enabled, peakPc }: BallisticsChartProps)
             contentStyle={{
               background: cssVar('--s-raised'),
               border: `1px solid ${cssVar('--b-strong')}`,
-              borderRadius: 3,
+              borderRadius: 0,
               fontSize: 11,
               fontFamily: 'var(--font-mono)',
               color: cssVar('--t-primary'),

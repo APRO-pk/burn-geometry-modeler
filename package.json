@@ -27,7 +27,6 @@
     "clipper-lib": "^6.4.2",
     "dxf-parser": "^1.1.2",
     "jszip": "^3.10.1",
-    "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

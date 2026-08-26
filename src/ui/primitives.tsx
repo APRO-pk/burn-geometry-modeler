@@ -1,5 +1,5 @@
 import React, { useId, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from './icons';
 import './primitives.css';
 
 /**

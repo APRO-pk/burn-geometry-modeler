@@ -53,7 +53,7 @@ interface Row {
  * log2 of the ratio; clamped at Z rather than running off the alphabet.
  */
 function designation(totalImpulse: number): string {
-  if (!(totalImpulse > 0)) return '—';
+  if (!(totalImpulse > 0)) return 'n/a';
   const i = Math.floor(Math.log2(totalImpulse / 2.5));
   return String.fromCharCode(65 + Math.max(0, Math.min(25, i)));
 }
@@ -120,7 +120,7 @@ export function StatisticsTab({
       tone: metrics.portThroatRatio < 2 ? 'warn' : undefined,
       hint:
         metrics.portThroatRatio < 2
-          ? 'Below 2, erosive burning dominates — and that model is uncalibrated here'
+          ? 'Below 2, erosive burning dominates, and that model is uncalibrated here'
           : undefined,
     },
     {

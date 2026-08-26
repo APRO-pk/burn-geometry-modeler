@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Ok, Play, Sweep, Warning } from './ui/icons';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Zap, Play, Check, AlertTriangle } from 'lucide-react';
 import {
   checkEnvelope,
   loadSurrogate,
@@ -154,10 +154,10 @@ function EnvelopeWarning({ design }: { design: RawDesign }) {
   const env = checkEnvelope(design);
   if (env.inside) return null;
   return (
-    <div className="border border-[var(--sem-danger)] bg-[var(--sem-danger-wash)] rounded p-2 text-[10px] text-[var(--sem-danger)] leading-snug">
+    <div className="border border-[var(--sem-danger)] bg-[var(--sem-danger-wash)] p-2 text-[10px] text-[var(--sem-danger)] leading-snug">
       <div className="flex items-center space-x-1 font-bold mb-1">
-        <AlertTriangle className="w-3 h-3" />
-        <span>OUTSIDE TRAINING ENVELOPE — surrogate values are extrapolation</span>
+        <Warning className="w-3 h-3" />
+        <span>OUTSIDE TRAINING ENVELOPE: surrogate values are extrapolation</span>
       </div>
       {env.violations.slice(0, 4).map((v) => (
         <div key={v.feature}>
@@ -169,7 +169,7 @@ function EnvelopeWarning({ design }: { design: RawDesign }) {
         <div>…and {env.violations.length - 4} more.</div>
       )}
       <div className="mt-1 text-[var(--sem-danger)]">
-        Use “Verify with full solve” — do not trust the prediction here.
+        Use “Verify with full solve”: do not trust the prediction here.
       </div>
     </div>
   );
@@ -278,7 +278,7 @@ export function SurrogatePanel({
         const truth = await solveTruth(found[0].design, burnRateRegimes);
         setCandidateTruth(truth);
         addLog(
-          `Inverse design (${kind}): best candidate verified — impulse ` +
+          `Inverse design (${kind}): best candidate verified: impulse ` +
             `${truth.total_impulse.toFixed(0)} N·s (target ≤ ${targetImpulse}), peak Pc ` +
             `${(truth.peak_pc / 1e6).toFixed(2)} MPa (limit ${targetMaxPc}).`
         );
@@ -384,8 +384,8 @@ export function SurrogatePanel({
   return (
     <div className="tab-doc">
       {/* ---- provenance ---- */}
-      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] rounded p-3 text-[10px] text-[var(--t-secondary)] leading-snug">
-        <span className="text-[var(--a-accent)] font-bold">SURROGATE MODEL</span> — one Gaussian process
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-3 text-[10px] text-[var(--t-secondary)] leading-snug">
+        <span className="text-[var(--a-accent)] font-bold">SURROGATE MODEL</span>: one Gaussian process
         covering all {info.grainKinds.length} grain geometries, trained on {String(info.dataset.trainRows)}{' '}
         solves of the same Rust core the Run button uses ({String(info.dataset.totalRows)} sampled,{' '}
         {String(info.dataset.testRows)} held out). It predicts from the grain's burn-back CURVES
@@ -405,14 +405,14 @@ export function SurrogatePanel({
       </div>
 
       {burnRateRegimes.length > 0 && (
-        <div className="bg-[var(--sem-warn-wash)] border border-[var(--sem-warn)] rounded p-3 text-[10px] text-[var(--sem-warn)] leading-snug">
-          <span className="font-bold">PIECEWISE BURN LAW — predictions below are approximate.</span>
+        <div className="bg-[var(--sem-warn-wash)] border border-[var(--sem-warn)] p-3 text-[10px] text-[var(--sem-warn)] leading-snug">
+          <span className="font-bold">PIECEWISE BURN LAW: predictions below are approximate.</span>
           <div className="mt-1 text-[var(--sem-warn)]">
             This propellant uses a measured {burnRateRegimes.length}-band burn-rate law, but the
             surrogate is trained on single power-law solves and takes a={design.a.toExponential(3)},
             n={design.n.toFixed(4)} as its inputs. Those are the propellant's fallback coefficients,
-            not the law the solver integrates, so everything on this tab — prediction, inverse
-            design and Monte Carlo — describes a slightly different motor. Press{' '}
+            not the law the solver integrates, so everything on this tab: prediction, inverse
+            design and Monte Carlo: describes a slightly different motor. Press{' '}
             <span className="text-[var(--sem-ok)]">Verify</span> against the real core, or run the full
             simulation, for a number you can size hardware from.
           </div>
@@ -422,18 +422,18 @@ export function SurrogatePanel({
       <EnvelopeWarning design={design} />
 
       {/* ---- a. instant prediction ---- */}
-      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4 rounded">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4">
         <div className="flex justify-between items-center border-b border-[var(--b-soft)] pb-2 mb-3">
           <h3 className="font-bold text-[var(--a-accent)] text-sm flex items-center space-x-2">
-            <Zap className="w-4 h-4" />
-            <span>INSTANT PREDICTION — {kind}</span>
+            <Sweep className="w-4 h-4" />
+            <span>INSTANT PREDICTION: {kind}</span>
           </h3>
           <div className="flex items-center space-x-3">
             <span className="text-[var(--t-muted)] text-[10px]">{predictMs.toFixed(2)} ms</span>
             <button
               onClick={runVerify}
               disabled={verifying}
-              className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 rounded hover:bg-[var(--a-accent)] hover:text-[var(--t-inverse)] transition-colors disabled:opacity-50"
+              className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 hover:bg-[var(--a-accent)] hover:text-[var(--t-inverse)] transition-colors disabled:opacity-50"
             >
               {verifying ? 'Solving…' : 'Verify with full solve'}
             </button>
@@ -462,12 +462,12 @@ export function SurrogatePanel({
                   <td className="py-1">{LABEL[t]}</td>
                   <td className="text-right text-[var(--sem-warn)]">{FORMAT[t](prediction.mean[t])}</td>
                   <td className="text-right text-[var(--t-secondary)]">
-                    {FORMAT[t](prediction.lower[t])} – {FORMAT[t](prediction.upper[t])}
+                    {FORMAT[t](prediction.lower[t])} to {FORMAT[t](prediction.upper[t])}
                   </td>
                   {verify && <td className="text-right text-[var(--sem-ok)]">{FORMAT[t](verify.truth[t])}</td>}
                   {verify && (
                     <td className={`text-right ${Math.abs(delta) < 0.05 ? 'text-[var(--sem-ok)]' : 'text-[var(--sem-warn)]'}`}>
-                      {(delta * 100).toFixed(2)}%{covered ? ' ✓' : ' !'}
+                      {(delta * 100).toFixed(2)}%{covered ? ' ok' : ' out'}
                     </td>
                   )}
                 </tr>
@@ -478,16 +478,16 @@ export function SurrogatePanel({
         {verify && (
           <p className="text-[var(--t-muted)] text-[10px] mt-2">
             Full solve took {verify.ms.toFixed(0)} ms versus {predictMs.toFixed(2)} ms for the
-            surrogate — a {(verify.ms / Math.max(predictMs, 1e-6)).toFixed(0)}× speedup. “✓” means
+            surrogate, a {(verify.ms / Math.max(predictMs, 1e-6)).toFixed(0)}× speedup. "ok" means
             the true value fell inside the predicted band.
           </p>
         )}
       </div>
 
       {/* ---- b. inverse design ---- */}
-      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4 rounded">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4">
         <h3 className="font-bold text-[var(--a-accent)] text-sm border-b border-[var(--b-soft)] pb-2 mb-3">
-          INVERSE DESIGN — searching {kind} geometry
+          INVERSE DESIGN: searching {kind} geometry
         </h3>
         <div className="flex flex-wrap items-end gap-4 mb-3">
           <label className="flex flex-col space-y-1">
@@ -511,7 +511,7 @@ export function SurrogatePanel({
           <button
             onClick={runSearch}
             disabled={searching}
-            className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1.5 font-bold rounded flex items-center hover:brightness-110 disabled:opacity-50"
+            className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1.5 font-bold flex items-center hover:brightness-110 disabled:opacity-50"
           >
             <Play className="w-3 h-3 mr-1" /> {searching ? 'Searching…' : 'Find design'}
           </button>
@@ -526,7 +526,7 @@ export function SurrogatePanel({
           {shapeSpec.length > 0 ? (
             <>
               Free variables: length, casing radius, throat, expansion ratio, and this geometry's
-              shape — {shapeSpec.map((p) => p.label.toLowerCase()).join(', ')}. Propellant is held
+              shape: {shapeSpec.map((p) => p.label.toLowerCase()).join(', ')}. Propellant is held
               fixed.
             </>
           ) : (
@@ -573,7 +573,7 @@ export function SurrogatePanel({
                           onApplyDesign(c.design);
                           addLog(`Applied surrogate candidate ${i + 1} (${kind}) to the design inputs.`);
                         }}
-                        className="text-[var(--a-accent)] hover:text-[var(--t-primary)] border border-[var(--b-strong)] px-1 rounded text-[10px]"
+                        className="text-[var(--a-accent)] hover:text-[var(--t-primary)] border border-[var(--b-strong)] px-1 text-[10px]"
                       >
                         Apply
                       </button>
@@ -584,9 +584,9 @@ export function SurrogatePanel({
             </table>
 
             {candidateTruth ? (
-              <div className="mt-3 border border-[var(--sem-ok)] bg-[var(--sem-ok-wash)] rounded p-2 text-[10px]">
+              <div className="mt-3 border border-[var(--sem-ok)] bg-[var(--sem-ok-wash)] p-2 text-[10px]">
                 <div className="flex items-center space-x-1 text-[var(--sem-ok)] font-bold mb-1">
-                  <Check className="w-3 h-3" />
+                  <Ok className="w-3 h-3" />
                   <span>CANDIDATE 1 VERIFIED AGAINST THE PHYSICS CORE</span>
                 </div>
                 <div className="text-[var(--sem-ok)]">
@@ -638,7 +638,7 @@ export function SurrogatePanel({
       </div>
 
       {/* ---- c. real-time Monte Carlo ---- */}
-      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4 rounded">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-4">
         <h3 className="font-bold text-[var(--a-accent)] text-sm border-b border-[var(--b-soft)] pb-2 mb-3">
           REAL-TIME MONTE CARLO
         </h3>
@@ -661,7 +661,7 @@ export function SurrogatePanel({
             </select>
           </label>
           <button onClick={runMonteCarlo}
-            className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1.5 font-bold rounded flex items-center hover:brightness-110">
+            className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1.5 font-bold flex items-center hover:brightness-110">
             <Play className="w-3 h-3 mr-1" /> Run
           </button>
           {mcResult && (
@@ -670,7 +670,7 @@ export function SurrogatePanel({
                 {mcSamples.toLocaleString()} samples in {mcMs.toFixed(0)} ms
               </span>
               <button onClick={confirmMonteCarlo} disabled={confirming}
-                className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 rounded hover:bg-[var(--a-accent)] hover:text-[var(--t-inverse)] disabled:opacity-50">
+                className="border border-[var(--a-accent)] text-[var(--a-accent)] px-3 py-1 hover:bg-[var(--a-accent)] hover:text-[var(--t-inverse)] disabled:opacity-50">
                 {confirming ? 'Solving 40…' : 'Confirm with 40 full solves'}
               </button>
             </>
@@ -679,7 +679,7 @@ export function SurrogatePanel({
 
         {mcResult && (
           <>
-            <div className="h-48 border border-[var(--b-soft)] rounded bg-[var(--s-canvas)]">
+            <div className="h-48 border border-[var(--b-soft)] bg-[var(--s-canvas)]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={mcHist} margin={{ top: 10, right: 20, bottom: 4, left: 0 }}>
                   <CartesianGrid strokeDasharray="1 3" stroke="var(--b-soft)" />
@@ -706,16 +706,16 @@ export function SurrogatePanel({
               )}
             </div>
             <p className="text-[var(--t-muted)] text-[10px] mt-2 leading-snug">
-              The spread here is manufacturing dispersion, not model error — the surrogate's own
+              The spread here is manufacturing dispersion, not model error. The surrogate's own
               uncertainty on this design is ±{(prediction.relativeBand[mcTarget] * 100).toFixed(1)}%
               and is reported separately above, so a wide distribution is never confused with an
               unsure model.
             </p>
 
             {mcConfirm && (
-              <div className="mt-3 border border-[var(--sem-ok)] bg-[var(--sem-ok-wash)] rounded p-2 text-[10px]">
+              <div className="mt-3 border border-[var(--sem-ok)] bg-[var(--sem-ok-wash)] p-2 text-[10px]">
                 <div className="flex items-center space-x-1 text-[var(--sem-ok)] font-bold mb-1">
-                  <Check className="w-3 h-3" />
+                  <Ok className="w-3 h-3" />
                   <span>CONFIRMED WITH {mcConfirm.n} FULL SOLVES ({mcConfirm.ms.toFixed(0)} ms)</span>
                 </div>
                 {(() => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, XCircle } from 'lucide-react';
+import { Failure, Warning } from './icons';
 import './alertchip.css';
 
 /**
@@ -54,7 +54,7 @@ export function AlertChip({ severity, noun, items, title, footer }: AlertChipPro
 
   if (!items.length) return null;
 
-  const Icon = severity === 'error' ? XCircle : AlertTriangle;
+  const Icon = severity === 'error' ? Failure : Warning;
   const label = `${items.length} ${noun}${items.length > 1 ? 's' : ''}`;
 
   return (

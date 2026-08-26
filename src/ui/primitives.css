@@ -268,7 +268,6 @@
 .ui-check-swatch {
   width: 9px;
   height: 9px;
-  border-radius: 2px;
   flex: none;
 }
 .ui-check-label {
@@ -284,7 +283,7 @@
   flex-direction: column;
   gap: 1px;
   padding: 3px 10px;
-  border-left: 2px solid transparent;
+  border-left: 1px solid var(--b-strong);
   min-width: 0;
 }
 .ui-stat-label {
@@ -305,17 +304,8 @@
   font-size: var(--fs-xs);
   color: var(--t-muted);
 }
-.ui-stat.is-ok {
-  border-left-color: var(--sem-ok);
-}
-.ui-stat.is-warn {
-  border-left-color: var(--sem-warn);
-}
 .ui-stat.is-warn .ui-stat-band {
   color: var(--sem-warn);
-}
-.ui-stat.is-danger {
-  border-left-color: var(--sem-danger);
 }
 .ui-stat.is-danger .ui-stat-band {
   color: var(--sem-danger);
@@ -759,9 +749,17 @@
 
 /* ---- Materials cards ---- */
 
+/*
+ * Materials, stacked rather than laid out as cards across a row.
+ *
+ * Three equal cards side by side is a marketing layout, and it forced each
+ * material into the same height regardless of how much it had to say. Stacked
+ * full-width rows let the propellant carry five properties and the nozzle
+ * three without either being padded to match.
+ */
 .mat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--gap-lg);
 }
 .mat-subtitle {
@@ -779,18 +777,15 @@
   gap: var(--gap-lg);
   padding: var(--gap-lg);
   border-bottom: 1px solid var(--b-soft);
-  border-left: 3px solid var(--b-control);
+  border-left: 1px solid var(--b-strong);
 }
 .verdict.is-ok {
-  border-left-color: var(--sem-ok);
   background: var(--sem-ok-wash);
 }
 .verdict.is-warn {
-  border-left-color: var(--sem-warn);
   background: var(--sem-warn-wash);
 }
 .verdict.is-danger {
-  border-left-color: var(--sem-danger);
   background: var(--sem-danger-wash);
 }
 
@@ -874,4 +869,52 @@
   font-size: var(--fs-xs);
   line-height: 1.5;
   color: var(--sem-danger);
+}
+
+/* ---- working overlay ---- */
+
+.busy {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  /* Opaque enough to mute what is behind without hiding the layout. */
+  background: color-mix(in srgb, var(--s-canvas) 88%, transparent);
+}
+
+.busy-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-secondary);
+}
+
+.busy-track {
+  width: 220px;
+  height: 3px;
+  background: var(--s-sunken);
+  border: 1px solid var(--b-strong);
+  overflow: hidden;
+}
+
+.busy-fill {
+  width: 34%;
+  height: 100%;
+  background: var(--a-accent);
+  animation: busy-sweep 1.1s linear infinite;
+}
+
+@keyframes busy-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(390%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A static filled bar still says "working" without the travel. */
+  .busy-fill { animation: none; width: 100%; opacity: 0.5; }
 }

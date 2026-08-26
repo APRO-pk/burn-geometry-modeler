@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { Warning } from './ui/icons';
 
 /**
  * Catches a render error in one part of the UI instead of losing the whole app.
@@ -54,10 +54,10 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div
         role="alert"
-        className="border border-[var(--sem-danger)] bg-[var(--sem-danger-wash)] rounded p-4 m-2 font-mono text-xs"
+        className="border border-[var(--sem-danger)] bg-[var(--sem-danger-wash)] p-4 m-2 font-mono text-xs"
       >
         <div className="flex items-center gap-2 text-[var(--sem-danger)] font-bold mb-2">
-          <AlertTriangle size={14} aria-hidden="true" />
+          <Warning size={14} aria-hidden="true" />
           <span>{this.props.label} failed to render</span>
         </div>
         <p className="text-[var(--sem-danger)] leading-snug mb-3">
@@ -70,7 +70,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <button
           type="button"
           onClick={this.reset}
-          className="border border-[var(--sem-danger)] text-[var(--sem-danger)] px-3 py-1 rounded hover:bg-[var(--sem-danger-wash)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sem-danger)]"
+          className="border border-[var(--sem-danger)] text-[var(--sem-danger)] px-3 py-1 hover:bg-[var(--sem-danger-wash)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sem-danger)]"
         >
           Try again
         </button>

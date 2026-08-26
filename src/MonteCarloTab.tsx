@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Play } from 'lucide-react';
+import { Play } from './ui/icons';
 import { Button } from './ui/primitives';
 import { useFieldIds } from './useFieldIds';
 import {
@@ -130,7 +130,7 @@ export function MonteCarloTab({
             <div className="kv-row">
               <span className="kv-key">Peak pressure, range</span>
               <span className="kv-val">
-                {summary.pc.min.toFixed(2)} – {summary.pc.max.toFixed(2)} MPa
+                {summary.pc.min.toFixed(2)} to {summary.pc.max.toFixed(2)} MPa
               </span>
             </div>
             <div className="kv-row">
@@ -143,13 +143,12 @@ export function MonteCarloTab({
             <div className="kv-row">
               <span className="kv-key">Peak thrust, range</span>
               <span className="kv-val">
-                {summary.thrust.min.toFixed(2)} – {summary.thrust.max.toFixed(2)} kN
+                {summary.thrust.min.toFixed(2)} to {summary.thrust.max.toFixed(2)} kN
               </span>
             </div>
           </div>
           <p className="sec-note">
-            Input variation only. This is what the perturbations you specified do to the model —
-            it does not include the model&apos;s own error, which the Statistics tab reports
+            Input variation only. This is what the perturbations you specified do to the model. It does not include the model&apos;s own error, which the Statistics tab reports
             separately and which is usually larger.
           </p>
         </section>
@@ -178,7 +177,7 @@ export function MonteCarloTab({
                 contentStyle={{
                   background: 'var(--s-raised)',
                   border: '1px solid var(--b-strong)',
-                  borderRadius: 3,
+                  borderRadius: 0,
                   color: 'var(--t-primary)',
                   fontSize: 11,
                   fontFamily: 'var(--font-mono)',

@@ -58,16 +58,8 @@
   flex-direction: column;
   background: var(--s-raised);
   border: 1px solid var(--b-strong);
-  border-left-width: 3px;
   border-radius: var(--radius);
-  box-shadow: 0 10px 28px #000000b0;
   overflow: hidden;
-}
-.ac-pop.is-warning {
-  border-left-color: var(--sem-warn);
-}
-.ac-pop.is-error {
-  border-left-color: var(--sem-danger);
 }
 
 .ac-pop-head {

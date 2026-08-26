@@ -56,18 +56,27 @@
 
   /* ---- accent ---------------------------------------------------------- */
   /* The single interactive accent: focus, selection, primary action. */
-  --a-accent: #4d9fff;
-  --a-accent-dim: #2b6cb8;
-  --a-accent-wash: #4d9fff22;
+  /*
+   * A muted steel blue. The previous #4d9fff was bright enough to glow against
+   * the dark ground, which is the neon look; this sits back where an accent on
+   * an instrument should.
+   */
+  --a-accent: #5b87b8;
+  --a-accent-dim: #3d5f84;
+  --a-accent-wash: #5b87b81f;
 
   /* ---- semantic -------------------------------------------------------- */
   /* Reserved for meaning, never decoration. */
-  --sem-ok: #3ecf8e;
-  --sem-warn: #e0a33a;
-  --sem-danger: #f2604c;
-  --sem-ok-wash: #3ecf8e1a;
-  --sem-warn-wash: #e0a33a1a;
-  --sem-danger-wash: #f2604c1a;
+  /*
+   * Desaturated to roughly the weight of a printed warning label. Bright enough
+   * to find, dull enough that three of them on screen do not fight.
+   */
+  --sem-ok: #6f9e6a;
+  --sem-warn: #b08a45;
+  --sem-danger: #b4574c;
+  --sem-ok-wash: #6f9e6a1c;
+  --sem-warn-wash: #b08a451c;
+  --sem-danger-wash: #b4574c1c;
 
   /*
    * ---- chart series -----------------------------------------------------
@@ -76,12 +85,18 @@
    * common forms of colour blindness -- these traces are frequently compared
    * against each other, so a pair that merges is a real loss of information.
    */
-  --c-1: #4d9fff; /* pressure */
-  --c-2: #3ecf8e; /* Kn */
-  --c-3: #d78bff; /* thrust */
-  --c-4: #e0a33a; /* mass flux */
-  --c-5: #ff8fa3; /* auxiliary */
-  --c-6: #56d4dd; /* auxiliary */
+  /*
+   * Six muted hues, not a spectrum. Traces are compared against each other, so
+   * they must stay separable -- but a saturated rainbow across one plot is the
+   * thing that makes a chart look like a toy. These are spaced around the wheel
+   * at low saturation, and hold up under the common forms of colour blindness.
+   */
+  --c-1: #5b87b8; /* pressure */
+  --c-2: #6f9e6a; /* Kn */
+  --c-3: #9c7fae; /* thrust */
+  --c-4: #b08a45; /* mass flux */
+  --c-5: #b06f70; /* auxiliary */
+  --c-6: #5f9a9e; /* auxiliary */
   --c-grid: #22262c;
   --c-axis: #4a515a;
 
@@ -96,7 +111,11 @@
   --gap: 6px;
   --gap-sm: 3px;
   --gap-lg: 12px;
-  --radius: 3px;
+  /*
+   * Square. A soft radius reads as a consumer card; instrument panels and
+   * drawings have corners.
+   */
+  --radius: 0px;
 
   --font-ui: system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
@@ -155,7 +174,7 @@
 .app-root *::-webkit-scrollbar-thumb {
   background: var(--b-control);
   border: 2px solid var(--s-sunken);
-  border-radius: 5px;
+  border-radius: 0;
 }
 .app-root *::-webkit-scrollbar-thumb:hover {
   background: var(--t-muted);

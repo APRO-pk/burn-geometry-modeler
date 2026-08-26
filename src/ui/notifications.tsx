@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AlertTriangle, Bell, Check, Info, X, XCircle, Trash2 } from 'lucide-react';
+import { Bell, Close, Failure, Info, Ok, Trash, Warning } from './icons';
 import './notifications.css';
 
 /**
@@ -155,11 +155,11 @@ function SeverityIcon({ severity, size = 13 }: { severity: Severity; size?: numb
   const common = { size, 'aria-hidden': true } as const;
   switch (severity) {
     case 'success':
-      return <Check {...common} />;
+      return <Ok {...common} />;
     case 'warning':
-      return <AlertTriangle {...common} />;
+      return <Warning {...common} />;
     case 'error':
-      return <XCircle {...common} />;
+      return <Failure {...common} />;
     default:
       return <Info {...common} />;
   }
@@ -291,7 +291,7 @@ function Toast({
         onClick={() => onDismiss(n.id)}
         aria-label="Dismiss"
       >
-        <X size={12} />
+        <Close size={12} />
       </button>
       {/*
         * A visible countdown, so a toast vanishing is never a surprise.
@@ -375,7 +375,7 @@ export function NotificationBell() {
               disabled={!history.length}
               title="Clear all"
             >
-              <Trash2 size={11} /> Clear
+              <Trash size={11} /> Clear
             </button>
           </div>
           <div className="nt-panel-body">

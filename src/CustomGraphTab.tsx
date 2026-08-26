@@ -149,7 +149,7 @@ export function CustomGraphTab({ chartData, numSegments }: CustomGraphTabProps) 
                 contentStyle={{
                   background: 'var(--s-raised)',
                   border: '1px solid var(--b-strong)',
-                  borderRadius: 3,
+                  borderRadius: 0,
                   color: 'var(--t-primary)',
                   fontSize: 11,
                   fontFamily: 'var(--font-mono)',

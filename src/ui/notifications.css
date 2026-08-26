@@ -37,9 +37,7 @@
   padding: 9px 10px;
   background: var(--s-raised);
   border: 1px solid var(--b-strong);
-  border-left-width: 3px;
   border-radius: var(--radius);
-  box-shadow: 0 6px 20px #000000a0;
   overflow: hidden;
   animation: nt-in 160ms ease-out;
 }
@@ -62,26 +60,14 @@
   }
 }
 
-.nt-toast.is-info {
-  border-left-color: var(--a-accent);
-}
 .nt-toast.is-info .nt-toast-icon {
   color: var(--a-accent);
-}
-.nt-toast.is-success {
-  border-left-color: var(--sem-ok);
 }
 .nt-toast.is-success .nt-toast-icon {
   color: var(--sem-ok);
 }
-.nt-toast.is-warning {
-  border-left-color: var(--sem-warn);
-}
 .nt-toast.is-warning .nt-toast-icon {
   color: var(--sem-warn);
-}
-.nt-toast.is-error {
-  border-left-color: var(--sem-danger);
 }
 .nt-toast.is-error .nt-toast-icon {
   color: var(--sem-danger);
@@ -236,7 +222,8 @@
   justify-content: center;
   background: var(--sem-danger);
   color: #fff;
-  border-radius: 7px;
+  /* Square, like everything else. A pill badge is a consumer-app shape. */
+  border-radius: 0;
   font-family: var(--font-ui);
   font-size: 9px;
   font-weight: 700;
@@ -257,7 +244,6 @@
   background: var(--s-raised);
   border: 1px solid var(--b-strong);
   border-radius: var(--radius);
-  box-shadow: 0 10px 30px #000000b0;
   overflow: hidden;
 }
 

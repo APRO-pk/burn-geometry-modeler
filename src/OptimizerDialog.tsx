@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
+import { Close, Play} from './ui/icons';
 import { useFieldIds } from './useFieldIds';
-import { Play } from 'lucide-react';
 import { runMotor } from './wasmClient';
 import { grainConfigFromUi } from './wasmCore';
 import type { DesignSnapshot } from './useDesignHistory';
@@ -137,10 +137,10 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[var(--scrim)] font-mono text-xs text-[var(--t-primary)]">
-      <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-[600px] flex flex-col p-4 space-y-4">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-[600px] flex flex-col p-4 space-y-4">
         <div className="flex justify-between items-center text-[var(--sem-warn)] font-bold text-sm border-b border-[var(--b-soft)] pb-2">
           <span>Design Optimizer / Sweep</span>
-          <button onClick={onClose} className="hover:text-red-500">✕</button>
+          <button onClick={onClose} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
         </div>
         
         <div className="flex space-x-4 items-end">
@@ -175,13 +175,13 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
               <option value="quasi1D">Quasi-1-D axial</option>
             </select>
           </div>
-          <button onClick={runSweep} disabled={isRunning} className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1 font-bold rounded flex items-center h-7 hover:brightness-110 disabled:opacity-50">
+          <button onClick={runSweep} disabled={isRunning} className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1 font-bold flex items-center h-7 hover:brightness-110 disabled:opacity-50">
             {isRunning ? 'Running...' : <><Play size={12} className="mr-1"/> Run</>}
           </button>
         </div>
 
         {results.length > 0 && (
-          <div className="border border-[var(--b-soft)] rounded overflow-hidden">
+          <div className="border border-[var(--b-soft)] overflow-hidden">
             <table className="w-full text-left">
               <thead className="bg-[var(--s-sunken)] text-[var(--t-secondary)]">
                 <tr>
@@ -197,12 +197,12 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
                 {results.map((r, i) => (
                   <tr key={i} className="hover:bg-[var(--s-raised)] transition-colors border-b border-[var(--b-soft)]">
                     <td className="p-1 pl-2 font-bold text-[var(--sem-ok)]">{r.val.toFixed(4)}</td>
-                    <td className={`p-1 ${r.maxPc > 10 ? 'text-red-400' : 'text-[var(--t-primary)]'}`}>{r.maxPc.toFixed(2)}</td>
+                    <td className={`p-1 ${r.maxPc > 10 ? 'text-[var(--sem-danger)]' : 'text-[var(--t-primary)]'}`}>{r.maxPc.toFixed(2)}</td>
                     <td className="p-1 text-[var(--t-primary)]">{r.maxThrust.toFixed(2)}</td>
                     <td className="p-1 text-[var(--t-primary)]">{r.initialKn.toFixed(0)}</td>
-                    <td className="p-1 text-[10px] text-amber-500 max-w-[100px] truncate" title={r.warnings?.join('\n')}>{r.warnings?.length > 0 ? `${r.warnings.length}⚠️` : ''}</td>
+                    <td className="p-1 text-[10px] text-[var(--sem-warn)] max-w-[100px] truncate" title={r.warnings?.join('\n')}>{r.warnings?.length > 0 ? `${r.warnings.length}⚠️` : ''}</td>
                     <td className="p-1">
-                      <button onClick={() => { onApply({ ...currentConfig, [paramToSweep]: r.val }); onClose(); }} className="text-[var(--a-accent)] hover:text-[var(--t-primary)] text-[10px] bg-[var(--s-sunken)] border border-[var(--b-strong)] px-1 rounded">Apply</button>
+                      <button onClick={() => { onApply({ ...currentConfig, [paramToSweep]: r.val }); onClose(); }} className="text-[var(--a-accent)] hover:text-[var(--t-primary)] text-[10px] bg-[var(--s-sunken)] border border-[var(--b-strong)] px-1">Apply</button>
                     </td>
                   </tr>
                 ))}

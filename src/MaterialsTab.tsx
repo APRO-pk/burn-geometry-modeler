@@ -174,7 +174,7 @@ export function MaterialsTab({
           <p className="sec-note" style={{ borderTop: 0 }}>
             Material parameters are set in the Motor Parameters dock on the left, or loaded whole
             from a configuration file. The thermodynamic erosion model resolves the detailed
-            properties behind the scenes for the named combinations — Graphite and Phenolic —
+            properties behind the scenes for the named combinations, Graphite and Phenolic,
             and exposes them for editing only when the material is set to Custom.
           </p>
         </section>

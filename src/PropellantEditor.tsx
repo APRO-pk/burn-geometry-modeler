@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
+import { Close, Ok, Plus, Settings, Trash} from './ui/icons';
 import { useFieldIds } from './useFieldIds';
-import { Settings, Plus, Trash2, Check } from 'lucide-react';
 import type { BurnRateRegime } from './wasmCore';
 
 export interface PropellantData {
@@ -79,10 +79,10 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--scrim)] font-mono text-xs text-[var(--t-primary)]">
-      <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-[600px] flex flex-col max-h-[90vh]">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-[600px] flex flex-col max-h-[90vh]">
         <div className="bg-[var(--s-sunken)] px-3 py-2 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-[var(--sem-ok)]">
           <div className="flex items-center"><Settings size={14} className="mr-1" /> Propellant Editor</div>
-          <button onClick={onClose} className="hover:text-red-500">✕</button>
+          <button onClick={onClose} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
         </div>
         
         <div className="flex flex-1 overflow-hidden">
@@ -103,13 +103,13 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
                   */
                  <div
                    key={p.id}
-                   className={`p-2 rounded flex justify-between items-center group ${selectedId === p.id ? 'bg-[var(--s-raised)] border border-[var(--b-control)]' : 'hover:bg-[var(--s-sunken)] border border-transparent'}`}
+                   className={`p-2  flex justify-between items-center group ${selectedId === p.id ? 'bg-[var(--s-raised)] border border-[var(--b-control)]' : 'hover:bg-[var(--s-sunken)] border border-transparent'}`}
                  >
                    <button
                      type="button"
                      onClick={() => setSelectedId(p.id)}
                      aria-current={selectedId === p.id}
-                     className="truncate pr-2 flex-1 text-left cursor-pointer bg-transparent border-0 p-0 text-inherit focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sem-ok)] rounded"
+                     className="truncate pr-2 flex-1 text-left cursor-pointer bg-transparent border-0 p-0 text-inherit focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sem-ok)]"
                    >
                      {p.name || 'Unnamed'}
                    </button>
@@ -118,16 +118,16 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
                        type="button"
                        onClick={() => handleDelete(p.id)}
                        aria-label={`Delete ${p.name || 'Unnamed'}`}
-                       className="text-[var(--t-muted)] hover:text-red-500 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity focus:outline-none focus-visible:ring-1 focus-visible:ring-red-500 rounded"
+                       className="text-[var(--t-muted)] hover:text-[var(--sem-danger)] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity focus:outline-none focus-visible:ring-1 focus-visible:ring-red-500"
                      >
-                       <Trash2 size={12} />
+                       <Trash size={12} />
                      </button>
                    )}
                  </div>
                ))}
              </div>
              <div className="p-2 border-t border-[var(--b-strong)]">
-               <button onClick={handleAdd} className="w-full flex items-center justify-center py-1.5 bg-[var(--s-sunken)] hover:bg-[var(--s-raised)] border border-[var(--b-control)] rounded text-[var(--sem-ok)]">
+               <button onClick={handleAdd} className="w-full flex items-center justify-center py-1.5 bg-[var(--s-sunken)] hover:bg-[var(--s-raised)] border border-[var(--b-control)] text-[var(--sem-ok)]">
                  <Plus size={14} className="mr-1" /> Add Propellant
                </button>
              </div>
@@ -186,15 +186,15 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
         </div>
         
         <div className="p-3 border-t border-[var(--b-strong)] flex justify-end space-x-2 bg-[var(--s-sunken)]">
-          <button onClick={onClose} className="px-4 py-1.5 rounded border border-[var(--b-control)] text-[var(--t-secondary)] hover:bg-[var(--s-raised)] hover:text-[var(--t-primary)] transition-colors">
+          <button onClick={onClose} className="px-4 py-1.5 border border-[var(--b-control)] text-[var(--t-secondary)] hover:bg-[var(--s-raised)] hover:text-[var(--t-primary)] transition-colors">
             Close
           </button>
           <button 
             disabled={!selectedProp}
             onClick={() => { if(selectedProp) onApply(selectedProp); }} 
-            className="px-4 py-1.5 rounded bg-[var(--sem-ok)] text-[var(--t-inverse)] font-bold hover:brightness-110 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="px-4 py-1.5 bg-[var(--sem-ok)] text-[var(--t-inverse)] font-bold hover:brightness-110 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
-            <Check size={14} className="mr-1" /> Apply to Engine
+            <Ok size={14} className="mr-1" /> Apply to Engine
           </button>
         </div>
       </div>

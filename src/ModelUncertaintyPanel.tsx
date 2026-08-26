@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Warning } from './ui/icons';
 import {
   modelUncertainty,
   formatBand,
@@ -87,7 +87,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
 
   return (
     <section
-      className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-5 rounded-md shadow-lg w-full"
+      className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-5 w-full"
       aria-labelledby="model-uncertainty-heading"
     >
       <h3
@@ -105,8 +105,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
         * is the only part that changes how you read the figures.
         */}
       <p className="mu-intro">
-        Measured model error, propagated. A <strong>floor</strong> on the error, not a bound —
-        batch, casting and machining variation are invisible to any solver.
+        Measured model error, propagated. A <strong>floor</strong> on the error, not a bound. Batch, casting and machining variation are invisible to any solver.
       </p>
 
       <ul className="space-y-2">
@@ -115,18 +114,18 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
           const isOpen = open === u.output;
           const units = inUnits(u, props);
           return (
-            <li key={u.output} className={`border ${tone.border} ${tone.bg} rounded`}>
+            <li key={u.output} className={`border ${tone.border} ${tone.bg} `}>
               <button
                 type="button"
                 onClick={() => setOpen(isOpen ? null : u.output)}
                 aria-expanded={isOpen}
-                className="w-full flex items-center justify-between p-3 text-left hover:bg-[var(--s-hover)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--a-accent)] rounded"
+                className="w-full flex items-center justify-between p-3 text-left hover:bg-[var(--s-hover)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--a-accent)]"
               >
                 <span className="flex items-center gap-2">
                   {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   <span className="text-[var(--t-primary)] text-[11px] font-semibold">{u.label}</span>
                   {u.orderOfMagnitudeOnly && (
-                    <AlertTriangle size={11} className="text-[var(--sem-danger)]" aria-hidden="true" />
+                    <Warning size={11} className="text-[var(--sem-danger)]" aria-hidden="true" />
                   )}
                 </span>
                 <span className={`${tone.text} font-mono text-[12px] font-bold`}>
@@ -143,7 +142,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
                   )}
                   {u.orderOfMagnitudeOnly && (
                     <p className="mu-warn">
-                      <strong>Order of magnitude only</strong> — uncalibrated here. Compare designs
+                      <strong>Order of magnitude only</strong>: uncalibrated here. Compare designs
                       with it; do not size hardware.
                     </p>
                   )}
@@ -172,7 +171,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
       </ul>
 
       {geom && (
-        <div className="border border-[var(--b-soft)] rounded p-3 bg-[var(--s-canvas)] mt-4">
+        <div className="border border-[var(--b-soft)] p-3 bg-[var(--s-canvas)] mt-4">
           <p className="text-[var(--t-secondary)] font-bold mb-2 text-[11px]">
             GRAIN MODEL: {props.grainKind.toUpperCase()}
           </p>
@@ -210,7 +209,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
             {geom.signFlips && (
               <li>
                 • The error changes sign through the burn, so no single correction factor can remove
-                it — one half would get worse.
+                it, because one half would get worse.
               </li>
             )}
             {geom.impulseWeightedError < 0.001 && (

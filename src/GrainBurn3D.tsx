@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pause, Play, Reset } from './ui/icons';
 import * as THREE from 'three';
-import { Play, Pause, RotateCcw } from 'lucide-react';
 import { outlineAt } from './grainOutline';
 import type { GrainOutline, Pt } from './grainOutline';
 import { grainFromConfig, burnoutWeb } from './surrogate/features';
@@ -378,7 +378,7 @@ export function GrainBurn3D({ grain, results }: Props) {
     <div className="w-full max-w-5xl space-y-3 mt-4 text-xs font-mono">
       <div
         ref={mountRef}
-        className="w-full h-[420px] border border-[var(--b-soft)] rounded bg-[var(--s-canvas)] relative overflow-hidden"
+        className="w-full h-[420px] border border-[var(--b-soft)] bg-[var(--s-canvas)] relative overflow-hidden"
       >
         <div className="absolute top-2 left-2 z-10 text-[var(--t-muted)] text-[10px] pointer-events-none">
           drag to rotate &middot; scroll to zoom
@@ -394,16 +394,16 @@ export function GrainBurn3D({ grain, results }: Props) {
       <div className="flex items-center space-x-3">
         <button
           onClick={() => (progress >= 1 ? (setProgress(0), setPlaying(true)) : setPlaying(!playing))}
-          className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-3 py-1.5 font-bold rounded flex items-center hover:brightness-110"
+          className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-3 py-1.5 font-bold flex items-center hover:brightness-110"
         >
           {playing ? <Pause className="w-3 h-3 mr-1" /> : <Play className="w-3 h-3 mr-1" />}
           {playing ? 'Pause' : 'Play'}
         </button>
         <button
           onClick={reset}
-          className="border border-[var(--b-control)] text-[var(--t-secondary)] px-2 py-1.5 rounded flex items-center hover:border-[var(--b-control)]"
+          className="border border-[var(--b-control)] text-[var(--t-secondary)] px-2 py-1.5 flex items-center hover:border-[var(--b-control)]"
         >
-          <RotateCcw className="w-3 h-3" />
+          <Reset className="w-3 h-3" />
         </button>
         <input
           type="range"
@@ -428,7 +428,7 @@ export function GrainBurn3D({ grain, results }: Props) {
       </div>
 
       {/* --- readout --- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border border-[var(--b-soft)] rounded p-3 bg-[var(--s-canvas)]">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border border-[var(--b-soft)] p-3 bg-[var(--s-canvas)]">
         <div>
           <p className="text-[var(--t-secondary)] text-[10px]">{timeline ? 'Time' : 'Burn progress'}</p>
           <p className="text-[var(--t-primary)]">
@@ -488,11 +488,11 @@ export function GrainBurn3D({ grain, results }: Props) {
         saying so is more useful than quietly showing two figures that disagree.
       */}
       {Math.abs(abGap) > 0.02 && !outline.burnedOut && (
-        <div className="border border-[var(--sem-warn)] bg-[var(--sem-warn-wash)] rounded p-2 text-[10px] text-[var(--sem-warn)] leading-snug">
+        <div className="border border-[var(--sem-warn)] bg-[var(--sem-warn-wash)] p-2 text-[10px] text-[var(--sem-warn)] leading-snug">
           At this web the drawn burning area is {(abGap * 100).toFixed(1)}% from the value the
           solver used ({(lateral * 1e4).toFixed(1)} cm² lateral). The shape here comes from exact
           polygon offsetting; <span className="text-[var(--sem-warn)]">{grain.kind}</span>&apos;s analytic
-          model in engine.ts is an approximation — for Finocyl the fin slots are treated as sharp
+          model in engine.ts is an approximation: for Finocyl the fin slots are treated as sharp
           rectangles, which a real burn rounds off. The picture is the accurate one.
         </div>
       )}

@@ -43,7 +43,6 @@
   border: 1px solid var(--b-strong);
   border-radius: var(--radius);
   /* A real drop shadow: the menu must read as floating above the window. */
-  box-shadow: 0 8px 24px #000000a8;
 }
 
 .sh-menu-item {
@@ -431,8 +430,6 @@
   white-space: nowrap;
 }
 
-
-
 /* ---------------------------------------------------- Ballistics tab body */
 
 .bal-stack {
@@ -517,13 +514,11 @@
   font-size: var(--fs-xs);
   line-height: 1.45;
   padding-left: 8px;
-  border-left: 2px solid transparent;
+  border-left: 1px solid var(--b-strong);
 }
 .chk-item.is-error {
   color: var(--sem-danger);
-  border-left-color: var(--sem-danger);
 }
 .chk-item.is-warning {
   color: var(--sem-warn);
-  border-left-color: var(--sem-warn);
 }

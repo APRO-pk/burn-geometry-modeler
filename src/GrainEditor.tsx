@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { Close, Ok, Settings} from './ui/icons';
 import { useFieldIds } from './useFieldIds';
-import { Settings, Check } from 'lucide-react';
 import { grainFromUi } from './engine';
 import { DXFRegressionResults } from './dxfProcessor';
 
@@ -83,10 +83,10 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--scrim)] font-mono text-xs text-[var(--t-primary)]">
-      <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] shadow-2xl rounded w-[800px] flex flex-col max-h-[90vh]">
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-[800px] flex flex-col max-h-[90vh]">
         <div className="bg-[var(--s-sunken)] px-3 py-2 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-[var(--a-accent)]">
           <div className="flex items-center"><Settings size={14} className="mr-1" /> Grain Geometry Editor & Previewer</div>
-          <button onClick={onClose} className="hover:text-red-500">✕</button>
+          <button onClick={onClose} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
         </div>
         
         <div className="flex flex-1 overflow-hidden min-h-[500px]">
@@ -179,7 +179,7 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
              )}
              
              {params.grainType === 'CustomDXF' && !dxfData && (
-                <div className="text-red-400 text-xs">DXF Data must be loaded in the main window.</div>
+                <div className="text-[var(--sem-danger)] text-xs">DXF Data must be loaded in the main window.</div>
              )}
 
           </div>
@@ -281,11 +281,11 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
                 className="w-full accent-[var(--a-accent)]"
               />
               <div className="grid grid-cols-2 gap-4 text-sm mt-4">
-                 <div className="flex flex-col bg-[var(--s-sunken)] p-2 rounded border border-[var(--b-soft)]">
+                 <div className="flex flex-col bg-[var(--s-sunken)] p-2 border border-[var(--b-soft)]">
                    <span className="text-[var(--t-secondary)]">Port Area</span>
                    <span className="text-[var(--t-primary)] text-lg font-bold">{(stats.portArea * 10000).toFixed(2)} cm²</span>
                  </div>
-                 <div className="flex flex-col bg-[var(--s-sunken)] p-2 rounded border border-[var(--b-soft)]">
+                 <div className="flex flex-col bg-[var(--s-sunken)] p-2 border border-[var(--b-soft)]">
                    <span className="text-[var(--t-secondary)]">Burning Area</span>
                    <span className="text-[var(--sem-ok)] text-lg font-bold">{(stats.burnArea * 10000).toFixed(2)} cm²</span>
                  </div>
@@ -295,14 +295,14 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
         </div>
         
         <div className="p-3 border-t border-[var(--b-strong)] flex justify-end space-x-2 bg-[var(--s-sunken)]">
-          <button onClick={onClose} className="px-4 py-1.5 rounded border border-[var(--b-control)] text-[var(--t-secondary)] hover:bg-[var(--s-raised)] hover:text-[var(--t-primary)] transition-colors">
+          <button onClick={onClose} className="px-4 py-1.5 border border-[var(--b-control)] text-[var(--t-secondary)] hover:bg-[var(--s-raised)] hover:text-[var(--t-primary)] transition-colors">
             Cancel
           </button>
           <button 
             onClick={() => onApply(params)} 
-            className="px-4 py-1.5 rounded bg-[var(--a-accent)] text-[var(--t-inverse)] font-bold hover:bg-[var(--a-accent-dim)] transition-colors flex items-center"
+            className="px-4 py-1.5 bg-[var(--a-accent)] text-[var(--t-inverse)] font-bold hover:bg-[var(--a-accent-dim)] transition-colors flex items-center"
           >
-            <Check size={14} className="mr-1" /> Apply Settings
+            <Ok size={14} className="mr-1" /> Apply Settings
           </button>
         </div>
       </div>
