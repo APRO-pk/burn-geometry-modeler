@@ -2073,7 +2073,7 @@ export default function AppDesktop() {
 
       {showPreferences && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--scrim)]">
-          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-96 flex flex-col font-mono text-[var(--t-primary)]">
+          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-96 flex flex-col text-[var(--t-primary)]">
             <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--sem-warn)]">
               <div className="flex items-center"><Settings size={14} className="mr-1" /> Preferences</div>
               <button onClick={() => setShowPreferences(false)} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
@@ -2127,7 +2127,7 @@ export default function AppDesktop() {
 
       {showUnitConverter && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--scrim)]">
-          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-80 flex flex-col font-mono text-[var(--t-primary)]">
+          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-80 flex flex-col text-[var(--t-primary)]">
             <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--a-accent)]">
               <div className="flex items-center"><Grain size={14} className="mr-1" /> Unit Converter</div>
               <button onClick={() => setShowUnitConverter(false)} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
@@ -2151,7 +2151,7 @@ export default function AppDesktop() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <input type="number" step="any" value={ucVal1} onChange={e => setUcVal1(e.target.value)} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--sem-ok)] px-2 py-1 mb-1 font-mono text-right outline-none focus:border-[var(--a-accent)]" />
+                  <input type="number" step="any" value={ucVal1} onChange={e => setUcVal1(e.target.value)} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--sem-ok)] px-2 py-1 mb-1 text-right outline-none focus:border-[var(--a-accent)]" />
                   <select value={ucUnit1} onChange={e => setUcUnit1(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] px-2 py-1 outline-none focus:border-[var(--a-accent)]">
                     {ucMode === 'Length' && ['m','cm','mm','in','ft'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Pressure' && ['Pa','kPa','MPa','psi','bar','atm'].map(u => <option key={u} value={u}>{u}</option>)}
@@ -2160,7 +2160,7 @@ export default function AppDesktop() {
                   </select>
                 </div>
                 <div>
-                  <input type="text" readOnly value={getUcConvertedMode()} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--a-accent)] px-2 py-1 mb-1 font-mono text-right font-bold outline-none" />
+                  <input type="text" readOnly value={getUcConvertedMode()} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--a-accent)] px-2 py-1 mb-1 text-right font-bold outline-none" />
                   <select value={ucUnit2} onChange={e => setUcUnit2(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] px-2 py-1 outline-none focus:border-[var(--a-accent)]">
                     {ucMode === 'Length' && ['m','cm','mm','in','ft'].map(u => <option key={u} value={u}>{u}</option>)}
                     {ucMode === 'Pressure' && ['Pa','kPa','MPa','psi','bar','atm'].map(u => <option key={u} value={u}>{u}</option>)}
@@ -2746,7 +2746,7 @@ export default function AppDesktop() {
                             border: '1px solid var(--b-strong)',
                             borderRadius: 0,
                             fontSize: 11,
-                            fontFamily: 'var(--font-mono)',
+                            fontFamily: 'var(--font)',
                           }}
                           labelFormatter={(v: number | string) => `x = ${Number(v).toFixed(3)} m`}
                         />
@@ -2859,12 +2859,12 @@ export default function AppDesktop() {
                   </svg>
                 </div>
                 <div className="absolute bottom-4 left-4 right-4 flex flex-col space-y-2 bg-[var(--s-canvas)] p-3 border border-[var(--b-soft)]">
-                  <div className="flex justify-between text-[var(--c-6)] text-[10px] font-mono px-2">
+                  <div className="flex justify-between text-[var(--c-6)] text-[10px] px-2">
                     <span>Burn Area: {(results[visualizerIndex]?.Ab * 10000 || 0).toFixed(1)} cm²</span>
                     <span>Port Area: {(results[visualizerIndex]?.PortArea * 10000 || 0).toFixed(1)} cm²</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-[var(--c-6)] text-[10px] font-mono w-16">T: {results[visualizerIndex]?.Time.toFixed(2) || '0.00'}s</span>
+                    <span className="text-[var(--c-6)] text-[10px] w-16">T: {results[visualizerIndex]?.Time.toFixed(2) || '0.00'}s</span>
                     <input 
                       type="range" 
                       min="0" 
@@ -2874,7 +2874,7 @@ export default function AppDesktop() {
                       className="flex-1 accent-[var(--c-6)]"
                       disabled={results.length === 0}
                     />
-                    <span className="text-[var(--c-6)] text-[10px] font-mono w-16 text-right">W: {(currentY * 1000).toFixed(1)}mm</span>
+                    <span className="text-[var(--c-6)] text-[10px] w-16 text-right">W: {(currentY * 1000).toFixed(1)}mm</span>
                   </div>
                 </div>
               </div>
@@ -2907,7 +2907,7 @@ export default function AppDesktop() {
                           borderRadius: 0,
                           color: 'var(--t-primary)',
                           fontSize: 11,
-                          fontFamily: 'var(--font-mono)',
+                          fontFamily: 'var(--font)',
                         }}
                         labelFormatter={(v: number | string) => `${Number(v).toFixed(2)} MPa`}
                       />
@@ -3022,12 +3022,12 @@ export default function AppDesktop() {
               <div className="chart-frame" style={{ overflowY: "auto", padding: "var(--gap-lg)" }}>
                 <div className="chart-caption">Live grain burn-back</div>
                 {grainType === 'CustomDXF' && !dxfData ? (
-                  <div className="text-[var(--t-muted)] italic font-mono text-xs mt-6">
+                  <div className="text-[var(--t-muted)] italic text-xs mt-6">
                     Load a DXF profile to view its burn-back.
                   </div>
                 ) : (
                   <React.Suspense
-                    fallback={<div className="text-[var(--t-muted)] italic font-mono text-xs mt-6">Loading 3D view…</div>}
+                    fallback={<div className="text-[var(--t-muted)] italic text-xs mt-6">Loading 3D view…</div>}
                   >
                     <GrainBurn3D grain={burn3dGrain} results={results} />
                   </React.Suspense>

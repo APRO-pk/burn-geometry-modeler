@@ -136,7 +136,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[var(--scrim)] font-mono text-xs text-[var(--t-primary)]">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[var(--scrim)] text-xs text-[var(--t-primary)]">
       <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-[600px] flex flex-col p-4 space-y-4">
         <div className="flex justify-between items-center text-[var(--sem-warn)] font-bold text-sm border-b border-[var(--b-soft)] pb-2">
           <span>Design Optimizer / Sweep</span>

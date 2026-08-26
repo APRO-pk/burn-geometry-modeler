@@ -92,7 +92,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
     >
       <h3
         id="model-uncertainty-heading"
-        className="font-mono font-bold text-[var(--a-accent)] mb-1 pb-2 border-b border-[var(--b-soft)] text-sm tracking-wide"
+        className="font-bold text-[var(--a-accent)] mb-1 pb-2 border-b border-[var(--b-soft)] text-sm tracking-wide"
       >
         MODEL UNCERTAINTY
       </h3>
@@ -128,7 +128,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
                     <Warning size={11} className="text-[var(--sem-danger)]" aria-hidden="true" />
                   )}
                 </span>
-                <span className={`${tone.text} font-mono text-[12px] font-bold`}>
+                <span className={`${tone.text}  text-[12px] font-bold`}>
                   {formatBand(u)}
                 </span>
               </button>
@@ -136,7 +136,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
               {isOpen && (
                 <div className="px-3 pb-3 pt-0 space-y-2">
                   {units && (
-                    <p className="text-[10px] text-[var(--t-secondary)] font-mono">
+                    <p className="text-[10px] text-[var(--t-secondary)]">
                       Predicted range: <span className="text-[var(--t-primary)]">{units}</span>
                     </p>
                   )}
@@ -154,7 +154,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
                       {u.contributions.map((c) => (
                         <li key={c.name} className="text-[10px] leading-snug">
                           <span className="text-[var(--t-primary)]">{c.name}</span>{' '}
-                          <span className="font-mono text-[var(--t-secondary)]">
+                          <span className="text-[var(--t-secondary)]">
                             ±{(c.relative * 100).toFixed(c.relative < 0.1 ? 1 : 0)}%
                           </span>
                           <br />
@@ -178,14 +178,14 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
           <ul className="space-y-1.5 text-[10px] text-[var(--t-muted)] leading-snug">
             <li>
               • Burning area vs polygon ground truth:{' '}
-              <span className="text-[var(--t-secondary)] font-mono">
+              <span className="text-[var(--t-secondary)]">
                 {(geom.impulseWeightedError * 100).toFixed(2)}%
               </span>{' '}
               weighted by area, {(geom.mainBurnError * 100).toFixed(2)}% through the main burn.
             </li>
             <li>
               • Total burned volume, which sets impulse:{' '}
-              <span className="text-[var(--t-secondary)] font-mono">
+              <span className="text-[var(--t-secondary)]">
                 {geom.volumeError >= 0 ? '+' : ''}
                 {(geom.volumeError * 100).toFixed(2)}%
               </span>
@@ -194,7 +194,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
             {geom.maxAnalyticStep > 0.2 && (
               <li className="text-[var(--sem-warn)]">
                 • Burning area steps{' '}
-                <span className="font-mono">{(geom.maxAnalyticStep * 100).toFixed(0)}%</span> at{' '}
+                <span className="">{(geom.maxAnalyticStep * 100).toFixed(0)}%</span> at{' '}
                 {(geom.maxAnalyticStepAt * 100).toFixed(0)}% web, where the geometry changes
                 topology. The solver integrates straight through; real hardware rounds this off.
               </li>
@@ -202,7 +202,7 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
             {geom.burnoutOverrun > 0.02 && (
               <li className="text-[var(--sem-warn)]">
                 • This model keeps burning for{' '}
-                <span className="font-mono">{(geom.burnoutOverrun * 100).toFixed(0)}%</span> of the
+                <span className="">{(geom.burnoutOverrun * 100).toFixed(0)}%</span> of the
                 web after the geometry says the grain is consumed, inflating burn time and impulse.
               </li>
             )}

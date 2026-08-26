@@ -54,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div
         role="alert"
-        className="border border-[var(--sem-danger)] bg-[var(--sem-danger-wash)] p-4 m-2 font-mono text-xs"
+        className="border border-[var(--sem-danger)] bg-[var(--sem-danger-wash)] p-4 m-2 text-xs"
       >
         <div className="flex items-center gap-2 text-[var(--sem-danger)] font-bold mb-2">
           <Warning size={14} aria-hidden="true" />

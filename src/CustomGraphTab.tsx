@@ -152,7 +152,7 @@ export function CustomGraphTab({ chartData, numSegments }: CustomGraphTabProps) 
                   borderRadius: 0,
                   color: 'var(--t-primary)',
                   fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font)',
                 }}
               />
               <Legend

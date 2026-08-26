@@ -206,10 +206,10 @@ export function StructuralTab({
                 ))}
                 <rect x="590" y="30" width="22" height="140" fill="var(--sem-danger)" />
                 <rect x="88" y="30" width="22" height="140" fill="var(--c-1)" />
-                <text x="350" y="30" fill="var(--t-secondary)" fontSize="11" textAnchor="middle" fontFamily="var(--font-mono)">
+                <text x="350" y="30" fill="var(--t-secondary)" fontSize="11" textAnchor="middle" fontFamily="var(--font)">
                   bore hoop ≈ {MPa(s.lame.inner.hoop)} MPa
                 </text>
-                <text x="601" y="185" fill="var(--sem-danger)" fontSize="11" textAnchor="middle" fontFamily="var(--font-mono)">
+                <text x="601" y="185" fill="var(--sem-danger)" fontSize="11" textAnchor="middle" fontFamily="var(--font)">
                   {MPa(s.maxVonMises)} MPa
                 </text>
               </svg>
@@ -271,7 +271,7 @@ export function StructuralTab({
                 <Tooltip
                   contentStyle={{
                     background: 'var(--s-raised)', border: '1px solid var(--b-strong)',
-                    borderRadius: 0, fontSize: 11, fontFamily: 'var(--font-mono)',
+                    borderRadius: 0, fontSize: 11, fontFamily: 'var(--font)',
                   }}
                   formatter={(v: number | string) => `${Number(v).toFixed(1)} MPa`}
                 />

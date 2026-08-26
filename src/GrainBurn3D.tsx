@@ -375,7 +375,7 @@ export function GrainBurn3D({ grain, results }: Props) {
   const abGap = lateral > 0 ? (drawnAb - lateral) / lateral : 0;
 
   return (
-    <div className="w-full max-w-5xl space-y-3 mt-4 text-xs font-mono">
+    <div className="w-full max-w-5xl space-y-3 mt-4 text-xs">
       <div
         ref={mountRef}
         className="w-full h-[420px] border border-[var(--b-soft)] bg-[var(--s-canvas)] relative overflow-hidden"

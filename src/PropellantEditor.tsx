@@ -78,7 +78,7 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--scrim)] font-mono text-xs text-[var(--t-primary)]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--scrim)] text-xs text-[var(--t-primary)]">
       <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-[600px] flex flex-col max-h-[90vh]">
         <div className="bg-[var(--s-sunken)] px-3 py-2 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-[var(--sem-ok)]">
           <div className="flex items-center"><Settings size={14} className="mr-1" /> Propellant Editor</div>

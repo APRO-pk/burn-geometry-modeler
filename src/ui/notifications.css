@@ -115,7 +115,7 @@
   border: 1px solid var(--b-control);
   border-radius: var(--radius);
   color: var(--t-primary);
-  font-family: var(--font-ui);
+  font-family: var(--font);
   font-size: var(--fs-xs);
   cursor: pointer;
 }
@@ -224,7 +224,7 @@
   color: #fff;
   /* Square, like everything else. A pill badge is a consumer-app shape. */
   border-radius: 0;
-  font-family: var(--font-ui);
+  font-family: var(--font);
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
@@ -270,7 +270,7 @@
   background: none;
   border: 0;
   color: var(--t-muted);
-  font-family: var(--font-ui);
+  font-family: var(--font);
   font-size: var(--fs-xs);
   text-transform: none;
   letter-spacing: 0;
@@ -348,7 +348,7 @@
 
 .nt-item-time {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--font);
   font-size: var(--fs-xs);
   color: var(--t-muted);
 }

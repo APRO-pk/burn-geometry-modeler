@@ -148,7 +148,7 @@
   color: var(--t-primary);
   border: 1px solid var(--b-control);
   border-radius: var(--radius);
-  font-family: var(--font-mono);
+  font-family: var(--font);
   font-size: var(--fs-sm);
 }
 .ui-input:hover:not(:disabled) {
@@ -171,7 +171,7 @@
 }
 
 .ui-select {
-  font-family: var(--font-ui);
+  font-family: var(--font);
   cursor: pointer;
   /* Native arrow, restyled by the browser's dark scheme. */
   color-scheme: dark;
@@ -190,7 +190,7 @@
   color: var(--t-primary);
   border: 1px solid var(--b-control);
   border-radius: var(--radius);
-  font-family: var(--font-ui);
+  font-family: var(--font);
   font-size: var(--fs-sm);
   cursor: pointer;
   white-space: nowrap;
@@ -294,7 +294,7 @@
   text-overflow: ellipsis;
 }
 .ui-stat-value {
-  font-family: var(--font-mono);
+  font-family: var(--font);
   font-size: var(--fs-base);
   color: var(--t-primary);
   white-space: nowrap;
@@ -330,7 +330,7 @@
   background: none;
   border: 0;
   color: var(--t-secondary);
-  font-family: var(--font-ui);
+  font-family: var(--font);
   font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -453,7 +453,7 @@
   background: none;
   border: 0;
   padding: 0;
-  font-family: var(--font-ui);
+  font-family: var(--font);
   font-size: var(--fs-xs);
   font-weight: 400;
   text-transform: none;
@@ -482,7 +482,7 @@
   font-size: var(--fs-sm);
 }
 .ui-kv-val {
-  font-family: var(--font-mono);
+  font-family: var(--font);
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--t-primary);
@@ -596,7 +596,7 @@
   white-space: nowrap;
 }
 .kv-val {
-  font-family: var(--font-mono);
+  font-family: var(--font);
   font-size: var(--fs-sm);
   color: var(--t-primary);
   text-align: right;
@@ -673,7 +673,7 @@
 .ui-table td {
   padding: 4px 8px;
   border-bottom: 1px solid var(--b-soft);
-  font-family: var(--font-mono);
+  font-family: var(--font);
   color: var(--t-primary);
 }
 .ui-table tbody tr:hover td {
@@ -764,7 +764,7 @@
 }
 .mat-subtitle {
   padding: 6px var(--gap-lg) 0;
-  font-family: var(--font-mono);
+  font-family: var(--font);
   font-size: var(--fs-sm);
   color: var(--t-primary);
 }
@@ -797,7 +797,7 @@
   min-width: 110px;
 }
 .verdict-num {
-  font-family: var(--font-mono);
+  font-family: var(--font);
   font-size: 26px;
   font-weight: 700;
   line-height: 1.1;
@@ -887,7 +887,7 @@
 }
 
 .busy-label {
-  font-family: var(--font-mono);
+  font-family: var(--font);
   font-size: var(--fs-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;

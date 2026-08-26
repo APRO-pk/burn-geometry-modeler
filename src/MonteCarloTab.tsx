@@ -180,7 +180,7 @@ export function MonteCarloTab({
                   borderRadius: 0,
                   color: 'var(--t-primary)',
                   fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font)',
                 }}
               />
               <Scatter name="Runs" data={results} fill="var(--c-1)" fillOpacity={0.75} />

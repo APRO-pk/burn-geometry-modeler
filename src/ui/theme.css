@@ -117,8 +117,25 @@
    */
   --radius: 0px;
 
-  --font-ui: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+  /*
+   * ONE typeface for the whole interface.
+   *
+   * It was a monospace stack, on the reasoning that aligned digits make a
+   * column of readouts easier to scan. That is true of the digits and wrong
+   * about everything else: menus, labels, headings, warnings and explanatory
+   * notes were all being set in a code face, which is what made the app read
+   * as a terminal rather than as an instrument.
+   *
+   * A neutral grotesque instead. The alignment argument is answered properly
+   * by `font-variant-numeric: tabular-nums` on the readouts (below), which
+   * gives fixed-width digits in a proportional face -- the same thing a
+   * spreadsheet or a CAD package does.
+   *
+   * System faces only: no webfont to download, and each platform contributes
+   * the one its own applications use.
+   */
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
   --fs-base: 12px;
   --fs-sm: 11px;
   --fs-xs: 10px;
@@ -134,7 +151,7 @@
   flex-direction: column;
   background: var(--s-window);
   color: var(--t-primary);
-  font-family: var(--font-ui);
+  font-family: var(--font);
   font-size: var(--fs-base);
   /*
    * Chrome is not selectable; readouts are. Dragging across a desktop app's
@@ -142,6 +159,34 @@
    * computed number out of a results table must be able to.
    */
   user-select: none;
+}
+
+/*
+ * Fixed-width digits, everywhere a number is read as part of a column.
+ *
+ * This is what the monospace stack was really for. Tabular figures give the
+ * same alignment inside a proportional face, so a table of pressures still
+ * lines up while the labels beside them are set in the interface font.
+ *
+ * Applied to the readout classes rather than globally: prose does not want it,
+ * and neither does a heading.
+ */
+.kv-val,
+.kv-sub,
+.ui-stat-value,
+.ui-stat-band,
+.ui-input,
+.ui-table td,
+.ui-table th,
+.verdict-num,
+.unc-band,
+.sh-console-body,
+.nt-item-time,
+.busy-label,
+.recharts-text {
+  font-variant-numeric: tabular-nums;
+  /* Slightly tighter than default so long values stay in their column. */
+  letter-spacing: 0.01em;
 }
 
 .selectable {

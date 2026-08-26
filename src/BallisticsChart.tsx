@@ -157,7 +157,7 @@ export function BallisticsChart({ data, enabled, peakPc }: BallisticsChartProps)
               border: `1px solid ${cssVar('--b-strong')}`,
               borderRadius: 0,
               fontSize: 11,
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font)',
               color: cssVar('--t-primary'),
             }}
             labelFormatter={(v: number | string) => `t = ${Number(v).toFixed(3)} s`}
