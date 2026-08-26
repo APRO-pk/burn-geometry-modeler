@@ -96,11 +96,17 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
       >
         MODEL UNCERTAINTY
       </h3>
-      <p className="text-[10px] text-[var(--t-muted)] leading-snug mb-4 mt-2">
-        Known error of the approximations this solver makes, propagated to each output. These are
-        measured against independent references, not fitted to firings — so treat them as a{' '}
-        <span className="text-[var(--t-secondary)]">floor</span> on the error, not a bound. Real hardware also
-        varies by propellant batch, grain defects and machining, which no model here can see.
+      {/*
+        * One line, not a paragraph.
+        *
+        * The full reasoning is in MODEL_UNCERTAINTY.md; repeating it above the
+        * numbers meant four lines of prose between the reader and the thing
+        * they opened the tab for. The essential caveat -- floor, not bound --
+        * is the only part that changes how you read the figures.
+        */}
+      <p className="mu-intro">
+        Measured model error, propagated. A <strong>floor</strong> on the error, not a bound —
+        batch, casting and machining variation are invisible to any solver.
       </p>
 
       <ul className="space-y-2">
@@ -136,10 +142,9 @@ export function ModelUncertaintyPanel(props: ModelUncertaintyPanelProps) {
                     </p>
                   )}
                   {u.orderOfMagnitudeOnly && (
-                    <p className="text-[10px] text-[var(--sem-danger)] leading-snug">
-                      This output is <strong>order-of-magnitude only</strong>. The model behind it is
-                      uncalibrated in this repository — use it to compare designs, not to size
-                      hardware.
+                    <p className="mu-warn">
+                      <strong>Order of magnitude only</strong> — uncalibrated here. Compare designs
+                      with it; do not size hardware.
                     </p>
                   )}
                   <div>

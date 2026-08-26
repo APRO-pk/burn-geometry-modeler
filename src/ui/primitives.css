@@ -770,3 +770,108 @@
   font-size: var(--fs-sm);
   color: var(--t-primary);
 }
+
+/* ---- verdict block: the one number the Structural tab exists to produce ---- */
+
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-lg);
+  padding: var(--gap-lg);
+  border-bottom: 1px solid var(--b-soft);
+  border-left: 3px solid var(--b-control);
+}
+.verdict.is-ok {
+  border-left-color: var(--sem-ok);
+  background: var(--sem-ok-wash);
+}
+.verdict.is-warn {
+  border-left-color: var(--sem-warn);
+  background: var(--sem-warn-wash);
+}
+.verdict.is-danger {
+  border-left-color: var(--sem-danger);
+  background: var(--sem-danger-wash);
+}
+
+.verdict-sf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  min-width: 110px;
+}
+.verdict-num {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.verdict.is-ok .verdict-num {
+  color: var(--sem-ok);
+}
+.verdict.is-warn .verdict-num {
+  color: var(--sem-warn);
+}
+.verdict.is-danger .verdict-num {
+  color: var(--sem-danger);
+}
+.verdict-cap {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-muted);
+}
+.verdict-detail {
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--t-primary);
+}
+.verdict-where {
+  color: var(--t-muted);
+  font-size: var(--fs-xs);
+}
+
+/* ---- assumptions ---- */
+
+.assump {
+  margin: 0;
+  padding: var(--gap) var(--gap-lg) var(--gap) 26px;
+  list-style: disc;
+}
+.assump li {
+  margin: 5px 0;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--t-muted);
+}
+
+/* ---- FEA schematic ---- */
+
+.fea-svg {
+  width: 100%;
+  height: auto;
+  max-height: 200px;
+  background: var(--s-canvas);
+  border: 1px solid var(--b-strong);
+  border-radius: var(--radius);
+}
+
+/* ---- model-uncertainty panel ---- */
+
+.mu-intro {
+  margin: 6px 0 10px;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--t-muted);
+}
+.mu-intro strong {
+  color: var(--t-secondary);
+  font-weight: 600;
+}
+.mu-warn {
+  margin: 0 0 6px;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--sem-danger);
+}

@@ -2300,6 +2300,21 @@ export default function AppDesktop() {
           items={stabilityWarnings}
           footer="Raised by the solver during the last run."
         />
+        {/*
+          * Structural flags, hoisted out of the Structural tab.
+          *
+          * They were a red panel at the bottom of a long scrolling page, which
+          * is the worst place for "your casing yields at peak pressure" -- you
+          * only saw it if you had already scrolled past everything else. Here
+          * they are visible from any tab.
+          */}
+        <AlertChip
+          severity="error"
+          noun="flag"
+          title="Structural flags"
+          items={structural?.warnings ?? []}
+          footer="From the casing and closure analysis. Full detail on the Structural tab."
+        />
         <NotificationBell />
         <span className="sh-toolbar-note">
           {autosave.unavailable
@@ -2551,23 +2566,63 @@ export default function AppDesktop() {
               </div>
             </div>
 
-            {/* QGroupBox: Results Summary */}
+            {/*
+              * Quick results, in the dock beside the inputs.
+              *
+              * Was a stack of alternating label and value divs, which put the
+              * labels down one side and the values down the other instead of
+              * pairing them. It is a two-column grid now, like every other
+              * readout in the app.
+              */}
             {metrics && (
               <div className="ui-groupbox is-result">
-                <span className="absolute -top-2.5 left-2 bg-[var(--s-panel)] px-1 text-[10px] font-bold text-[var(--a-accent)] uppercase">Results Summary</span>
-                <div className="ui-fields">
-                  <div className="ui-kv-key">Max Thrust:</div><div className="ui-kv-val">{(metrics.maxThrust/1000).toFixed(2)} kN</div>
-                  <div className="ui-kv-key">Max Press:</div><div className="ui-kv-val">{(metrics.maxPc/1e6).toFixed(2)} MPa</div>
-                  <div className="ui-kv-key">Total Imp:</div><div className="ui-kv-val">{(metrics.totalImpulse/1000).toFixed(1)} kNs</div>
-                  <div className="ui-kv-key">Isp:</div><div className="ui-kv-val">{metrics.isp.toFixed(1)} s</div>
-                  <div className="ui-kv-key">Action Time:</div><div className="ui-kv-val">{metrics.actionTime.toFixed(2)} s</div>
-                  <div className="ui-kv-key">Case SF:</div>
-                  <div className={`font-mono font-bold ${structural && structural.safetyFactor < 1.5 ? 'text-[var(--sem-danger)]' : 'text-[var(--s-canvas)]'}`}>
-                    {structural ? `${structural.safetyFactor.toFixed(2)}x` : '--'}
+                <span className="ui-groupbox-title">Results Summary</span>
+                <div className="kv" style={{ gridTemplateColumns: '1fr', border: 0, background: 'transparent', gap: 0 }}>
+                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
+                    <span className="kv-key">Max thrust</span>
+                    <span className="kv-val">{(metrics.maxThrust / 1000).toFixed(2)} kN</span>
                   </div>
-                  <div className="ui-kv-key">Bore Growth:</div>
-                  <div className="ui-kv-val">
-                    {structural ? `${(structural.boreRadialGrowth * 1e6).toFixed(0)} µm` : '--'}
+                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
+                    <span className="kv-key">Peak pressure</span>
+                    <span className="kv-val">{(metrics.maxPc / 1e6).toFixed(2)} MPa</span>
+                  </div>
+                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
+                    <span className="kv-key">Total impulse</span>
+                    <span className="kv-val">{metrics.totalImpulse.toFixed(0)} N·s</span>
+                  </div>
+                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
+                    <span className="kv-key">Delivered Isp</span>
+                    <span className="kv-val">{metrics.isp.toFixed(1)} s</span>
+                  </div>
+                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
+                    <span className="kv-key">Burn time</span>
+                    <span className="kv-val">{metrics.actionTime.toFixed(2)} s</span>
+                  </div>
+                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
+                    <span className="kv-key">Case safety factor</span>
+                    {/*
+                      * A passing safety factor used to render in the canvas
+                      * colour -- near-black text on a dark panel, invisible.
+                      */}
+                    <span
+                      className={`kv-val ${
+                        !structural
+                          ? ''
+                          : structural.safetyFactor < 1
+                            ? 'is-danger'
+                            : structural.safetyFactor < 1.5
+                              ? 'is-warn'
+                              : 'is-ok'
+                      }`}
+                    >
+                      {structural ? `${structural.safetyFactor.toFixed(2)}×` : '—'}
+                    </span>
+                  </div>
+                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
+                    <span className="kv-key">Bore growth</span>
+                    <span className="kv-val">
+                      {structural ? `${(structural.boreRadialGrowth * 1e6).toFixed(0)} µm` : '—'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -2702,7 +2757,7 @@ export default function AppDesktop() {
             {/* TAB: GEOMETRY */}
             {activeTab === 'geometry' && (
               <div className="chart-frame" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div className="absolute top-1 left-2 z-10 text-[var(--c-6)] text-[10px] font-mono">Grain Cross-Section Regression</div>
+                <div className="chart-caption">Grain cross-section regression</div>
                 <div className="w-full h-full flex items-center justify-center p-8">
                   <svg viewBox="0 0 200 200" className="w-full h-full max-w-[500px] max-h-[500px] bg-[var(--s-sunken)] rounded-full border border-[var(--b-strong)] shadow-2xl">
                     <circle cx="100" cy="100" r={(outerRadius / outerRadius) * 95} fill="var(--b-control)" />
@@ -2953,9 +3008,7 @@ export default function AppDesktop() {
             {/* TAB: 3D BURN */}
             {activeTab === 'burn3d' && (
               <div className="chart-frame" style={{ overflowY: "auto", padding: "var(--gap-lg)" }}>
-                <div className="absolute top-1 left-2 z-10 text-[var(--a-accent)] text-[10px] font-mono">
-                  Live Grain Burn-Back
-                </div>
+                <div className="chart-caption">Live grain burn-back</div>
                 {grainType === 'CustomDXF' && !dxfData ? (
                   <div className="text-[var(--t-muted)] italic font-mono text-xs mt-6">
                     Load a DXF profile to view its burn-back.

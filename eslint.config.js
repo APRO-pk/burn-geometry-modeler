@@ -121,6 +121,22 @@ export default tseslint.config(
   },
 
   {
+    /*
+     * Toasts pause their countdown on hover and focus.
+     *
+     * The rule wants an interactive role on any element carrying mouse
+     * handlers. A toast is a live region -- role="status" or role="alert" --
+     * and its children are the controls; labelling it "button" to satisfy the
+     * linter would announce a control that does not exist, which is worse for
+     * a screen-reader user than the warning is for us. Focus handlers are
+     * present alongside the mouse ones, so the behaviour itself is reachable
+     * without a pointer.
+     */
+    files: ['src/ui/notifications.tsx'],
+    rules: { 'jsx-a11y/no-static-element-interactions': 'off' },
+  },
+
+  {
     // Tests reach into internals and construct deliberately malformed inputs.
     files: ['**/*.test.ts', '**/*.test.tsx'],
     rules: {
