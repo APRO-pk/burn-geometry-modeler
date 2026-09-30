@@ -3,10 +3,16 @@ build/
 dist/
 coverage/
 
-# Rust build artifacts (crates/burn-core). The generated wasm-pack output in
-# crates/burn-core/pkg-* IS committed, so the JS build and tests work without
-# a Rust toolchain installed.
+# Rust build artifacts (crates/burn-core and src-tauri). The generated wasm-pack
+# output in crates/burn-core/pkg-* IS committed, so the JS build and tests work
+# without a Rust toolchain installed.
 target/
+
+# Tauri desktop shell: compiled binaries/installers and generated schemas.
+# The hand-written config (src-tauri/*.json, Cargo.toml, src/, icons/) IS
+# committed; only these regenerable artifacts are ignored.
+src-tauri/gen/
+src-tauri/target/
 .DS_Store
 *.log
 .env*

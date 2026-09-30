@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capabilities for the main window. The app is a self-contained webview with no plugin surface, so only Tauri's core defaults are granted.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

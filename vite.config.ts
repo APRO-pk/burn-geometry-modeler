@@ -3,9 +3,36 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+// Tauri sets these while running `beforeBuildCommand` / `beforeDevCommand`, so
+// they are only present when Vite is invoked by the desktop shell. A plain
+// `npm run dev` / `npm run build` for the web target leaves them undefined and
+// the config below falls back to browser-friendly defaults.
+const tauriPlatform = process.env.TAURI_ENV_PLATFORM;
+const tauriDebug = !!process.env.TAURI_ENV_DEBUG;
+
+// Only tune the build for the desktop target when Vite is actually invoked by
+// Tauri. The plain web `npm run build` keeps Vite's defaults untouched, so the
+// browser artifact is unchanged by this file.
+const build = tauriPlatform
+  ? {
+      // Match the webview engine Tauri ships against so esbuild does not down-
+      // level past what the desktop runtime needs. WebView2 (Windows) tracks
+      // Chromium; the WebKit fallback covers macOS/Linux dev builds.
+      target: tauriPlatform === 'windows' ? 'chrome110' : 'safari15',
+      minify: (tauriDebug ? false : 'esbuild') as false | 'esbuild',
+      sourcemap: tauriDebug,
+    }
+  : undefined;
+
 export default defineConfig(() => {
   return {
+    build,
     plugins: [react(), tailwindcss()],
+    // Tauri runs its own progress UI; let its output through rather than having
+    // Vite wipe the terminal on every rebuild.
+    clearScreen: false,
+    // Expose TAURI_* to the client the same way VITE_* is exposed.
+    envPrefix: ['VITE_', 'TAURI_ENV_*'],
     // Any future AI feature must call a backend proxy for API calls — never
     // `define` a secret key into the client bundle, as it would ship to the browser.
     resolve: {
@@ -48,6 +75,10 @@ export default defineConfig(() => {
       environment: "node",
     },
     server: {
+      // Tauri's devUrl points at a fixed port, so fail loudly instead of
+      // silently hopping to another port the desktop shell will not find.
+      port: 3000,
+      strictPort: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

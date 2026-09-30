@@ -1,0 +1,36 @@
+# Tauri v2 desktop shell for the APRO Burn & Geometry Modeler.
+#
+# This crate only wraps the existing Vite/React frontend in a native window --
+# the physics still runs as the burn-core WASM module inside the webview, so
+# there is no Rust <-> JS command surface to maintain here yet.
+#
+# Standalone workspace: the repo root has no Cargo.toml and crates/burn-core
+# declares its own empty [workspace]. Declaring one here too stops cargo from
+# trying to merge the two unrelated crates into a single workspace.
+[package]
+name = "apro-burn-geometry-modeler"
+version = "0.1.0"
+description = "APRO Burn & Geometry Modeler"
+authors = ["APRO"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+# Smaller, faster-to-scan binaries. A single self-contained codegen unit and
+# fat LTO also give SmartScreen/Defender less surface to flag heuristically,
+# though a real code-signing certificate is what actually clears the warning.
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[workspace]
