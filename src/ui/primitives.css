@@ -305,10 +305,10 @@
   color: var(--t-muted);
 }
 .ui-stat.is-warn .ui-stat-band {
-  color: var(--sem-warn);
+  color: var(--t-muted);
 }
 .ui-stat.is-danger .ui-stat-band {
-  color: var(--sem-danger);
+  color: var(--t-muted);
 }
 
 /* ---------------------------------------------------------------- Group */
@@ -388,7 +388,7 @@
   margin: 2px 0 4px;
 }
 .ui-note.is-accent {
-  color: var(--sem-ok);
+  color: var(--a-accent);
 }
 .ui-note.is-divided,
 .ui-block.is-divided {
@@ -466,27 +466,6 @@
 }
 
 /* The quick-results box in the dock: an accented group box. */
-.ui-groupbox.is-result {
-  background: var(--a-accent-wash);
-  border-color: var(--a-accent-dim);
-}
-.ui-groupbox.is-result .ui-groupbox-title {
-  background: var(--s-panel);
-  color: var(--a-accent);
-}
-
-.ui-kv-key {
-  text-align: right;
-  padding-right: 5px;
-  color: var(--t-secondary);
-  font-size: var(--fs-sm);
-}
-.ui-kv-val {
-  font-family: var(--font);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--t-primary);
-}
 
 /* ======================================================================
  * Tab content layout
@@ -602,13 +581,13 @@
   text-align: right;
 }
 .kv-val.is-ok {
-  color: var(--sem-ok);
+  color: var(--t-primary);
 }
 .kv-val.is-warn {
-  color: var(--sem-warn);
+  color: var(--t-primary);
 }
 .kv-val.is-danger {
-  color: var(--sem-danger);
+  color: var(--t-secondary);
 }
 /* A secondary unit or band after the value. */
 .kv-sub {
@@ -777,16 +756,16 @@
   gap: var(--gap-lg);
   padding: var(--gap-lg);
   border-bottom: 1px solid var(--b-soft);
-  border-left: 1px solid var(--b-strong);
+  border-left: 2px solid var(--b-strong);
 }
 .verdict.is-ok {
-  background: var(--sem-ok-wash);
+  border-left-color: var(--sem-ok);
 }
 .verdict.is-warn {
-  background: var(--sem-warn-wash);
+  border-left-color: var(--sem-warn);
 }
 .verdict.is-danger {
-  background: var(--sem-danger-wash);
+  border-left-color: var(--sem-danger);
 }
 
 .verdict-sf {
@@ -801,15 +780,7 @@
   font-size: 26px;
   font-weight: 700;
   line-height: 1.1;
-}
-.verdict.is-ok .verdict-num {
-  color: var(--sem-ok);
-}
-.verdict.is-warn .verdict-num {
-  color: var(--sem-warn);
-}
-.verdict.is-danger .verdict-num {
-  color: var(--sem-danger);
+  color: var(--a-accent);
 }
 .verdict-cap {
   font-size: var(--fs-xs);
@@ -850,25 +821,6 @@
   background: var(--s-canvas);
   border: 1px solid var(--b-strong);
   border-radius: var(--radius);
-}
-
-/* ---- model-uncertainty panel ---- */
-
-.mu-intro {
-  margin: 6px 0 10px;
-  font-size: var(--fs-xs);
-  line-height: 1.5;
-  color: var(--t-muted);
-}
-.mu-intro strong {
-  color: var(--t-secondary);
-  font-weight: 600;
-}
-.mu-warn {
-  margin: 0 0 6px;
-  font-size: var(--fs-xs);
-  line-height: 1.5;
-  color: var(--sem-danger);
 }
 
 /* ---- working overlay ---- */

@@ -1,42 +1,10 @@
 import React from 'react';
-import { ModelUncertaintyPanel } from './ModelUncertaintyPanel';
 import type { MotorMetrics } from './motorMetrics';
-import type { BurnRateRegime } from './wasmCore';
-
-/**
- * Motor Statistics: the summary table, and the model-uncertainty budget that
- * says how much of it to believe.
- *
- * Read-only. Every value derives from the last run, so this component owns no
- * state and needs no callbacks.
- *
- * The rows are DATA rather than hand-written markup. Fourteen near-identical
- * blocks of JSX had already drifted -- different separators, one row missing
- * its bottom rule, imperial units on some and not others -- and a list makes
- * adding a metric a one-line change instead of a copy-paste.
- */
 
 export interface StatisticsTabProps {
   metrics: MotorMetrics | null;
   throatDiameter: number;
-  /**
-   * Grain length, metres.
-   *
-   * Explicitly a prop because it was previously a bare `length`, which
-   * TypeScript happily resolved to the DOM global `window.length` -- the frame
-   * count, always 0. The readout showed "0.00 in / 0.0 mm" and nothing
-   * complained, because it is a legitimate global of the right type.
-   */
   grainLength: number;
-  /** Inputs to the uncertainty budget -- see src/modelUncertainty.ts. */
-  grainKind: string;
-  n: number;
-  propellantName: string;
-  burnRateRegimes: BurnRateRegime[];
-  erosiveModel: string;
-  /** Peak erosive augmentation as a fraction of base burn rate, if recoverable. */
-  erosiveFraction: number | undefined;
-  nozzleMaterial: string;
 }
 
 interface Row {
@@ -62,13 +30,6 @@ export function StatisticsTab({
   metrics,
   throatDiameter,
   grainLength,
-  grainKind,
-  n,
-  propellantName,
-  burnRateRegimes,
-  erosiveModel,
-  erosiveFraction,
-  nozzleMaterial,
 }: StatisticsTabProps) {
   if (!metrics) {
     return <div className="tab-empty">Run a simulation to view motor statistics.</div>;
@@ -178,22 +139,6 @@ export function StatisticsTab({
         {section('Chamber & flow', pressure)}
         {section('Geometry & mass', geometry)}
 
-        {/*
-          * Every number above is printed to several significant figures. This
-          * says how many of them mean anything.
-          */}
-        <ModelUncertaintyPanel
-          grainKind={grainKind}
-          n={n}
-          hasBurnRateRegimes={burnRateRegimes.length > 0}
-          propellantName={propellantName}
-          erosiveModel={erosiveModel}
-          erosiveFraction={erosiveFraction}
-          hasNozzleMaterial={!!nozzleMaterial}
-          peakPressurePa={metrics.maxPc}
-          totalImpulseNs={metrics.totalImpulse}
-          burnTimeS={metrics.actionTime}
-        />
       </div>
     </div>
   );

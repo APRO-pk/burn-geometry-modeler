@@ -736,9 +736,6 @@ export class MotorSimulation {
         if (G > this.propellant.G_threshold) {
           r_b = r_b * (1 + k_jpl * (G - this.propellant.G_threshold));
         }
-      } else if (G > this.propellant.G_threshold && this.propellant.k_erosive > 0 && this.erosive_model !== 'None') {
-        // Fallback generic linear
-        r_b = r_b * (1 + this.propellant.k_erosive * (G - this.propellant.G_threshold));
       }
 
       if (Ab <= 0.0) {
@@ -874,32 +871,6 @@ export class MotorSimulation {
     return { results: this.results, warnings };
   }
 }
-
-/*
- * The structural analysis that used to live here has moved to the Rust core:
- * crates/burn-core/src/structural.rs, reached through `analyzeStructure` in
- * src/structuralClient.ts.
- *
- * What was here:
- *   calculate_casing_thickness    thin-wall pR/t sizing rule. Still available,
- *                                 as `required_wall_thickness` in the core, but
- *                                 labelled a SIZING RULE rather than an
- *                                 analysis result -- feeding its own answer back
- *                                 through the real analysis gives a safety
- *                                 factor below the one requested, because pR/t
- *                                 knows nothing about the closure junction.
- *   calculate_casing_strain       uniaxial hoop strain pR/tE, which ignores the
- *                                 radial and axial stresses. Replaced by the
- *                                 full triaxial Hooke's law at the bore.
- *   calculate_discontinuity_stress  computed "max bending stress" as a literal
- *                                 1.3x the hoop stress -- its own comment called
- *                                 it "approximation for visual proxy". It also
- *                                 computed beta, Q0 and M0 and then used none of
- *                                 them. Replaced by real cylindrical-shell edge
- *                                 bending, where the ratio is
- *                                 sqrt(3)/sqrt(1-nu^2) ~ 1.82, so the old value
- *                                 was ~30% low everywhere, non-conservatively.
- */
 
 export function export_to_eng(
   results: SimulationResult[],

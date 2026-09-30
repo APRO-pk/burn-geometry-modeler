@@ -1,44 +1,96 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pause, Play, Reset } from './ui/icons';
+import { Close, Pause, Play, Reset, Trash } from './ui/icons';
 import * as THREE from 'three';
 import { outlineAt } from './grainOutline';
 import type { GrainOutline, Pt } from './grainOutline';
 import { grainFromConfig, burnoutWeb } from './surrogate/features';
 import type { SurrogateGrain } from './surrogate/features';
 import type { SimulationResult } from './engine';
+import type { StationProfiles } from './wasmCore';
+import type { StructuralResult, StressProfile } from './wasmCore';
 
-/*
- * Live 3-D burn-back view.
- *
- * The grain is drawn as a solid: the casing disc with the port cut out of it,
- * extruded along the motor axis. As the web regresses the port grows, the solid
- * thins, and BATES additionally shortens because its end faces burn too.
- *
- * The shape comes from src/grainOutline.ts, which offsets the port polygon --
- * which is what burn-back physically is -- so what is on screen is the real
- * regressed geometry rather than an artist's impression of one.
- *
- * When a simulation has been run the scrubber is in TIME and the web comes from
- * the solver's own `y` column, so the animation plays the motor that was
- * actually simulated. Without results it falls back to scrubbing the web
- * directly, which still works for a grain that has never been run.
- */
-
-/** Web positions are snapped to this many steps so meshes can be cached. */
 const WEB_STEPS = 240;
 
 const PROPELLANT = 0x9a8f7a;
-const CASING = 0x4a5568;
+const CASING_COLOR = 0x4a5568;
+
+// ── Color maps ──
+
+type ColorMap = 'jet' | 'viridis' | 'thermal' | 'coolwarm';
+
+function sampleColorMap(t: number, map: ColorMap): THREE.Color {
+  const s = Math.max(0, Math.min(1, t));
+  if (map === 'jet') {
+    const r = Math.min(1, Math.max(0, 1.5 - Math.abs(4 * s - 3)));
+    const g = Math.min(1, Math.max(0, 1.5 - Math.abs(4 * s - 2)));
+    const b = Math.min(1, Math.max(0, 1.5 - Math.abs(4 * s - 1)));
+    return new THREE.Color(r, g, b);
+  }
+  if (map === 'thermal') {
+    return new THREE.Color().setHSL((1 - s) * 0.7, 0.9, 0.35 + s * 0.3);
+  }
+  if (map === 'coolwarm') {
+    const r = s;
+    const b = 1 - s;
+    const g = 1 - 2 * Math.abs(s - 0.5);
+    return new THREE.Color(r * 0.9 + 0.1, g * 0.5, b * 0.9 + 0.1);
+  }
+  // viridis approximation
+  const r = Math.max(0, Math.min(1, -0.27 + 4.36 * s - 9.11 * s * s + 8.1 * s * s * s - 2.26 * s * s * s * s));
+  const g = Math.max(0, Math.min(1, 0.004 + 1.42 * s - 1.77 * s * s + 1.31 * s * s * s - 0.55 * s * s * s * s));
+  const b = Math.max(0, Math.min(1, 0.33 + 1.74 * s - 5.09 * s * s + 6.06 * s * s * s - 2.61 * s * s * s * s));
+  return new THREE.Color(r, g, b);
+}
+
+// ── View / field types ──
+
+type ViewMode = 'solid' | 'xray' | 'cutaway';
+
+type FieldId =
+  | 'none'
+  | 'pressure'
+  | 'burnRate'
+  | 'massFlux'
+  | 'erosiveRate'
+  | 'temperature'
+  | 'hoopStress'
+  | 'vonMises'
+  | 'safetyFactor';
+
+const FIELD_LABELS: Record<FieldId, string> = {
+  none: 'Solid color',
+  pressure: 'Pressure (MPa)',
+  burnRate: 'Burn rate (mm/s)',
+  massFlux: 'Mass flux (kg/m²s)',
+  erosiveRate: 'Erosive rate (mm/s)',
+  temperature: 'Temperature (K)',
+  hoopStress: 'Hoop stress (MPa)',
+  vonMises: 'Von Mises (MPa)',
+  safetyFactor: 'Safety factor',
+};
+
+interface ProbePoint {
+  id: number;
+  position: THREE.Vector3;
+  normal: THREE.Vector3;
+  meshType: 'grain' | 'casing';
+  axialFrac: number;
+  radialFrac: number;
+}
 
 interface Props {
   grain: SurrogateGrain;
-  /** Solver output, if a simulation has been run. Enables the time scrubber. */
   results: SimulationResult[];
-  /** Extra rows the caller wants shown alongside the geometry readout. */
+  stations?: StationProfiles;
+  structural?: StructuralResult;
+  caseWallThickness: number;
+  casingYieldStress: number;
+  maxPc: number;
+  flameTemp: number;
   addLog?: (msg: string) => void;
 }
 
-// --- mesh building ---------------------------------------------------------
+// ── Mesh building ──
 
 function ringToShapePath(ring: Pt[]): THREE.Path {
   const p = new THREE.Path();
@@ -48,13 +100,6 @@ function ringToShapePath(ring: Pt[]): THREE.Path {
   return p;
 }
 
-/**
- * Build the propellant solid for one outline.
- *
- * The grain is the casing disc minus the port, so the port rings become HOLES
- * in the outer shape -- which is also why a Rod & Tube rod has to be a separate
- * solid: it is propellant that sits inside the void, not part of the ring.
- */
 function buildGrainGeometry(o: GrainOutline): THREE.BufferGeometry | null {
   if (o.burnedOut || o.length <= 0) return null;
 
@@ -92,54 +137,194 @@ function buildGrainGeometry(o: GrainOutline): THREE.BufferGeometry | null {
     geo.computeVertexNormals();
     return geo;
   } catch {
-    // A degenerate outline near burnout can defeat triangulation; drawing
-    // nothing for one frame is better than tearing down the scene.
     return null;
   }
 }
 
-// --- component -------------------------------------------------------------
+function buildCasingGeometry(
+  innerR: number,
+  wallThickness: number,
+  length: number,
+): THREE.BufferGeometry {
+  const outerR = innerR + wallThickness;
+  const seg = 96;
+  const rings = 32;
 
-export function GrainBurn3D({ grain, results }: Props) {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
+
+  // Outer surface
+  for (let j = 0; j <= rings; j++) {
+    const z = -length / 2 + (j / rings) * length;
+    for (let i = 0; i <= seg; i++) {
+      const a = (2 * Math.PI * i) / seg;
+      const x = outerR * Math.cos(a);
+      const y = outerR * Math.sin(a);
+      positions.push(x, y, z);
+      normals.push(Math.cos(a), Math.sin(a), 0);
+    }
+  }
+  const outerVerts = (rings + 1) * (seg + 1);
+  for (let j = 0; j < rings; j++) {
+    for (let i = 0; i < seg; i++) {
+      const a = j * (seg + 1) + i;
+      const b = a + seg + 1;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+
+  // Inner surface
+  const innerOffset = outerVerts;
+  for (let j = 0; j <= rings; j++) {
+    const z = -length / 2 + (j / rings) * length;
+    for (let i = 0; i <= seg; i++) {
+      const a = (2 * Math.PI * i) / seg;
+      const x = innerR * Math.cos(a);
+      const y = innerR * Math.sin(a);
+      positions.push(x, y, z);
+      normals.push(-Math.cos(a), -Math.sin(a), 0);
+    }
+  }
+  for (let j = 0; j < rings; j++) {
+    for (let i = 0; i < seg; i++) {
+      const a = innerOffset + j * (seg + 1) + i;
+      const b = a + seg + 1;
+      indices.push(a, a + 1, b, b, a + 1, b + 1);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geo.setIndex(indices);
+  return geo;
+}
+
+function applyContourColors(
+  geo: THREE.BufferGeometry,
+  length: number,
+  fieldValues: Float64Array | number[] | null,
+  fieldMin: number,
+  fieldMax: number,
+  colorMap: ColorMap,
+  isCasing: boolean,
+  wallThickness: number,
+  innerRadius: number,
+  stressProfile?: StressProfile,
+): void {
+  const pos = geo.getAttribute('position');
+  const count = pos.count;
+  const colors = new Float32Array(count * 3);
+  const range = fieldMax - fieldMin || 1;
+
+  for (let i = 0; i < count; i++) {
+    const z = pos.getZ(i);
+    let t = 0;
+
+    if (isCasing && stressProfile && stressProfile.position.length > 1) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const r = Math.sqrt(x * x + y * y);
+      const radialFrac = Math.max(0, Math.min(1, (r - innerRadius) / wallThickness));
+      const idx = Math.min(stressProfile.position.length - 1, Math.round(radialFrac * (stressProfile.position.length - 1)));
+      const val = stressProfile.vonMises[idx];
+      t = (val - fieldMin) / range;
+    } else if (fieldValues && fieldValues.length > 1) {
+      const axialFrac = (z + length / 2) / length;
+      const idx = Math.min(fieldValues.length - 1, Math.max(0, Math.round(axialFrac * (fieldValues.length - 1))));
+      t = (fieldValues[idx] - fieldMin) / range;
+    } else if (fieldValues && fieldValues.length === 1) {
+      t = (fieldValues[0] - fieldMin) / range;
+    }
+
+    const c = sampleColorMap(t, colorMap);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+}
+
+// ── Color legend component ──
+
+function ColorLegend({ min, max, unit, colorMap, label }: {
+  min: number; max: number; unit: string; colorMap: ColorMap; label: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+    const w = cv.width;
+    const h = cv.height;
+    for (let x = 0; x < w; x++) {
+      const t = x / (w - 1);
+      const c = sampleColorMap(t, colorMap);
+      ctx.fillStyle = `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
+      ctx.fillRect(x, 0, 1, h);
+    }
+  }, [min, max, colorMap]);
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[9px] text-[var(--t-secondary)]">{label}</span>
+      <canvas ref={canvasRef} width={200} height={12} className="w-full h-3 border border-[var(--b-soft)]" />
+      <div className="flex justify-between text-[9px] text-[var(--t-muted)]">
+        <span>{min.toFixed(2)} {unit}</span>
+        <span>{max.toFixed(2)} {unit}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ──
+
+export function GrainBurn3D({
+  grain,
+  results,
+  stations,
+  structural,
+  caseWallThickness,
+  casingYieldStress,
+  maxPc,
+  flameTemp,
+}: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
     grainMesh: THREE.Mesh | null;
-    casing: THREE.Mesh;
+    casingMesh: THREE.Mesh | null;
+    clipPlane: THREE.Plane;
+    probeMarkers: THREE.Group;
     dispose: () => void;
-    /**
-     * Re-frame the camera around a motor of this radius and length.
-     *
-     * Declared here rather than cast on at the two call sites: it is assigned
-     * once the renderer exists, so it is genuinely optional, and saying so lets
-     * the optional-call operator do the checking instead of `as any`.
-     */
     frame?: (r: number, len: number) => void;
+    raycaster: THREE.Raycaster;
+    pointer: THREE.Vector2;
   } | null>(null);
 
   const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0); // 0..1 through the burn
+  const [progress, setProgress] = useState(0);
   const [showCasing, setShowCasing] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('solid');
+  const [field, setField] = useState<FieldId>('none');
+  const [colorMap, setColorMap] = useState<ColorMap>('jet');
+  const [probes, setProbes] = useState<ProbePoint[]>([]);
+  const [nextProbeId, setNextProbeId] = useState(1);
+  const [clipAngle, setClipAngle] = useState(0);
 
   const web = useMemo(() => burnoutWeb(grainFromConfig(grain)), [grain]);
 
-  /**
-   * Web positions sampled from the solver, so the animation follows the real
-   * regression history -- which is not linear in time, since burn rate tracks
-   * chamber pressure.
-   */
   const timeline = useMemo(() => {
     const usable = results.filter((r) => Number.isFinite(r.y));
     if (usable.length < 2) return null;
-    return {
-      duration: usable[usable.length - 1].Time,
-      rows: usable,
-    };
+    return { duration: usable[usable.length - 1].Time, rows: usable };
   }, [results]);
 
-  /** Current web, and the solver row it came from if there is one. */
   const current = useMemo(() => {
     if (!timeline) return { y: progress * web, row: null as SimulationResult | null, t: 0 };
     const idx = Math.min(
@@ -150,7 +335,6 @@ export function GrainBurn3D({ grain, results }: Props) {
     return { y: row.y, row, t: row.Time };
   }, [timeline, progress, web]);
 
-  /** Snap so identical webs reuse a cached mesh instead of retriangulating. */
   const quantWeb = Math.round((current.y / Math.max(web, 1e-9)) * WEB_STEPS) / WEB_STEPS;
 
   const outline = useMemo(
@@ -158,7 +342,84 @@ export function GrainBurn3D({ grain, results }: Props) {
     [grain, quantWeb, web]
   );
 
-  // --- scene setup (once) ---
+  // Compute field data ranges for the legend
+  const fieldData = useMemo(() => {
+    if (field === 'none') return null;
+
+    if ((field === 'hoopStress' || field === 'vonMises' || field === 'safetyFactor') && structural) {
+      const prof = structural.lame.profile;
+      let values: Float64Array;
+      if (field === 'hoopStress') values = prof.hoop;
+      else if (field === 'vonMises') values = prof.vonMises;
+      else values = new Float64Array(prof.vonMises.length);
+      if (field === 'safetyFactor') {
+        const ys = casingYieldStress * 1e6;
+        for (let i = 0; i < prof.vonMises.length; i++) {
+          (values as Float64Array)[i] = prof.vonMises[i] > 0 ? ys / prof.vonMises[i] : 99;
+        }
+      }
+      let mn = Infinity, mx = -Infinity;
+      for (let i = 0; i < values.length; i++) {
+        if (values[i] < mn) mn = values[i];
+        if (values[i] > mx) mx = values[i];
+      }
+      const scale = field === 'safetyFactor' ? 1 : 1e-6;
+      const unit = field === 'safetyFactor' ? '' : 'MPa';
+      return { values: null, min: mn * scale, max: mx * scale, unit, isCasing: true, stressProfile: prof };
+    }
+
+    if (stations && stations.count > 1) {
+      let raw: Float64Array;
+      let unit = '';
+      let scale = 1;
+      switch (field) {
+        case 'pressure': raw = stations.pressure; unit = 'MPa'; scale = 1e-6; break;
+        case 'burnRate': raw = stations.burnRate; unit = 'mm/s'; scale = 1000; break;
+        case 'massFlux': raw = stations.massFlux; unit = 'kg/m²s'; break;
+        case 'erosiveRate': raw = stations.erosiveRate; unit = 'mm/s'; scale = 1000; break;
+        case 'temperature': {
+          const arr = new Float64Array(stations.count);
+          for (let i = 0; i < stations.count; i++) {
+            arr[i] = flameTemp * (1 - 0.15 * (1 - stations.pressure[i] / (maxPc || 1)));
+          }
+          raw = arr;
+          unit = 'K';
+          break;
+        }
+        default: return null;
+      }
+      let mn = Infinity, mx = -Infinity;
+      for (let i = 0; i < raw.length; i++) {
+        const v = raw[i] * scale;
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+      }
+      const scaled = new Float64Array(raw.length);
+      for (let i = 0; i < raw.length; i++) scaled[i] = raw[i] * scale;
+      return { values: scaled, min: mn, max: mx, unit, isCasing: false };
+    }
+
+    // 0-D fallback: uniform field from the current timestep
+    if (current.row && (field === 'pressure' || field === 'temperature')) {
+      const val = field === 'pressure' ? current.row.Pc * 1e-6 : flameTemp;
+      const unit = field === 'pressure' ? 'MPa' : 'K';
+      return { values: new Float64Array([val]), min: val * 0.9, max: val * 1.1, unit, isCasing: false };
+    }
+
+    return null;
+  }, [field, stations, structural, current.row, casingYieldStress, maxPc, flameTemp]);
+
+  // Probe values at current field
+  const probeValues = useMemo(() => {
+    if (!fieldData || !fieldData.values) return probes.map(() => '—');
+    return probes.map((p) => {
+      if (!fieldData.values) return '—';
+      const idx = Math.min(fieldData.values.length - 1, Math.max(0, Math.round(p.axialFrac * (fieldData.values.length - 1))));
+      return `${fieldData.values[idx].toFixed(2)} ${fieldData.unit}`;
+    });
+  }, [probes, fieldData]);
+
+  // ── Scene setup ──
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
@@ -169,6 +430,7 @@ export function GrainBurn3D({ grain, results }: Props) {
     const camera = new THREE.PerspectiveCamera(45, 1, 0.001, 100);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.localClippingEnabled = true;
     mount.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.55));
@@ -179,28 +441,17 @@ export function GrainBurn3D({ grain, results }: Props) {
     rim.position.set(-1.5, -0.6, -1);
     scene.add(rim);
 
-    const casing = new THREE.Mesh(
-      new THREE.CylinderGeometry(1, 1, 1, 96, 1, true),
-      new THREE.MeshStandardMaterial({
-        color: CASING,
-        metalness: 0.7,
-        roughness: 0.45,
-        transparent: true,
-        opacity: 0.18,
-        side: THREE.DoubleSide,
-      })
-    );
-    casing.rotation.x = Math.PI / 2;
-    scene.add(casing);
+    const clipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
 
-    // Hand-rolled orbit: drag to rotate, wheel to dolly. Two handlers beat
-    // pulling in a controls addon for this.
-    let theta = 0.9;
-    let phi = 1.15;
-    let radius = 1;
-    let dragging = false;
-    let lastX = 0;
-    let lastY = 0;
+    const probeMarkers = new THREE.Group();
+    scene.add(probeMarkers);
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    // Orbit controls
+    let theta = 0.9, phi = 1.15, radius = 1, radius0 = 1;
+    let dragging = false, lastX = 0, lastY = 0;
 
     const applyCamera = () => {
       camera.position.set(
@@ -212,6 +463,7 @@ export function GrainBurn3D({ grain, results }: Props) {
     };
 
     const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
       dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
@@ -227,11 +479,7 @@ export function GrainBurn3D({ grain, results }: Props) {
     };
     const onUp = (e: PointerEvent) => {
       dragging = false;
-      try {
-        renderer.domElement.releasePointerCapture(e.pointerId);
-      } catch {
-        /* pointer already released */
-      }
+      try { renderer.domElement.releasePointerCapture(e.pointerId); } catch { /* */ }
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -239,7 +487,6 @@ export function GrainBurn3D({ grain, results }: Props) {
       applyCamera();
     };
 
-    let radius0 = 1;
     const el = renderer.domElement;
     el.style.touchAction = 'none';
     el.addEventListener('pointerdown', onDown);
@@ -247,6 +494,9 @@ export function GrainBurn3D({ grain, results }: Props) {
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onUp);
     el.addEventListener('wheel', onWheel, { passive: false });
+
+    // Context menu for probing
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
 
     let raf = 0;
     const resize = () => {
@@ -266,12 +516,9 @@ export function GrainBurn3D({ grain, results }: Props) {
     };
     loop();
 
-    sceneRef.current = {
-      renderer,
-      scene,
-      camera,
-      grainMesh: null,
-      casing,
+    const ctx = {
+      renderer, scene, camera, grainMesh: null as THREE.Mesh | null,
+      casingMesh: null as THREE.Mesh | null, clipPlane, probeMarkers,
       dispose: () => {
         cancelAnimationFrame(raf);
         ro.disconnect();
@@ -283,26 +530,82 @@ export function GrainBurn3D({ grain, results }: Props) {
         renderer.dispose();
         if (el.parentNode) el.parentNode.removeChild(el);
       },
+      raycaster, pointer,
+      frame: (r: number, len: number) => {
+        radius0 = Math.max(r * 4.2, len * 1.9);
+        radius = radius0;
+        applyCamera();
+        camera.near = radius0 / 200;
+        camera.far = radius0 * 20;
+        camera.updateProjectionMatrix();
+      },
     };
-
-    // Frame the motor: expose a setter the geometry effect can call.
-    sceneRef.current.frame = (r: number, len: number) => {
-      radius0 = Math.max(r * 4.2, len * 1.9);
-      radius = radius0;
-      applyCamera();
-      camera.near = radius0 / 200;
-      camera.far = radius0 * 20;
-      camera.updateProjectionMatrix();
-    };
-
+    sceneRef.current = ctx;
     applyCamera();
-    return () => {
-      sceneRef.current?.dispose();
-      sceneRef.current = null;
-    };
+    return () => { ctx.dispose(); sceneRef.current = null; };
   }, []);
 
-  // --- swap the grain mesh whenever the outline changes ---
+  // ── Right-click probe placement ──
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const s = sceneRef.current;
+    if (!s) return;
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    s.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    s.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    s.raycaster.setFromCamera(s.pointer, s.camera);
+
+    const meshes: THREE.Mesh[] = [];
+    if (s.grainMesh) meshes.push(s.grainMesh);
+    if (s.casingMesh) meshes.push(s.casingMesh);
+    const hits = s.raycaster.intersectObjects(meshes);
+    if (hits.length === 0) return;
+
+    const hit = hits[0];
+    const pt = hit.point;
+    const isGrain = hit.object === s.grainMesh;
+    const len = grain.length;
+    const axialFrac = Math.max(0, Math.min(1, (pt.z + len / 2) / len));
+    const r = Math.sqrt(pt.x * pt.x + pt.y * pt.y);
+    const radialFrac = r / (grain.outer_radius + (caseWallThickness || 0));
+
+    setProbes((prev) => [...prev, {
+      id: nextProbeId, position: pt.clone(),
+      normal: hit.face?.normal.clone() || new THREE.Vector3(0, 1, 0),
+      meshType: isGrain ? 'grain' : 'casing',
+      axialFrac, radialFrac,
+    }]);
+    setNextProbeId((n) => n + 1);
+  }, [grain, caseWallThickness, nextProbeId]);
+
+  // ── Update probe markers ──
+  useEffect(() => {
+    const s = sceneRef.current;
+    if (!s) return;
+    while (s.probeMarkers.children.length > 0) {
+      const c = s.probeMarkers.children[0];
+      s.probeMarkers.remove(c);
+      if (c instanceof THREE.Mesh) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
+    }
+    for (const p of probes) {
+      const marker = new THREE.Mesh(
+        new THREE.SphereGeometry(grain.outer_radius * 0.04, 12, 12),
+        new THREE.MeshBasicMaterial({ color: 0xff3333 })
+      );
+      marker.position.copy(p.position);
+      s.probeMarkers.add(marker);
+    }
+  }, [probes, grain.outer_radius]);
+
+  // ── Clip plane angle ──
+  useEffect(() => {
+    const s = sceneRef.current;
+    if (!s) return;
+    const angle = (clipAngle * Math.PI) / 180;
+    s.clipPlane.normal.set(-Math.cos(angle), -Math.sin(angle), 0);
+  }, [clipAngle]);
+
+  // ── Swap grain mesh ──
   useEffect(() => {
     const s = sceneRef.current;
     if (!s) return;
@@ -316,25 +619,76 @@ export function GrainBurn3D({ grain, results }: Props) {
 
     const geo = buildGrainGeometry(outline);
     if (geo) {
-      const mesh = new THREE.Mesh(
-        geo,
-        new THREE.MeshStandardMaterial({
-          color: PROPELLANT,
-          roughness: 0.85,
-          metalness: 0.05,
-          side: THREE.DoubleSide,
-        })
-      );
+      const useContour = field !== 'none' && fieldData && !fieldData.isCasing;
+      if (useContour && fieldData) {
+        applyContourColors(
+          geo, grain.length, fieldData.values, fieldData.min, fieldData.max,
+          colorMap, false, caseWallThickness, grain.outer_radius,
+        );
+      }
+
+      const mat = new THREE.MeshStandardMaterial({
+        color: useContour ? 0xffffff : PROPELLANT,
+        vertexColors: !!useContour,
+        roughness: 0.85,
+        metalness: 0.05,
+        side: THREE.DoubleSide,
+        transparent: viewMode === 'xray',
+        opacity: viewMode === 'xray' ? 0.35 : 1.0,
+        clippingPlanes: viewMode === 'cutaway' ? [s.clipPlane] : [],
+        clipShadows: true,
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
       s.scene.add(mesh);
       s.grainMesh = mesh;
     }
 
-    s.casing.visible = showCasing;
-    s.casing.scale.set(outline.outerRadius, grain.length, outline.outerRadius);
     s.frame?.(outline.outerRadius, grain.length);
-  }, [outline, showCasing, grain.length]);
+  }, [outline, viewMode, field, fieldData, colorMap, grain.length, grain.outer_radius, caseWallThickness]);
 
-  // --- playback ---
+  // ── Swap casing mesh ──
+  useEffect(() => {
+    const s = sceneRef.current;
+    if (!s) return;
+
+    if (s.casingMesh) {
+      s.scene.remove(s.casingMesh);
+      s.casingMesh.geometry.dispose();
+      (s.casingMesh.material as THREE.Material).dispose();
+      s.casingMesh = null;
+    }
+
+    if (!showCasing) return;
+
+    const wall = caseWallThickness > 0.0001 ? caseWallThickness : grain.outer_radius * 0.05;
+    const geo = buildCasingGeometry(grain.outer_radius, wall, grain.length);
+
+    const useContour = field !== 'none' && fieldData && fieldData.isCasing;
+    if (useContour && fieldData) {
+      applyContourColors(
+        geo, grain.length, null, fieldData.min, fieldData.max,
+        colorMap, true, wall, grain.outer_radius, fieldData.stressProfile,
+      );
+    }
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: useContour ? 0xffffff : CASING_COLOR,
+      vertexColors: !!useContour,
+      metalness: 0.7,
+      roughness: 0.45,
+      transparent: viewMode !== 'solid' || !useContour,
+      opacity: viewMode === 'xray' ? 0.12 : (useContour ? 1.0 : 0.18),
+      side: THREE.DoubleSide,
+      clippingPlanes: viewMode === 'cutaway' ? [s.clipPlane] : [],
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    s.scene.add(mesh);
+    s.casingMesh = mesh;
+  }, [showCasing, grain.outer_radius, grain.length, caseWallThickness, viewMode, field, fieldData, colorMap]);
+
+  // ── Playback ──
   useEffect(() => {
     if (!playing) return;
     let raf = 0;
@@ -344,12 +698,8 @@ export function GrainBurn3D({ grain, results }: Props) {
       const dt = (now - last) / 1000;
       last = now;
       setProgress((p) => {
-        // Real burns are ~1-3 s; play them over ~6 s so the shape is readable.
         const next = p + dt / 6;
-        if (next >= 1) {
-          setPlaying(false);
-          return 1;
-        }
+        if (next >= 1) { setPlaying(false); return 1; }
         return next;
       });
       raf = requestAnimationFrame(step);
@@ -358,30 +708,37 @@ export function GrainBurn3D({ grain, results }: Props) {
     return () => cancelAnimationFrame(raf);
   }, [playing]);
 
-  const reset = useCallback(() => {
-    setPlaying(false);
-    setProgress(0);
-  }, []);
+  const reset = useCallback(() => { setPlaying(false); setProgress(0); }, []);
 
   const eng = useMemo(() => grainFromConfig(grain), [grain]);
   const analyticAb = eng.get_burning_area(current.y);
   const analyticPort = eng.get_port_area(current.y);
-  const drawnAb = outline.perimeter * outline.length;
-  const endArea =
-    grain.kind === 'BATES'
-      ? 2 * Math.PI * (grain.outer_radius ** 2 - Math.min(grain.inner_radius + current.y, grain.outer_radius) ** 2)
-      : 0;
-  const lateral = Math.max(analyticAb - endArea, 0);
-  const abGap = lateral > 0 ? (drawnAb - lateral) / lateral : 0;
+
+  const availableFields = useMemo(() => {
+    const fields: FieldId[] = ['none'];
+    if (stations || current.row) {
+      fields.push('pressure');
+      if (stations) {
+        fields.push('burnRate', 'massFlux', 'erosiveRate');
+      }
+      fields.push('temperature');
+    }
+    if (structural) {
+      fields.push('hoopStress', 'vonMises', 'safetyFactor');
+    }
+    return fields;
+  }, [stations, current.row, structural]);
 
   return (
-    <div className="w-full max-w-5xl space-y-3 mt-4 text-xs">
+    <div className="w-full space-y-2 text-xs">
+      {/* 3D viewport */}
       <div
         ref={mountRef}
-        className="w-full h-[420px] border border-[var(--b-soft)] bg-[var(--s-canvas)] relative overflow-hidden"
+        onContextMenu={handleContextMenu}
+        className="w-full h-[480px] border border-[var(--b-soft)] bg-black relative overflow-hidden"
       >
-        <div className="absolute top-2 left-2 z-10 text-[var(--t-muted)] text-[10px] pointer-events-none">
-          drag to rotate &middot; scroll to zoom
+        <div className="absolute top-2 left-2 z-10 text-[var(--t-muted)] text-[10px] pointer-events-none select-none">
+          left-drag: orbit &middot; scroll: zoom &middot; right-click: probe
         </div>
         {outline.burnedOut && (
           <div className="absolute inset-0 flex items-center justify-center text-[var(--sem-warn)] text-sm pointer-events-none">
@@ -390,11 +747,98 @@ export function GrainBurn3D({ grain, results }: Props) {
         )}
       </div>
 
-      {/* --- transport --- */}
+      {/* ── Toolbar ── */}
+      <div className="flex flex-wrap items-center gap-2 p-2 bg-[var(--s-sunken)] border border-[var(--b-soft)]">
+        {/* View mode */}
+        <div className="flex items-center gap-1">
+          <span className="text-[var(--t-secondary)] text-[10px] font-bold mr-1">View</span>
+          {(['solid', 'xray', 'cutaway'] as ViewMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setViewMode(m)}
+              className={`px-2 py-0.5 text-[10px] border ${
+                viewMode === m
+                  ? 'bg-[var(--a-accent)] text-[var(--t-inverse)] border-[var(--a-accent)]'
+                  : 'bg-[var(--s-canvas)] text-[var(--t-secondary)] border-[var(--b-control)] hover:border-[var(--a-accent)]'
+              }`}
+            >
+              {m === 'xray' ? 'X-Ray' : m === 'cutaway' ? 'Cut' : 'Solid'}
+            </button>
+          ))}
+        </div>
+
+        {/* Cutaway angle */}
+        {viewMode === 'cutaway' && (
+          <div className="flex items-center gap-1">
+            <span className="text-[var(--t-muted)] text-[10px]">Angle</span>
+            <input
+              type="range" min={0} max={360} value={clipAngle}
+              onChange={(e) => setClipAngle(Number(e.target.value))}
+              className="w-20 accent-[var(--a-accent)]"
+            />
+            <span className="text-[var(--t-muted)] text-[10px] w-6">{clipAngle}°</span>
+          </div>
+        )}
+
+        <div className="w-px h-4 bg-[var(--b-soft)]" />
+
+        {/* Field selector */}
+        <div className="flex items-center gap-1">
+          <span className="text-[var(--t-secondary)] text-[10px] font-bold">Field</span>
+          <select
+            value={field}
+            onChange={(e) => setField(e.target.value as FieldId)}
+            className="bg-[var(--s-canvas)] border border-[var(--b-control)] text-[var(--t-primary)] text-[10px] px-1 py-0.5 outline-none"
+          >
+            {availableFields.map((f) => (
+              <option key={f} value={f}>{FIELD_LABELS[f]}</option>
+            ))}
+          </select>
+        </div>
+
+        {field !== 'none' && (
+          <div className="flex items-center gap-1">
+            <span className="text-[var(--t-muted)] text-[10px]">Map</span>
+            <select
+              value={colorMap}
+              onChange={(e) => setColorMap(e.target.value as ColorMap)}
+              className="bg-[var(--s-canvas)] border border-[var(--b-control)] text-[var(--t-primary)] text-[10px] px-1 py-0.5 outline-none"
+            >
+              <option value="jet">Jet</option>
+              <option value="viridis">Viridis</option>
+              <option value="thermal">Thermal</option>
+              <option value="coolwarm">Cool-Warm</option>
+            </select>
+          </div>
+        )}
+
+        <div className="w-px h-4 bg-[var(--b-soft)]" />
+
+        {/* Casing toggle */}
+        <label className="flex items-center gap-1 text-[var(--t-secondary)] text-[10px]">
+          <input type="checkbox" checked={showCasing} onChange={(e) => setShowCasing(e.target.checked)} />
+          Casing
+        </label>
+      </div>
+
+      {/* Color legend */}
+      {field !== 'none' && fieldData && (
+        <div className="px-2">
+          <ColorLegend
+            min={fieldData.min}
+            max={fieldData.max}
+            unit={fieldData.unit}
+            colorMap={colorMap}
+            label={FIELD_LABELS[field]}
+          />
+        </div>
+      )}
+
+      {/* Transport controls */}
       <div className="flex items-center space-x-3">
         <button
           onClick={() => (progress >= 1 ? (setProgress(0), setPlaying(true)) : setPlaying(!playing))}
-          className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-3 py-1.5 font-bold flex items-center hover:brightness-110"
+          className="bg-[var(--a-accent-dim)] border border-[var(--a-accent)] text-white px-3 py-1.5 font-bold flex items-center hover:bg-[var(--a-accent)]"
         >
           {playing ? <Pause className="w-3 h-3 mr-1" /> : <Play className="w-3 h-3 mr-1" />}
           {playing ? 'Pause' : 'Play'}
@@ -406,28 +850,16 @@ export function GrainBurn3D({ grain, results }: Props) {
           <Reset className="w-3 h-3" />
         </button>
         <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.002}
-          value={progress}
-          onChange={(e) => {
-            setPlaying(false);
-            setProgress(parseFloat(e.target.value));
-          }}
-          className="flex-1 accent-[var(--sem-warn)]"
+          type="range" min={0} max={1} step={0.002} value={progress}
+          onChange={(e) => { setPlaying(false); setProgress(parseFloat(e.target.value)); }}
+          className="flex-1 accent-[var(--a-accent)]"
         />
-        <label className="flex items-center space-x-1 text-[var(--t-secondary)] whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={showCasing}
-            onChange={(e) => setShowCasing(e.target.checked)}
-          />
-          <span>casing</span>
-        </label>
+        <span className="text-[var(--t-muted)] text-[10px] w-16 text-right">
+          {timeline ? `${current.t.toFixed(2)}s` : `${(progress * 100).toFixed(0)}%`}
+        </span>
       </div>
 
-      {/* --- readout --- */}
+      {/* Readout grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border border-[var(--b-soft)] p-3 bg-[var(--s-canvas)]">
         <div>
           <p className="text-[var(--t-secondary)] text-[10px]">{timeline ? 'Time' : 'Burn progress'}</p>
@@ -442,65 +874,75 @@ export function GrainBurn3D({ grain, results }: Props) {
           </p>
         </div>
         <div>
-          <p className="text-[var(--t-secondary)] text-[10px]">Burning area (drawn)</p>
-          <p className="text-[var(--sem-warn)]">{(drawnAb * 1e4).toFixed(1)} cm²</p>
+          <p className="text-[var(--t-secondary)] text-[10px]">Burning area</p>
+          <p className="text-[var(--a-accent)]">{(analyticAb * 1e4).toFixed(1)} cm²</p>
         </div>
         <div>
-          <p className="text-[var(--t-secondary)] text-[10px]">Port area (drawn)</p>
-          <p className="text-[var(--sem-warn)]">{(outline.area * 1e4).toFixed(2)} cm²</p>
+          <p className="text-[var(--t-secondary)] text-[10px]">Port area</p>
+          <p className="text-[var(--a-accent)]">{(analyticPort * 1e4).toFixed(2)} cm²</p>
         </div>
         {current.row && (
           <>
             <div>
               <p className="text-[var(--t-secondary)] text-[10px]">Chamber pressure</p>
-              <p className="text-[var(--sem-ok)]">{(current.row.Pc / 1e6).toFixed(2)} MPa</p>
+              <p className="text-[var(--a-accent)]">{(current.row.Pc / 1e6).toFixed(2)} MPa</p>
             </div>
             <div>
               <p className="text-[var(--t-secondary)] text-[10px]">Thrust</p>
-              <p className="text-[var(--sem-ok)]">{(current.row.Thrust / 1000).toFixed(2)} kN</p>
+              <p className="text-[var(--a-accent)]">{(current.row.Thrust / 1000).toFixed(2)} kN</p>
             </div>
             <div>
-              {/* BATES is the only geometry with burning END FACES, and a
-                  cross-section cannot show them -- so its solver total is
-                  legitimately above the drawn lateral figure. Labelling it
-                  stops that reading as a discrepancy. */}
-              <p className="text-[var(--t-secondary)] text-[10px]">
-                Solver burning area{endArea > 0 ? ' (incl. ends)' : ''}
-              </p>
-              <p className="text-[var(--t-primary)]">
-                {(analyticAb * 1e4).toFixed(1)} cm²
-                {endArea > 0 && (
-                  <span className="text-[var(--t-muted)]"> · {(lateral * 1e4).toFixed(1)} lateral</span>
-                )}
-              </p>
+              <p className="text-[var(--t-secondary)] text-[10px]">Mass flow</p>
+              <p className="text-[var(--t-primary)]">{current.row.MassFlow.toFixed(3)} kg/s</p>
             </div>
             <div>
-              <p className="text-[var(--t-secondary)] text-[10px]">Solver port area</p>
-              <p className="text-[var(--t-primary)]">{(analyticPort * 1e4).toFixed(2)} cm²</p>
+              <p className="text-[var(--t-secondary)] text-[10px]">Port mass flux</p>
+              <p className="text-[var(--t-primary)]">{current.row.PortMassFlux.toFixed(1)} kg/m²s</p>
             </div>
           </>
         )}
       </div>
 
-      {/*
-        The drawn shape is exact offsetting; the solver holds an analytic model.
-        Where they differ the number the solver used is the approximate one, and
-        saying so is more useful than quietly showing two figures that disagree.
-      */}
-      {Math.abs(abGap) > 0.02 && !outline.burnedOut && (
-        <div className="border border-[var(--sem-warn)] bg-[var(--sem-warn-wash)] p-2 text-[10px] text-[var(--sem-warn)] leading-snug">
-          At this web the drawn burning area is {(abGap * 100).toFixed(1)}% from the value the
-          solver used ({(lateral * 1e4).toFixed(1)} cm² lateral). The shape here comes from exact
-          polygon offsetting; <span className="text-[var(--sem-warn)]">{grain.kind}</span>&apos;s analytic
-          model in engine.ts is an approximation: for Finocyl the fin slots are treated as sharp
-          rectangles, which a real burn rounds off. The picture is the accurate one.
+      {/* Probe points panel */}
+      {probes.length > 0 && (
+        <div className="border border-[var(--b-soft)] bg-[var(--s-canvas)] p-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[var(--t-secondary)] text-[10px] font-bold">Probe Points</span>
+            <button
+              onClick={() => setProbes([])}
+              className="text-[var(--t-muted)] hover:text-[var(--sem-danger)] text-[10px] flex items-center gap-0.5"
+            >
+              <Trash className="w-2.5 h-2.5" /> Clear all
+            </button>
+          </div>
+          <div className="space-y-1">
+            {probes.map((p, i) => (
+              <div key={p.id} className="flex items-center gap-2 text-[10px]">
+                <span className="text-[var(--sem-danger)] font-bold w-4">#{p.id}</span>
+                <span className="text-[var(--t-muted)]">{p.meshType}</span>
+                <span className="text-[var(--t-muted)]">z={((p.axialFrac - 0.5) * grain.length * 1000).toFixed(1)}mm</span>
+                <span className="text-[var(--t-primary)] font-mono">
+                  {field !== 'none' ? probeValues[i] : '—'}
+                </span>
+                <button
+                  onClick={() => setProbes((prev) => prev.filter((x) => x.id !== p.id))}
+                  className="text-[var(--t-muted)] hover:text-[var(--sem-danger)] ml-auto"
+                >
+                  <Close className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          {field === 'none' && (
+            <p className="text-[var(--t-muted)] text-[9px] mt-1">Select a field to see probe values.</p>
+          )}
         </div>
       )}
 
       {!timeline && (
         <p className="text-[var(--t-muted)] text-[10px]">
-          Scrubbing web directly. Run a simulation to scrub in time instead, with pressure and
-          thrust at each instant.
+          Scrubbing web directly. Run a simulation to scrub in time with pressure and thrust data.
+          {!stations && ' Use the quasi-1-D solver for axial field visualization.'}
         </p>
       )}
     </div>

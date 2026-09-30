@@ -80,7 +80,7 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--scrim)] text-xs text-[var(--t-primary)]">
       <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-[600px] flex flex-col max-h-[90vh]">
-        <div className="bg-[var(--s-sunken)] px-3 py-2 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-[var(--sem-ok)]">
+        <div className="bg-[var(--s-sunken)] px-3 py-2 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-[var(--a-accent)]">
           <div className="flex items-center"><Settings size={14} className="mr-1" /> Propellant Editor</div>
           <button onClick={onClose} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
         </div>
@@ -109,7 +109,7 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
                      type="button"
                      onClick={() => setSelectedId(p.id)}
                      aria-current={selectedId === p.id}
-                     className="truncate pr-2 flex-1 text-left cursor-pointer bg-transparent border-0 p-0 text-inherit focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sem-ok)]"
+                     className="truncate pr-2 flex-1 text-left cursor-pointer bg-transparent border-0 p-0 text-inherit focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--a-accent)]"
                    >
                      {p.name || 'Unnamed'}
                    </button>
@@ -127,7 +127,7 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
                ))}
              </div>
              <div className="p-2 border-t border-[var(--b-strong)]">
-               <button onClick={handleAdd} className="w-full flex items-center justify-center py-1.5 bg-[var(--s-sunken)] hover:bg-[var(--s-raised)] border border-[var(--b-control)] text-[var(--sem-ok)]">
+               <button onClick={handleAdd} className="w-full flex items-center justify-center py-1.5 bg-[var(--s-sunken)] hover:bg-[var(--s-raised)] border border-[var(--b-control)] text-[var(--t-secondary)]">
                  <Plus size={14} className="mr-1" /> Add Propellant
                </button>
              </div>
@@ -139,41 +139,41 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
                <>
                  <div className="space-y-1">
                    <label className="text-[var(--t-secondary)]" htmlFor={fieldId('name')}>Name</label>
-                   <input id={fieldId('name')} type="text" value={selectedProp.name} onChange={e => updateSelected('name', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-ok)] text-[var(--t-primary)]" />
+                   <input id={fieldId('name')} type="text" value={selectedProp.name} onChange={e => updateSelected('name', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-[var(--t-primary)]" />
                  </div>
                  
                  <div className="grid grid-cols-2 gap-3">
                    <div className="space-y-1">
                      <label className="text-[var(--t-secondary)]" htmlFor={fieldId('density-kg-m')}>Density (kg/m³)</label>
-                     <input id={fieldId('density-kg-m')} type="number" step="any" value={selectedProp.density} onChange={e => handleNumChange('density', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-ok)] text-[var(--t-primary)] text-right" />
+                     <input id={fieldId('density-kg-m')} type="number" step="any" value={selectedProp.density} onChange={e => handleNumChange('density', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-[var(--t-primary)] text-right" />
                    </div>
                    <div className="space-y-1">
                      <label className="text-[var(--t-secondary)]" htmlFor={fieldId('burn-coeff-a-m-s-pa-n')}>Burn Coeff 'a' (m/s/Pa^n)</label>
-                     <input id={fieldId('burn-coeff-a-m-s-pa-n')} type="number" step="any" value={selectedProp.a} onChange={e => handleNumChange('a', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-ok)] text-[var(--t-primary)] text-right" />
+                     <input id={fieldId('burn-coeff-a-m-s-pa-n')} type="number" step="any" value={selectedProp.a} onChange={e => handleNumChange('a', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-[var(--t-primary)] text-right" />
                    </div>
                    <div className="space-y-1">
                      <label className="text-[var(--t-secondary)]" htmlFor={fieldId('pressure-exp-n')}>Pressure Exp 'n'</label>
-                     <input id={fieldId('pressure-exp-n')} type="number" step="any" value={selectedProp.n} onChange={e => handleNumChange('n', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-ok)] text-[var(--t-primary)] text-right" />
+                     <input id={fieldId('pressure-exp-n')} type="number" step="any" value={selectedProp.n} onChange={e => handleNumChange('n', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-[var(--t-primary)] text-right" />
                    </div>
                    <div className="space-y-1">
                      <label className="text-[var(--t-secondary)]" htmlFor={fieldId('mol-wt-kg-mol')}>Mol Wt (kg/mol)</label>
-                     <input id={fieldId('mol-wt-kg-mol')} type="number" step="any" value={selectedProp.molWeight} onChange={e => handleNumChange('molWeight', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-ok)] text-[var(--t-primary)] text-right" />
+                     <input id={fieldId('mol-wt-kg-mol')} type="number" step="any" value={selectedProp.molWeight} onChange={e => handleNumChange('molWeight', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-[var(--t-primary)] text-right" />
                    </div>
                    <div className="space-y-1">
                      <label className="text-[var(--t-secondary)]" htmlFor={fieldId('linear-k-erosive')}>Linear k_erosive</label>
-                     <input id={fieldId('linear-k-erosive')} type="number" step="any" value={selectedProp.kErosive} onChange={e => handleNumChange('kErosive', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-ok)] text-[var(--t-primary)] text-right" />
+                     <input id={fieldId('linear-k-erosive')} type="number" step="any" value={selectedProp.kErosive} onChange={e => handleNumChange('kErosive', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-[var(--t-primary)] text-right" />
                    </div>
                    <div className="space-y-1">
                      <label className="text-[var(--t-secondary)]" htmlFor={fieldId('g-threshold-kg-m-s')}>G Threshold (kg/m²s)</label>
-                     <input id={fieldId('g-threshold-kg-m-s')} type="number" step="any" value={selectedProp.gThreshold} onChange={e => handleNumChange('gThreshold', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-ok)] text-[var(--t-primary)] text-right" />
+                     <input id={fieldId('g-threshold-kg-m-s')} type="number" step="any" value={selectedProp.gThreshold} onChange={e => handleNumChange('gThreshold', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-[var(--t-primary)] text-right" />
                    </div>
                    <div className="space-y-1">
                      <label className="text-[var(--t-secondary)]" htmlFor={fieldId('flame-temp-k')}>Flame Temp (K)</label>
-                     <input id={fieldId('flame-temp-k')} type="number" step="any" value={selectedProp.flameTemp} onChange={e => handleNumChange('flameTemp', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-ok)] text-[var(--t-primary)] text-right" />
+                     <input id={fieldId('flame-temp-k')} type="number" step="any" value={selectedProp.flameTemp} onChange={e => handleNumChange('flameTemp', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-[var(--t-primary)] text-right" />
                    </div>
                    <div className="space-y-1">
                      <label className="text-[var(--t-secondary)]" htmlFor={fieldId('gamma-ratio-of-specific-heats')}>Gamma (ratio of specific heats)</label>
-                     <input id={fieldId('gamma-ratio-of-specific-heats')} type="number" step="any" value={selectedProp.gamma} onChange={e => handleNumChange('gamma', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-ok)] text-[var(--t-primary)] text-right" />
+                     <input id={fieldId('gamma-ratio-of-specific-heats')} type="number" step="any" value={selectedProp.gamma} onChange={e => handleNumChange('gamma', e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)] text-[var(--t-primary)] text-right" />
                    </div>
                  </div>
                </>
@@ -192,7 +192,7 @@ export function PropellantEditor({ propellants, onChange, onApply, onClose }: Pr
           <button 
             disabled={!selectedProp}
             onClick={() => { if(selectedProp) onApply(selectedProp); }} 
-            className="px-4 py-1.5 bg-[var(--sem-ok)] text-[var(--t-inverse)] font-bold hover:brightness-110 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="px-4 py-1.5 bg-[var(--a-accent-dim)] border border-[var(--a-accent)] text-white font-bold hover:bg-[var(--a-accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             <Ok size={14} className="mr-1" /> Apply to Engine
           </button>

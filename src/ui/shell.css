@@ -357,7 +357,7 @@
   font-family: var(--font);
   font-size: var(--fs-xs);
   line-height: 1.5;
-  color: var(--sem-ok);
+  color: var(--t-secondary);
 }
 .sh-console-line {
   white-space: pre-wrap;

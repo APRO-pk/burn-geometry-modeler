@@ -287,7 +287,7 @@ export function GrainEditor({ initialParams, dxfData, onApply, onClose }: GrainE
                  </div>
                  <div className="flex flex-col bg-[var(--s-sunken)] p-2 border border-[var(--b-soft)]">
                    <span className="text-[var(--t-secondary)]">Burning Area</span>
-                   <span className="text-[var(--sem-ok)] text-lg font-bold">{(stats.burnArea * 10000).toFixed(2)} cm²</span>
+                   <span className="text-[var(--a-accent)] text-lg font-bold">{(stats.burnArea * 10000).toFixed(2)} cm²</span>
                  </div>
               </div>
             </div>

@@ -20,25 +20,27 @@
 }
 
 .ac-chip.is-warning {
-  background: var(--sem-warn-wash);
-  border: 1px solid var(--sem-warn);
-  color: var(--sem-warn);
+  background: transparent;
+  border: 1px solid var(--b-control);
+  color: var(--t-secondary);
 }
 .ac-chip.is-warning:hover,
 .ac-chip.is-warning.is-open {
-  background: var(--sem-warn);
-  color: var(--t-inverse);
+  background: var(--s-active);
+  border-color: var(--t-secondary);
+  color: var(--t-primary);
 }
 
 .ac-chip.is-error {
-  background: var(--sem-danger-wash);
-  border: 1px solid var(--sem-danger);
-  color: var(--sem-danger);
+  background: transparent;
+  border: 1px solid var(--b-control);
+  color: var(--t-secondary);
 }
 .ac-chip.is-error:hover,
 .ac-chip.is-error.is-open {
-  background: var(--sem-danger);
-  color: #fff;
+  background: var(--s-active);
+  border-color: var(--t-secondary);
+  color: var(--t-primary);
 }
 
 /* ---- popover ---- */

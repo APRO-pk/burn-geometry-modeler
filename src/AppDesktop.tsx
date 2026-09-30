@@ -45,16 +45,20 @@ import {
 import { ErrorBoundary } from './ErrorBoundary';
 import { StructuralTab } from './StructuralTab';
 import { BallisticsChart, SERIES } from './BallisticsChart';
-import { modelUncertainty, formatBand } from './modelUncertainty';
+import { modelUncertainty } from './modelUncertainty';
 import './ui/theme.css';
-import { MenuBar, Toolbar, ToolbarSep, ToolbarSpacer, Dock, TabStrip, StatusBar } from './ui/shell';
+import { MenuBar, Toolbar, ToolbarSep, ToolbarSpacer, Dock, TabStrip } from './ui/shell';
 import { useNotifications, NotificationBell } from './ui/notifications';
 import { AlertChip } from './ui/AlertChip';
-import { Button, Checkbox, Stat, FieldGroup } from './ui/primitives';
+import { Button, Checkbox, FieldGroup } from './ui/primitives';
 import { MonteCarloTab } from './MonteCarloTab';
 import { MaterialsTab } from './MaterialsTab';
 import { CustomGraphTab } from './CustomGraphTab';
 import { StatisticsTab } from './StatisticsTab';
+import { InputBox, SettingsContext, UNIT_FACTORS, DEFAULT_METRIC_PREFS, DEFAULT_IMPERIAL_PREFS, IMPERIAL_OPTIONS } from './InputBox';
+import { generateGrainSTL, getCasingProfiles, generateProfileSTL, generateSCAD } from './exporters';
+import { UnitConverterDialog } from './UnitConverterDialog';
+import { GeometryTab } from './GeometryTab';
 import {
   useDesignHistory,
   applyNumber,
@@ -71,217 +75,6 @@ import { usePersistentState, isOneOf, isStringRecord } from './usePersistentStat
 const GrainBurn3D = React.lazy(() => import('./GrainBurn3D'));
 import type { SurrogateGrain } from './surrogate/features';
 
-// Unit Conversion Factors mapping to base SI units
-const UNIT_FACTORS: Record<string, Record<string, number>> = {
-  Length: { m: 1, cm: 0.01, mm: 0.001, in: 0.0254, ft: 0.3048 },
-  Pressure: { Pa: 1, kPa: 1000, MPa: 1e6, GPa: 1e9, psi: 6894.76, bar: 1e5, atm: 101325 },
-  Mass: { kg: 1, g: 0.001, lbm: 0.453592 },
-  Density: { 'kg/m³': 1, 'g/cm³': 1000, 'lb/in³': 27679.9 },
-  Area: { 'm²': 1, 'cm²': 0.0001, 'mm²': 1e-6, 'in²': 0.00064516 },
-  Temperature: { K: 1 } // Handled separately if needs shift, but let's assume raw delta/scale for now, or just use suffix="K"
-};
-
-/**
- * Display preferences, shared with every InputBox so units convert app-wide.
- *
- * Typed rather than `any` because InputBox reads `imperialPrefs[unitCat]`
- * deep inside a render -- an `any` context meant a typo there produced
- * undefined and a silently unconverted number, not an error.
- *
- * The default is null: an InputBox rendered outside the provider falls back to
- * its own suffix, which is the existing behaviour.
- */
-export interface UnitSettings {
-  unitSystem: 'Metric' | 'Imperial';
-  imperialPrefs: Record<string, string>;
-  setUnitSystem: React.Dispatch<React.SetStateAction<'Metric' | 'Imperial'>>;
-  setImperialPrefs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-}
-
-export const SettingsContext = React.createContext<UnitSettings | null>(null);
-
-const DEFAULT_METRIC_PREFS: Record<string, string> = {
-  Length: 'mm',
-  Pressure: 'MPa',
-  Mass: 'kg',
-  Density: 'kg/m³',
-  Area: 'mm²'
-};
-
-const DEFAULT_IMPERIAL_PREFS: Record<string, string> = {
-  Length: 'in',
-  Pressure: 'psi',
-  Mass: 'lbm',
-  Density: 'lb/in³',
-  Area: 'in²'
-};
-
-const IMPERIAL_OPTIONS: Record<string, string[]> = {
-  Length: ['in', 'ft'],
-  Pressure: ['psi', 'atm'],
-  Mass: ['lbm'],
-  Density: ['lb/in³'],
-  Area: ['in²']
-};
-
-/**
- * A labelled numeric input with unit conversion and inline validation.
- *
- * Three things were wrong with the previous version and are fixed here:
- *
- *   Props were typed `any`, so nothing checked that callers passed a real
- *   onChange or a sensible unit category.
- *
- *   The label was not associated with its input. Screen readers announced an
- *   unlabelled text box, and clicking the label did not focus the field.
- *
- *   There was nowhere to show a validation message, so problems could only be
- *   reported by an alert() at run time -- long after the value was typed, and
- *   only for the first problem found.
- */
-interface InputBoxProps {
-  label: string;
-  value: number | string;
-  onChange: (v: never) => void;
-  suffix?: string;
-  step?: string | number;
-  type?: string;
-  /** Key into UNIT_FACTORS, enabling the unit dropdown. */
-  unitCat?: string | null;
-  /** Validation issues for this field, rendered underneath. */
-  issues?: ValidationIssue[];
-}
-
-const InputBox = ({
-  label,
-  value,
-  onChange,
-  suffix,
-  step = 'any',
-  type = 'number',
-  unitCat = null,
-  issues = [],
-}: InputBoxProps) => {
-  const settings = React.useContext(SettingsContext);
-  const inputId = React.useId();
-  const issueId = `${inputId}-issues`;
-
-  const defaultLocalUnit = React.useMemo(() => {
-    if (!unitCat || !UNIT_FACTORS[unitCat]) return suffix || '';
-    if (settings) {
-      if (settings.unitSystem === 'Imperial' && settings.imperialPrefs[unitCat]) {
-        return settings.imperialPrefs[unitCat];
-      } else if (settings.unitSystem === 'Metric' && DEFAULT_METRIC_PREFS[unitCat]) {
-         return DEFAULT_METRIC_PREFS[unitCat];
-      }
-    }
-    return Object.keys(UNIT_FACTORS[unitCat])[0];
-  }, [unitCat, suffix, settings]);
-
-  const [localUnit, setLocalUnit] = useState<string>('');
-
-  React.useEffect(() => {
-    setLocalUnit(defaultLocalUnit);
-  }, [defaultLocalUnit]);
-
-  // Calculate display value if unitCat is used, else passed directly
-
-  const displayVal = React.useMemo(() => {
-    if (type !== 'number' || !unitCat || !UNIT_FACTORS[unitCat]) return value;
-    const factor = UNIT_FACTORS[unitCat][localUnit];
-    if (!factor) return value;
-    // value is SI base. Convert TO local unit.
-    const res = Number(value) / factor;
-    // Format nicely
-    return Number.isInteger(res) ? res.toString() : parseFloat(res.toPrecision(6)).toString();
-  }, [value, unitCat, localUnit, type]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    if (type !== 'number') return onChange(raw as never);
-    const num = parseFloat(raw);
-    /*
-     * An unparseable entry used to become 0, which is worse than it looks: a
-     * half-typed "-" or "1e" silently set the field to zero, and zero is a
-     * legal-looking radius that produces a confusing failure much later. Leave
-     * the previous value alone instead and let validation speak.
-     */
-    if (isNaN(num)) return;
-
-    if (unitCat && UNIT_FACTORS[unitCat] && UNIT_FACTORS[unitCat][localUnit]) {
-      const factor = UNIT_FACTORS[unitCat][localUnit];
-      // Input is local unit. Convert TO SI base.
-      onChange((num * factor) as never);
-    } else {
-      onChange(num as never);
-    }
-  };
-
-  const errors = issues.filter((i) => i.severity === 'error');
-  const worst = errors.length ? 'error' : issues.length ? 'warning' : null;
-
-  /*
-   * Markup matches the Field primitive in src/ui/primitives.tsx rather than
-   * carrying its own styles.
-   *
-   * InputBox predates that primitive and is used at roughly forty call sites.
-   * Rewriting all of them was not worth the risk for a visual change, so
-   * instead this adopts the same class names -- which is what actually makes
-   * the form look uniform. New code should use Field; this stays because it
-   * already handles unit conversion, which Field does not.
-   */
-  return (
-    <div className={`ui-field ${worst ? `is-${worst}` : ''}`}>
-      <label className="ui-field-label" htmlFor={inputId}>
-        {label}
-      </label>
-      <div className="ui-field-control">
-        <input
-          id={inputId}
-          type={type}
-          step={step}
-          value={displayVal}
-          onChange={handleChange}
-          aria-invalid={errors.length > 0 || undefined}
-          aria-describedby={issues.length ? issueId : undefined}
-          className="ui-input ui-input-num"
-        />
-        <div className="ui-field-suffix">
-          {unitCat && UNIT_FACTORS[unitCat] ? (
-            <select
-              value={localUnit}
-              onChange={(e) => setLocalUnit(e.target.value)}
-              aria-label={`Unit for ${label}`}
-            >
-              {Object.keys(UNIT_FACTORS[unitCat]).map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span>{suffix}</span>
-          )}
-        </div>
-      </div>
-      {issues.length > 0 && (
-        <div id={issueId} className="ui-field-msgs">
-          {issues.map((i, idx) => (
-            <p
-              key={idx}
-              // Errors are announced immediately; warnings wait for a pause, so
-              // typing a value that is briefly invalid is not read out mid-edit.
-              role={i.severity === 'error' ? 'alert' : undefined}
-              className={`ui-field-msg is-${i.severity}`}
-            >
-              {i.message}
-            </p>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 /**
  * The analysis views, in tab order.
@@ -308,7 +101,7 @@ const TAB_DEFS = [
   { id: 'burn3d', label: '3-D Burn' },
 ] as const;
 
-export type TabId = (typeof TAB_DEFS)[number]['id'];
+type TabId = (typeof TAB_DEFS)[number]['id'];
 
 /**
  * The message from a thrown value, whatever it turns out to be.
@@ -787,9 +580,9 @@ export default function AppDesktop() {
   /**
    * The live error budget, computed for whatever is currently configured.
    *
-   * Shown in the right dock and the status strip rather than only inside the
-   * statistics tab, because uncertainty that you have to go looking for does
-   * not inform the design decision you are making right now.
+   * The only reader left is the ballistics chart, which shades a confidence
+   * band around the peak-pressure marker; the standalone uncertainty readouts
+   * were removed so that warnings and flags live in a single place.
    */
   const uncertaintyBudget = useMemo(
     () =>
@@ -808,29 +601,7 @@ export default function AppDesktop() {
     () => uncertaintyBudget.find((u) => u.output === 'peak_pressure'),
     [uncertaintyBudget]
   );
-  const impulseBand = useMemo(
-    () => uncertaintyBudget.find((u) => u.output === 'total_impulse'),
-    [uncertaintyBudget]
-  );
-  const burnTimeBand = useMemo(
-    () => uncertaintyBudget.find((u) => u.output === 'burn_time'),
-    [uncertaintyBudget]
-  );
 
-  /**
-   * NAR/TRA-style impulse class letter, plus volume loading.
-   *
-   * Each class is double the previous, starting at 2.5 N*s for an A, so the
-   * letter is log2 of the ratio. Clamped at Z rather than running off the end
-   * of the alphabet for an absurd design.
-   */
-  const motorDesignation = useMemo(() => {
-    if (!metrics || !(metrics.totalImpulse > 0)) return String.fromCharCode(63);
-    const letter = String.fromCharCode(
-      65 + Math.max(0, Math.min(25, Math.floor(Math.log2(metrics.totalImpulse / 2.5))))
-    );
-    return letter + " (" + (metrics.volumeLoading * 100).toFixed(0) + "%)";
-  }, [metrics]);
   const [visualizerIndex, setVisualizerIndex] = useState<number>(0);
   const [statusMsg, setStatusMsg] = useState<string>('System Ready');
   // TabId is derived from TAB_DEFS, so the tab bar and this state cannot
@@ -881,10 +652,10 @@ export default function AppDesktop() {
   }, []);
 
   /** The grain inputs, in the shared shape both grain mappings take. */
-  const grainUiParams = (): GrainUiParams => ({
+  const grainUiParams = useMemo<GrainUiParams>(() => ({
     grainType, length, outerRadius, innerRadius,
     valleyRadius, tipRadius, numPoints, rodRadius, offset, finWidth, finDepth,
-  });
+  }), [grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius, numPoints, rodRadius, offset, finWidth, finDepth]);
 
   const buildNozzleMaterial = (): NozzleMaterialProps | null => {
     if (nozzleMaterial === 'Graphite') {
@@ -928,7 +699,7 @@ export default function AppDesktop() {
       // Empty array is the same as absent: the core falls back to a/n.
       ...(burnRateRegimes.length ? { burn_rate_regimes: burnRateRegimes } : {}),
     },
-    grain: grainConfigFromUi(grainUiParams(), dxfData),
+    grain: grainConfigFromUi(grainUiParams, dxfData),
     nozzle: {
       throat_diameter: overrides.throatDiameter ?? throatDiameter,
       expansion_ratio: expansionRatio,
@@ -990,7 +761,7 @@ export default function AppDesktop() {
       try {
         // Geometry is still evaluated in TypeScript for the propellant-volume
         // maths below; the solver itself runs in the wasm core.
-        const grain = grainFromUi(grainUiParams(), dxfData);
+        const grain = grainFromUi(grainUiParams, dxfData);
 
         const {
           results: simResults,
@@ -1155,113 +926,11 @@ export default function AppDesktop() {
 
     setTimeout(() => {
       try {
-        let stl = "solid motor_grain\n";
-        const addFacet = (v1: number[], v2: number[], v3: number[]) => {
-          const ux = v2[0] - v1[0], uy = v2[1] - v1[1], uz = v2[2] - v1[2];
-          const vx = v3[0] - v1[0], vy = v3[1] - v1[1], vz = v3[2] - v1[2];
-          let nx = uy * vz - uz * vy;
-          let ny = uz * vx - ux * vz;
-          let nz = ux * vy - uy * vx;
-          const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-          if (len > 1e-6) { nx /= len; ny /= len; nz /= len; }
-          stl += `  facet normal ${nx.toExponential(6)} ${ny.toExponential(6)} ${nz.toExponential(6)}\n    outer loop\n`;
-          stl += `      vertex ${v1[0].toExponential(6)} ${v1[1].toExponential(6)} ${v1[2].toExponential(6)}\n`;
-          stl += `      vertex ${v2[0].toExponential(6)} ${v2[1].toExponential(6)} ${v2[2].toExponential(6)}\n`;
-          stl += `      vertex ${v3[0].toExponential(6)} ${v3[1].toExponential(6)} ${v3[2].toExponential(6)}\n`;
-          stl += `    endloop\n  endfacet\n`;
-        };
-
-        const radialSteps = 120; // 3 degree steps
-        const innerProfile: number[][] = [];
-        const outerProfile: number[][] = [];
-        const rodProfile: number[][] | null = grainType === 'RodAndTube' ? [] : null;
-
-        for (let i = 0; i < radialSteps; i++) {
-          const a = (i * 2 * Math.PI) / radialSteps;
-          let r_in = innerRadius;
-          let cx = 0;
-          const cy = 0;
-          if (grainType === 'Star') {
-            const sector = (2 * Math.PI) / numPoints;
-            let local_a = a % sector;
-            if (local_a > sector / 2) {
-              local_a = sector - local_a;
-            }
-            r_in = tipRadius + (valleyRadius - tipRadius) * (local_a / (sector / 2));
-          } else if (grainType === 'Tubular' || grainType === 'BATES' || grainType === 'RodAndTube') {
-            r_in = innerRadius;
-          } else if (grainType === 'MoonBurner') {
-            r_in = innerRadius;
-            cx = offset;
-          } else if (grainType === 'CustomDXF') {
-            r_in = dxfData ? Math.sqrt(dxfData.areaTable[0] / Math.PI) : innerRadius;
-          } else if (grainType === 'Finocyl') {
-            const a_core = Math.PI * Math.pow(innerRadius, 2);
-            const tip_center = finDepth - finWidth / 2.0;
-            const fin_area = numPoints * (tip_center * finWidth + Math.PI * Math.pow(finWidth / 2, 2) / 2);
-            r_in = Math.sqrt((a_core + fin_area) / Math.PI);
-          }
-          if (r_in > outerRadius) r_in = outerRadius;
-
-          innerProfile.push([cx + Math.cos(a) * r_in, cy + Math.sin(a) * r_in]);
-          outerProfile.push([Math.cos(a) * outerRadius, Math.sin(a) * outerRadius]);
-          if (rodProfile) rodProfile.push([Math.cos(a) * rodRadius, Math.sin(a) * rodRadius]);
-        }
-
-        const segments = grainType === 'BATES' ? numSegments : 1;
-        const gap = 2; // 2mm gap visually separating BATES grains
-
-        for (let s = 0; s < segments; s++) {
-          const z0 = s * (length + gap);
-          const z1 = z0 + length;
-
-          for (let i = 0; i < radialSteps; i++) {
-            const next_i = (i + 1) % radialSteps;
-            const p1_in = [...innerProfile[i], z0];
-            const p2_in = [...innerProfile[next_i], z0];
-            const p3_in = [...innerProfile[next_i], z1];
-            const p4_in = [...innerProfile[i], z1];
-
-            const p1_out = [...outerProfile[i], z0];
-            const p2_out = [...outerProfile[next_i], z0];
-            const p3_out = [...outerProfile[next_i], z1];
-            const p4_out = [...outerProfile[i], z1];
-
-            // Bottom Face (z0) -> Normal (0,0,-1)
-            addFacet(p1_in, p2_in, p1_out);
-            addFacet(p2_in, p2_out, p1_out);
-
-            // Top Face (z1) -> Normal (0,0,1)
-            addFacet(p4_in, p4_out, p3_in);
-            addFacet(p3_in, p4_out, p3_out);
-
-            // Inner Wall -> Normal pointing inward (towards center)
-            addFacet(p1_in, p4_in, p2_in);
-            addFacet(p4_in, p3_in, p2_in);
-
-            // Outer Wall -> Normal pointing outward
-            addFacet(p1_out, p2_out, p4_out);
-            addFacet(p2_out, p3_out, p4_out);
-            
-            // Rod (if exists)
-            if (rodProfile) {
-              const r1 = [...rodProfile[i], z0];
-              const r2 = [...rodProfile[next_i], z0];
-              const r3 = [...rodProfile[next_i], z1];
-              const r4 = [...rodProfile[i], z1];
-              
-              // Bottom
-              addFacet([0,0,z0], r2, r1);
-              // Top
-              addFacet([0,0,z1], r4, r3);
-              // Wall
-              addFacet(r1, r2, r4);
-              addFacet(r2, r3, r4);
-            }
-          }
-        }
-
-        stl += "endsolid motor_grain\n";
+        const stl = generateGrainSTL({
+          grainType, innerRadius, outerRadius, tipRadius, valleyRadius,
+          numPoints, offset, finDepth, finWidth, rodRadius, length,
+          numSegments, dxfData,
+        });
 
         const blob = new Blob([stl], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
@@ -1279,131 +948,29 @@ export default function AppDesktop() {
     }, 50);
   };
 
-  const getCasingProfiles = () => {
-    const innerRadiusMM = outerRadius * 1000;
-    // The CAD export uses the wall the user is actually analysing.
-    let casingThicknessMM = caseWallThickness;
-    if (casingThicknessMM < 0.1) casingThicknessMM *= 1000;
-    const outerRadiusMM = innerRadiusMM + casingThicknessMM;
-    const lengthMM = length * 1000;
-    const throatRadiusMM = (throatDiameter * 1000) / 2;
-    const expRatio = expansionRatio || 3.0;
-    const exitRadiusMM = throatRadiusMM * Math.sqrt(expRatio);
-
-    const flangeThick = Math.max(boltDiameter * 1.5, 5);
-    const flangeR = outerRadiusMM + Math.max(boltDiameter * 1.5, 8);
-    const nozzleThick = Math.max(casingThicknessMM * 1.5, 5.0);
-    const domeSteps = 16;
-    
-    // 1. Main Tube
-    const mainTubeProf = [
-      [lengthMM, innerRadiusMM],
-      [0, innerRadiusMM],
-      [0, flangeR],
-      [flangeThick, flangeR],
-      [flangeThick, outerRadiusMM],
-      [lengthMM - flangeThick, outerRadiusMM],
-      [lengthMM - flangeThick, flangeR],
-      [lengthMM, flangeR]
-    ];
-
-    // 2. Forward Closure
-    const fwdProf = [];
-    for (let i = domeSteps; i >= 0; i--) {
-      const theta = (i / domeSteps) * (Math.PI / 2);
-      fwdProf.push([
-        lengthMM + flangeThick + outerRadiusMM * Math.sin(theta),
-        Math.max(0.001, outerRadiusMM * Math.cos(theta))
-      ]);
-    }
-    fwdProf.push([lengthMM + flangeThick, flangeR]);
-    fwdProf.push([lengthMM, flangeR]);
-    fwdProf.push([lengthMM, Math.max(0.001, innerRadiusMM)]);
-    for (let i = 0; i <= domeSteps; i++) {
-      const theta = (i / domeSteps) * (Math.PI / 2);
-      fwdProf.push([
-        lengthMM + innerRadiusMM * Math.sin(theta),
-        Math.max(0.001, innerRadiusMM * Math.cos(theta))
-      ]);
-    }
-
-    // 3. Aft Closure (Nozzle)
-    const exitLength = throatRadiusMM * 6;
-    const nozzleConvLen = throatRadiusMM * 3;
-    const aftProf = [
-      [0, Math.max(0.001, innerRadiusMM)],
-      [0, flangeR],
-      [-flangeThick, flangeR],
-      [-flangeThick, outerRadiusMM],
-      [-nozzleConvLen, throatRadiusMM + nozzleThick],
-      [-nozzleConvLen - exitLength, exitRadiusMM + nozzleThick],
-      [-nozzleConvLen - exitLength, Math.max(0.001, exitRadiusMM)],
-      [-nozzleConvLen, Math.max(0.001, throatRadiusMM)]
-    ];
-
-    return { mainTubeProf, fwdProf, aftProf };
-  };
+  const makeCasingProfiles = () =>
+    getCasingProfiles({
+      outerRadius, caseWallThickness, length,
+      throatDiameter, expansionRatio, boltDiameter,
+    });
 
   const handleExportCasingSTL = async () => {
     if (!metrics) {
       addLog('Error: Run simulation first to determine casing thickness.');
-      alert('You must run the simulation first to calculate the required casing thickness before exporting the CAD model.');
+      notify({ title: 'Run simulation first', body: 'Casing thickness must be calculated before exporting.', severity: 'warning' });
       return;
     }
     addLog('Generating Assembly Parts (STL ZIP)...');
     setIsSimulating(true);
-    
+
     try {
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
+      const { mainTubeProf, fwdProf, aftProf } = makeCasingProfiles();
 
-      const generateSTL = (prof: number[][], name: string) => {
-        let stl = `solid ${name}\n`;
-        const radialSteps = 120;
-        const addFacet = (v1: number[], v2: number[], v3: number[]) => {
-          const ux = v2[0] - v1[0], uy = v2[1] - v1[1], uz = v2[2] - v1[2];
-          const vx = v3[0] - v1[0], vy = v3[1] - v1[1], vz = v3[2] - v1[2];
-          let nx = uy * vz - uz * vy;
-          let ny = uz * vx - ux * vz;
-          let nz = ux * vy - uy * vx;
-          const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-          if (len > 1e-6) { nx /= len; ny /= len; nz /= len; }
-          stl += `  facet normal ${nx.toExponential(6)} ${ny.toExponential(6)} ${nz.toExponential(6)}\n    outer loop\n`;
-          stl += `      vertex ${v1[0].toExponential(6)} ${v1[1].toExponential(6)} ${v1[2].toExponential(6)}\n`;
-          stl += `      vertex ${v2[0].toExponential(6)} ${v2[1].toExponential(6)} ${v2[2].toExponential(6)}\n`;
-          stl += `      vertex ${v3[0].toExponential(6)} ${v3[1].toExponential(6)} ${v3[2].toExponential(6)}\n`;
-          stl += `    endloop\n  endfacet\n`;
-        };
-
-        for (let i = 0; i < radialSteps; i++) {
-          const a1 = (i * 2 * Math.PI) / radialSteps;
-          const a2 = ((i + 1) * 2 * Math.PI) / radialSteps;
-
-          for (let p = 0; p < prof.length; p++) {
-            const pNext = (p + 1) % prof.length;
-            const z1 = prof[p][0], r1 = prof[p][1];
-            const z2 = prof[pNext][0], r2 = prof[pNext][1];
-
-            if (Math.abs(z1-z2) < 1e-6 && Math.abs(r1-r2) < 1e-6) continue;
-
-            const p1_a1 = [r1 * Math.cos(a1), r1 * Math.sin(a1), z1];
-            const p1_a2 = [r1 * Math.cos(a2), r1 * Math.sin(a2), z1];
-            const p2_a1 = [r2 * Math.cos(a1), r2 * Math.sin(a1), z2];
-            const p2_a2 = [r2 * Math.cos(a2), r2 * Math.sin(a2), z2];
-
-            addFacet(p1_a1, p2_a1, p1_a2);
-            addFacet(p1_a2, p2_a1, p2_a2);
-          }
-        }
-        stl += `endsolid ${name}\n`;
-        return stl;
-      };
-
-      const { mainTubeProf, fwdProf, aftProf } = getCasingProfiles();
-      
-      zip.file("MainTube.stl", generateSTL(mainTubeProf, "MainTube"));
-      zip.file("ForwardClosure.stl", generateSTL(fwdProf, "ForwardClosure"));
-      zip.file("AftClosure.stl", generateSTL(aftProf, "AftClosure"));
+      zip.file("MainTube.stl", generateProfileSTL(mainTubeProf, "MainTube"));
+      zip.file("ForwardClosure.stl", generateProfileSTL(fwdProf, "ForwardClosure"));
+      zip.file("AftClosure.stl", generateProfileSTL(aftProf, "AftClosure"));
 
       const content = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(content);
@@ -1424,29 +991,12 @@ export default function AppDesktop() {
   const handleExportCasingSCAD = () => {
     if (!metrics) {
       addLog('Error: Run simulation first to determine casing thickness.');
-      alert('You must run the simulation first to calculate the required casing thickness.');
+      notify({ title: 'Run simulation first', body: 'Casing thickness must be calculated before exporting.', severity: 'warning' });
       return;
     }
     try {
-      const { mainTubeProf, fwdProf, aftProf } = getCasingProfiles();
-      
-      const serializeProf = (p: number[][]) => p.map(pt => `[${pt[1].toFixed(4)}, ${pt[0].toFixed(4)}]`).join(', ');
-
-      let scad = `// APRO Assembly Components\n`;
-      scad += `// This SCAD file can be opened in OpenSCAD or FreeCAD\n`;
-      scad += `// and subsequently exported directly to STEP, IGES, or Parasolid.\n\n`;
-      scad += `$fn = 120; // Resolution\n\n`;
-
-      scad += `module MainTube() {\n  rotate_extrude(angle=360)\n    polygon(points=[\n      ${serializeProf(mainTubeProf)}\n    ]);\n}\n\n`;
-      
-      scad += `module ForwardClosure() {\n  rotate_extrude(angle=360)\n    polygon(points=[\n      ${serializeProf(fwdProf)}\n    ]);\n}\n\n`;
-      
-      scad += `module AftClosure() {\n  rotate_extrude(angle=360)\n    polygon(points=[\n      ${serializeProf(aftProf)}\n    ]);\n}\n\n`;
-
-      scad += `// Display Full Assembly\n`;
-      scad += `MainTube();\n`;
-      scad += `ForwardClosure();\n`;
-      scad += `AftClosure();\n`;
+      const profiles = makeCasingProfiles();
+      const scad = generateSCAD(profiles);
 
       const blob = new Blob([scad], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
@@ -1559,7 +1109,7 @@ export default function AppDesktop() {
    * same inputs.
    */
   const burn3dGrain = useMemo(
-    () => grainConfigFromUi(grainUiParams(), dxfData) as SurrogateGrain,
+    () => grainConfigFromUi(grainUiParams, dxfData) as SurrogateGrain,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       grainType, length, outerRadius, innerRadius, valleyRadius, tipRadius,
@@ -1572,7 +1122,7 @@ export default function AppDesktop() {
       // The surrogate takes the grain itself, not a flat parameter list: it
       // predicts from the burn-back curves, so every geometry goes through the
       // same path and grainConfigFromUi is the one place that mapping lives.
-      grain: grainConfigFromUi(grainUiParams(), dxfData) as SurrogateGrain,
+      grain: grainConfigFromUi(grainUiParams, dxfData) as SurrogateGrain,
       throat_diameter: throatDiameter,
       expansion_ratio: expansionRatio,
       a,
@@ -1734,10 +1284,6 @@ export default function AppDesktop() {
     return data;
   }, [a, n]);
 
-  const currentY = results.length > 0 && visualizerIndex < results.length 
-    ? results[visualizerIndex].y 
-    : 0;
-
   const handleSaveMaterial = (type: string) => {
     let payload = {};
     if (type === 'propellant') {
@@ -1898,7 +1444,7 @@ export default function AppDesktop() {
                 addLog(`Successfully processed DXF geometry (Max port area: ${(results.areaTable[0] * 10000).toFixed(2)} cm²).`);
             } catch (err: unknown) {
                 addLog(`Failed to load DXF: ${errorMessage(err)}`);
-                alert(`Error reading DXF: ${errorMessage(err)}`);
+                notify({ title: 'DXF Error', body: errorMessage(err), severity: 'error' });
                 setDxfFilename('');
                 setDxfData(null);
             }
@@ -1971,39 +1517,6 @@ export default function AppDesktop() {
     }, 50);
   };
 
-  // Unit Converter Logic
-  const [ucMode, setUcMode] = useState<'Length' | 'Pressure' | 'Mass' | 'Temp'>('Length');
-  const [ucVal1, setUcVal1] = useState<string>('1');
-  const [ucUnit1, setUcUnit1] = useState<string>('in');
-  const [ucUnit2, setUcUnit2] = useState<string>('mm');
-
-  const unitRates: Record<string, Record<string, number>> = {
-    Length: { m: 1, cm: 0.01, mm: 0.001, in: 0.0254, ft: 0.3048 },
-    Pressure: { Pa: 1, kPa: 1000, MPa: 1e6, psi: 6894.76, bar: 1e5, atm: 101325 },
-    Mass: { kg: 1, g: 0.001, lbm: 0.453592 }
-  };
-
-  const getUcConvertedMode = () => {
-    const v = parseFloat(ucVal1) || 0;
-    if (ucMode === 'Temp') {
-      let tK = 0;
-      if (ucUnit1 === 'K') tK = v;
-      if (ucUnit1 === 'C') tK = v + 273.15;
-      if (ucUnit1 === 'F') tK = (v - 32) * 5/9 + 273.15;
-      if (ucUnit1 === 'R') tK = v * 5/9;
-      
-      if (ucUnit2 === 'K') return tK.toFixed(4);
-      if (ucUnit2 === 'C') return (tK - 273.15).toFixed(4);
-      if (ucUnit2 === 'F') return ((tK - 273.15) * 9/5 + 32).toFixed(4);
-      if (ucUnit2 === 'R') return (tK * 9/5).toFixed(4);
-    } else {
-      const rate1 = unitRates[ucMode]?.[ucUnit1] || 1;
-      const rate2 = unitRates[ucMode]?.[ucUnit2] || 1;
-      return ((v * rate1) / rate2).toPrecision(6);
-    }
-    return '';
-  };
-
   return (
     <SettingsContext.Provider value={settingsContextValue}>
       <div className="app-root">
@@ -2074,7 +1587,7 @@ export default function AppDesktop() {
       {showPreferences && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--scrim)]">
           <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-96 flex flex-col text-[var(--t-primary)]">
-            <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--sem-warn)]">
+            <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--a-accent)]">
               <div className="flex items-center"><Settings size={14} className="mr-1" /> Preferences</div>
               <button onClick={() => setShowPreferences(false)} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
             </div>
@@ -2126,52 +1639,7 @@ export default function AppDesktop() {
       )}
 
       {showUnitConverter && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--scrim)]">
-          <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-80 flex flex-col text-[var(--t-primary)]">
-            <div className="bg-[var(--s-sunken)] px-3 py-1.5 border-b border-[var(--b-strong)] flex justify-between items-center font-bold text-xs text-[var(--a-accent)]">
-              <div className="flex items-center"><Grain size={14} className="mr-1" /> Unit Converter</div>
-              <button onClick={() => setShowUnitConverter(false)} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
-            </div>
-            <div className="p-4 space-y-4 text-xs">
-              <div>
-                <label className="block mb-1 font-bold text-[var(--t-secondary)]" htmlFor={fieldId('measurement-type')}>Measurement Type</label>
-                <select id={fieldId('measurement-type')} value={ucMode} onChange={e => {
-                  const m = e.target.value as 'Length' | 'Pressure' | 'Mass' | 'Temp';
-                  setUcMode(m);
-                  if(m === 'Length') { setUcUnit1('in'); setUcUnit2('mm'); }
-                  if(m === 'Pressure') { setUcUnit1('psi'); setUcUnit2('MPa'); }
-                  if(m === 'Mass') { setUcUnit1('lbm'); setUcUnit2('kg'); }
-                  if(m === 'Temp') { setUcUnit1('F'); setUcUnit2('C'); }
-                }} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] px-2 py-1 outline-none focus:border-[var(--a-accent)]">
-                  <option value="Length">Length</option>
-                  <option value="Pressure">Pressure</option>
-                  <option value="Mass">Mass</option>
-                  <option value="Temp">Temperature</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <input type="number" step="any" value={ucVal1} onChange={e => setUcVal1(e.target.value)} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--sem-ok)] px-2 py-1 mb-1 text-right outline-none focus:border-[var(--a-accent)]" />
-                  <select value={ucUnit1} onChange={e => setUcUnit1(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] px-2 py-1 outline-none focus:border-[var(--a-accent)]">
-                    {ucMode === 'Length' && ['m','cm','mm','in','ft'].map(u => <option key={u} value={u}>{u}</option>)}
-                    {ucMode === 'Pressure' && ['Pa','kPa','MPa','psi','bar','atm'].map(u => <option key={u} value={u}>{u}</option>)}
-                    {ucMode === 'Mass' && ['kg','g','lbm'].map(u => <option key={u} value={u}>{u}</option>)}
-                    {ucMode === 'Temp' && ['K','C','F','R'].map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <input type="text" readOnly value={getUcConvertedMode()} className="w-full bg-[var(--s-canvas)] border border-[var(--b-strong)] text-[var(--a-accent)] px-2 py-1 mb-1 text-right font-bold outline-none" />
-                  <select value={ucUnit2} onChange={e => setUcUnit2(e.target.value)} className="w-full bg-[var(--s-sunken)] border border-[var(--b-strong)] text-[var(--t-primary)] px-2 py-1 outline-none focus:border-[var(--a-accent)]">
-                    {ucMode === 'Length' && ['m','cm','mm','in','ft'].map(u => <option key={u} value={u}>{u}</option>)}
-                    {ucMode === 'Pressure' && ['Pa','kPa','MPa','psi','bar','atm'].map(u => <option key={u} value={u}>{u}</option>)}
-                    {ucMode === 'Mass' && ['kg','g','lbm'].map(u => <option key={u} value={u}>{u}</option>)}
-                    {ucMode === 'Temp' && ['K','C','F','R'].map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <UnitConverterDialog onClose={() => setShowUnitConverter(false)} />
       )}
 
       {showOptimizer && (
@@ -2566,67 +2034,6 @@ export default function AppDesktop() {
               </div>
             </div>
 
-            {/*
-              * Quick results, in the dock beside the inputs.
-              *
-              * Was a stack of alternating label and value divs, which put the
-              * labels down one side and the values down the other instead of
-              * pairing them. It is a two-column grid now, like every other
-              * readout in the app.
-              */}
-            {metrics && (
-              <div className="ui-groupbox is-result">
-                <span className="ui-groupbox-title">Results Summary</span>
-                <div className="kv" style={{ gridTemplateColumns: '1fr', border: 0, background: 'transparent', gap: 0 }}>
-                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
-                    <span className="kv-key">Max thrust</span>
-                    <span className="kv-val">{(metrics.maxThrust / 1000).toFixed(2)} kN</span>
-                  </div>
-                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
-                    <span className="kv-key">Peak pressure</span>
-                    <span className="kv-val">{(metrics.maxPc / 1e6).toFixed(2)} MPa</span>
-                  </div>
-                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
-                    <span className="kv-key">Total impulse</span>
-                    <span className="kv-val">{metrics.totalImpulse.toFixed(0)} N·s</span>
-                  </div>
-                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
-                    <span className="kv-key">Delivered Isp</span>
-                    <span className="kv-val">{metrics.isp.toFixed(1)} s</span>
-                  </div>
-                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
-                    <span className="kv-key">Burn time</span>
-                    <span className="kv-val">{metrics.actionTime.toFixed(2)} s</span>
-                  </div>
-                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
-                    <span className="kv-key">Case safety factor</span>
-                    {/*
-                      * A passing safety factor used to render in the canvas
-                      * colour -- near-black text on a dark panel, invisible.
-                      */}
-                    <span
-                      className={`kv-val ${
-                        !structural
-                          ? ''
-                          : structural.safetyFactor < 1
-                            ? 'is-danger'
-                            : structural.safetyFactor < 1.5
-                              ? 'is-warn'
-                              : 'is-ok'
-                      }`}
-                    >
-                      {structural ? `${structural.safetyFactor.toFixed(2)}×` : 'n/a'}
-                    </span>
-                  </div>
-                  <div className="kv-row" style={{ background: 'transparent', padding: '2px 0' }}>
-                    <span className="kv-key">Bore growth</span>
-                    <span className="kv-val">
-                      {structural ? `${(structural.boreRadialGrowth * 1e6).toFixed(0)} µm` : 'n/a'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
 
           </div>
         </Dock>
@@ -2768,116 +2175,22 @@ export default function AppDesktop() {
 
             {/* TAB: GEOMETRY */}
             {activeTab === 'geometry' && (
-              <div className="chart-frame" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div className="chart-caption">Grain cross-section regression</div>
-                <div className="w-full h-full flex items-center justify-center p-8">
-                  <svg viewBox="0 0 200 200" className="w-full h-full max-w-[500px] max-h-[500px] bg-[var(--s-sunken)] border border-[var(--b-strong)]">
-                    <circle cx="100" cy="100" r={(outerRadius / outerRadius) * 95} fill="var(--b-control)" />
-                    {grainType === 'BATES' || grainType === 'Tubular' ? (
-                      <circle cx="100" cy="100" r={Math.min(outerRadius, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="var(--s-canvas)" />
-                    ) : grainType === 'RodAndTube' ? (
-                      <>
-                        <circle cx="100" cy="100" r={Math.min(outerRadius, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="var(--s-canvas)" />
-                        {rodRadius - currentY > 0 && (
-                          <circle cx="100" cy="100" r={Math.max(0, rodRadius - currentY) / outerRadius * 95} fill="var(--b-control)" />
-                        )}
-                      </>
-                    ) : grainType === 'MoonBurner' ? (
-                      <circle cx={100 + (offset / outerRadius) * 95} cy="100" r={Math.min(outerRadius + offset, Math.max(0, innerRadius + currentY)) / outerRadius * 95} fill="var(--s-canvas)" />
-                    ) : grainType === 'Finocyl' ? (
-                      <path d={(() => {
-                        const scale = 95 / outerRadius;
-                        const rc = Math.min(outerRadius * scale, (innerRadius + currentY) * scale);
-                        const hw = (finWidth / 2.0 + currentY) * scale;
-                        const td = (finDepth - finWidth / 2.0) * scale;
-                        if (rc >= outerRadius * scale) return `M 5,100 A 95,95 0 1,1 195,100 A 95,95 0 1,1 5,100 Z`;
-                        
-                        let path = "";
-                        for(let i=0; i<numPoints; i++) {
-                           const angle = (i * 2 * Math.PI) / numPoints;
-                           // we essentially draw a rough outline for each fin and the core arc between them
-                           // For visual approximation simple circles and rectangles usually suffice
-                           // Let's just create a composite shape: core circle + rects + tip circles
-                           // Using path strings is easier overall.
-                           const nx = Math.sin(angle);
-                           const ny = -Math.cos(angle);
-                           const tx = -ny;
-                           const ty = nx;
-                           
-                           // Fin tip center
-                           const cx = 100 + nx * td;
-                           const cy = 100 + ny * td;
-                           
-                           // Wall points
-                           const p1x = 100 + nx * rc + tx * hw;
-                           const p1y = 100 + ny * rc + ty * hw;
-                           const p2x = cx + tx * hw;
-                           const p2y = cy + ty * hw;
-                           const p3x = cx - tx * hw;
-                           const p3y = cy - ty * hw;
-                           const p4x = 100 + nx * rc - tx * hw;
-                           const p4y = 100 + ny * rc - ty * hw;
-
-                           if (i === 0) path += `M ${p1x} ${p1y} `;
-                           else path += `L ${p1x} ${p1y} `;
-                           path += `L ${p2x} ${p2y} `;
-                           // Tip arc approximation
-                           path += `A ${hw} ${hw} 0 0 1 ${p3x} ${p3y} `;
-                           path += `L ${p4x} ${p4y} `;
-                           
-                           // Core arc to next fin
-                           const next_angle = ((i + 1) * 2 * Math.PI) / numPoints;
-                           const next_nx = Math.sin(next_angle);
-                           const next_ny = -Math.cos(next_angle);
-                           const next_tx = -next_ny;
-                           const next_ty = next_nx;
-                           const next_p1x = 100 + next_nx * rc + next_tx * hw;
-                           const next_p1y = 100 + next_ny * rc + next_ty * hw;
-                           
-                           path += `A ${rc} ${rc} 0 0 1 ${next_p1x} ${next_p1y} `;
-                        }
-                        return path + "Z";
-                      })()} fill="var(--s-canvas)" />
-                    ) : grainType === 'CustomDXF' && dxfData ? (
-                      <circle cx="100" cy="100" r={Math.sqrt(dxfData.areaTable[Math.min(Math.floor(currentY / dxfData.dx), dxfData.areaTable.length - 1)] / Math.PI) / outerRadius * 95} fill="var(--s-canvas)" />
-                    ) : (
-                      <path d={(() => {
-                        const scale = 95 / outerRadius;
-                        const r_outer = Math.min(outerRadius, valleyRadius + currentY) * scale;
-                        const r_inner = Math.min(outerRadius, tipRadius + currentY) * scale;
-                        let path = "";
-                        for(let i=0; i<numPoints*2; i++) {
-                          const radius = i % 2 === 0 ? r_inner : r_outer;
-                          const angle = (i * Math.PI) / numPoints;
-                          const px = 100 + radius * Math.sin(angle);
-                          const py = 100 - radius * Math.cos(angle);
-                          path += (i === 0 ? `M ${px} ${py} ` : `L ${px} ${py} `);
-                        }
-                        return path + "Z";
-                      })()} fill="var(--s-canvas)" />
-                    )}
-                  </svg>
-                </div>
-                <div className="absolute bottom-4 left-4 right-4 flex flex-col space-y-2 bg-[var(--s-canvas)] p-3 border border-[var(--b-soft)]">
-                  <div className="flex justify-between text-[var(--c-6)] text-[10px] px-2">
-                    <span>Burn Area: {(results[visualizerIndex]?.Ab * 10000 || 0).toFixed(1)} cm²</span>
-                    <span>Port Area: {(results[visualizerIndex]?.PortArea * 10000 || 0).toFixed(1)} cm²</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[var(--c-6)] text-[10px] w-16">T: {results[visualizerIndex]?.Time.toFixed(2) || '0.00'}s</span>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max={Math.max(0, results.length - 1)} 
-                      value={visualizerIndex} 
-                      onChange={(e) => setVisualizerIndex(Number(e.target.value))}
-                      className="flex-1 accent-[var(--c-6)]"
-                      disabled={results.length === 0}
-                    />
-                    <span className="text-[var(--c-6)] text-[10px] w-16 text-right">W: {(currentY * 1000).toFixed(1)}mm</span>
-                  </div>
-                </div>
-              </div>
+              <GeometryTab
+                grainType={grainType}
+                outerRadius={outerRadius}
+                innerRadius={innerRadius}
+                valleyRadius={valleyRadius}
+                tipRadius={tipRadius}
+                numPoints={numPoints}
+                offset={offset}
+                finDepth={finDepth}
+                finWidth={finWidth}
+                rodRadius={rodRadius}
+                dxfData={dxfData}
+                results={results}
+                visualizerIndex={visualizerIndex}
+                onVisualizerIndexChange={setVisualizerIndex}
+              />
             )}
 
             {/* TAB: THERMO */}
@@ -3029,7 +2342,16 @@ export default function AppDesktop() {
                   <React.Suspense
                     fallback={<div className="text-[var(--t-muted)] italic text-xs mt-6">Loading 3D view…</div>}
                   >
-                    <GrainBurn3D grain={burn3dGrain} results={results} />
+                    <GrainBurn3D
+                      grain={burn3dGrain}
+                      results={results}
+                      stations={stations}
+                      structural={structural}
+                      caseWallThickness={caseWallThickness}
+                      casingYieldStress={casingYieldStress}
+                      maxPc={metrics?.maxPc ?? 0}
+                      flameTemp={flameTemp}
+                    />
                   </React.Suspense>
                 )}
               </div>
@@ -3059,13 +2381,6 @@ export default function AppDesktop() {
                 metrics={metrics}
                 throatDiameter={throatDiameter}
                 grainLength={length}
-                grainKind={grainType}
-                n={n}
-                propellantName={propellantName}
-                burnRateRegimes={burnRateRegimes}
-                erosiveModel={erosiveModel}
-                erosiveFraction={erosiveFraction}
-                nozzleMaterial={nozzleMaterial}
               />
             )}
             
@@ -3074,19 +2389,17 @@ export default function AppDesktop() {
         </div>
 
         {/*
-          * Right dock: what to plot, and how much to believe it.
+          * Right dock: what to plot, and the design checks against it.
           *
-          * openMotor puts axis checkboxes here. This keeps that -- picking
-          * channels is the most frequent thing you do to a trace -- and adds
-          * the thing this tool has that openMotor does not: a live uncertainty
-          * budget, visible while you design rather than filed away in a tab you
-          * have to remember to open.
+          * openMotor puts axis checkboxes here, and this keeps that -- picking
+          * channels is the most frequent thing you do to a trace. The design
+          * checks sit alongside them so a problem is visible from any tab.
           */}
         <Dock
           side="right"
           width={rightDockWidth}
           onWidthChange={setRightDockWidth}
-          label="Trace & Confidence"
+          label="Trace"
           railLabel="Trace"
           open={rightDockOpen}
           onOpenChange={setRightDockOpen}
@@ -3112,41 +2425,9 @@ export default function AppDesktop() {
               ))}
             </FieldGroup>
 
-            <FieldGroup title="Model uncertainty">
-              {metrics ? (
-                <div className="unc-list">
-                  {uncertaintyBudget.map((u) => (
-                    <div key={u.output} className="unc-row" title={`Dominated by: ${u.dominant}`}>
-                      <span className="unc-name">{u.label}</span>
-                      <span
-                        className={`unc-band ${
-                          u.orderOfMagnitudeOnly || u.relative >= 0.25
-                            ? 'is-danger'
-                            : u.relative >= 0.1
-                              ? 'is-warn'
-                              : 'is-ok'
-                        }`}
-                      >
-                        {formatBand(u)}
-                      </span>
-                    </div>
-                  ))}
-                  <p className="unc-note">
-                    Measured model error, propagated. A floor on the error, not a bound. Batch,
-                    casting and machining variation are invisible to any solver.
-                  </p>
-                  <Button variant="ghost" onClick={() => setActiveTab('statistics')}>
-                    Full breakdown →
-                  </Button>
-                </div>
-              ) : (
-                <p className="unc-note">Run a simulation to see the error budget.</p>
-              )}
-            </FieldGroup>
-
             <FieldGroup title="Design checks" defaultOpen={validationIssues.length > 0}>
               {validationIssues.length === 0 ? (
-                <p className="unc-note" style={{ color: 'var(--sem-ok)' }}>
+                <p className="unc-note" style={{ color: 'var(--t-secondary)' }}>
                   No problems found.
                 </p>
               ) : (
@@ -3162,66 +2443,6 @@ export default function AppDesktop() {
           </div>
         </Dock>
       </div>
-
-      {/*
-        * Status strip: the handful of numbers that describe the motor, always
-        * visible regardless of which tab is open.
-        *
-        * Peak pressure carries its band inline. That placement is the whole
-        * argument -- a peak quoted to four figures beside a wall thickness
-        * invites a confidence the model has not earned, and the band is only
-        * useful at the moment someone reads the number.
-        */}
-      <StatusBar>
-        {metrics ? (
-          <>
-            <Stat label="Designation" value={motorDesignation} />
-            <Stat
-              label="Total Impulse"
-              value={`${metrics.totalImpulse.toFixed(0)} N·s`}
-              band={impulseBand ? formatBand(impulseBand) : undefined}
-            />
-            <Stat
-              label="Peak Pressure"
-              value={`${(metrics.maxPc / 1e6).toFixed(2)} MPa`}
-              band={peakPcBand ? formatBand(peakPcBand) : undefined}
-              tone={
-                !peakPcBand
-                  ? 'default'
-                  : peakPcBand.orderOfMagnitudeOnly || peakPcBand.relative >= 0.25
-                    ? 'danger'
-                    : peakPcBand.relative >= 0.1
-                      ? 'warn'
-                      : 'ok'
-              }
-              hint={peakPcBand ? `Dominated by: ${peakPcBand.dominant}` : undefined}
-            />
-            <Stat label="Max Thrust" value={`${(metrics.maxThrust / 1000).toFixed(2)} kN`} />
-            <Stat
-              label="Burn Time"
-              value={`${metrics.actionTime.toFixed(3)} s`}
-              band={burnTimeBand ? formatBand(burnTimeBand) : undefined}
-            />
-            <Stat label="Delivered Isp" value={`${metrics.isp.toFixed(1)} s`} />
-            <Stat label="Propellant" value={`${metrics.propMass.toFixed(3)} kg`} />
-            <Stat
-              label="Port / Throat"
-              value={metrics.portThroatRatio.toFixed(2)}
-              tone={metrics.portThroatRatio < 2 ? 'warn' : 'default'}
-              hint={
-                metrics.portThroatRatio < 2
-                  ? 'Below 2, erosive burning dominates, and that model is uncalibrated here.'
-                  : undefined
-              }
-            />
-            <Stat label="Peak Kn" value={metrics.peakKn.toFixed(0)} />
-          </>
-        ) : (
-          <div className="sh-status-msg">
-            {statusMsg || 'No results: press Run to simulate this design.'}
-          </div>
-        )}
-      </StatusBar>
 
       {/*
         * Console. Collapsible, because it is essential while something is going

@@ -138,7 +138,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[var(--scrim)] text-xs text-[var(--t-primary)]">
       <div className="bg-[var(--s-canvas)] border border-[var(--b-strong)] w-[600px] flex flex-col p-4 space-y-4">
-        <div className="flex justify-between items-center text-[var(--sem-warn)] font-bold text-sm border-b border-[var(--b-soft)] pb-2">
+        <div className="flex justify-between items-center text-[var(--a-accent)] font-bold text-sm border-b border-[var(--b-soft)] pb-2">
           <span>Design Optimizer / Sweep</span>
           <button onClick={onClose} className="hover:text-[var(--sem-danger)]"><Close size={12} /></button>
         </div>
@@ -146,7 +146,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
         <div className="flex space-x-4 items-end">
           <div className="flex flex-col space-y-1 flex-1">
             <label className="text-[var(--t-secondary)]" htmlFor={fieldId('sweep-parameter')}>Sweep Parameter</label>
-            <select id={fieldId('sweep-parameter')} value={paramToSweep} onChange={e => setParamToSweep(e.target.value as SweepParam)} className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--sem-warn)]">
+            <select id={fieldId('sweep-parameter')} value={paramToSweep} onChange={e => setParamToSweep(e.target.value as SweepParam)} className="bg-[var(--s-sunken)] border border-[var(--b-control)] px-2 py-1 outline-none focus:border-[var(--a-accent)]">
               <option value="throatDiameter">Throat Diameter (m)</option>
               <option value="length">Grain Length (m)</option>
             </select>
@@ -175,7 +175,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
               <option value="quasi1D">Quasi-1-D axial</option>
             </select>
           </div>
-          <button onClick={runSweep} disabled={isRunning} className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1 font-bold flex items-center h-7 hover:brightness-110 disabled:opacity-50">
+          <button onClick={runSweep} disabled={isRunning} className="bg-[var(--a-accent-dim)] border border-[var(--a-accent)] text-white px-4 py-1 font-bold flex items-center h-7 hover:bg-[var(--a-accent)] disabled:opacity-50">
             {isRunning ? 'Running...' : <><Play size={12} className="mr-1"/> Run</>}
           </button>
         </div>
@@ -196,7 +196,7 @@ export function OptimizerDialog({ currentConfig, onApply, onClose, dxfData }: Op
               <tbody className="bg-[var(--s-sunken)]">
                 {results.map((r, i) => (
                   <tr key={i} className="hover:bg-[var(--s-raised)] transition-colors border-b border-[var(--b-soft)]">
-                    <td className="p-1 pl-2 font-bold text-[var(--sem-ok)]">{r.val.toFixed(4)}</td>
+                    <td className="p-1 pl-2 font-bold text-[var(--a-accent)]">{r.val.toFixed(4)}</td>
                     <td className={`p-1 ${r.maxPc > 10 ? 'text-[var(--sem-danger)]' : 'text-[var(--t-primary)]'}`}>{r.maxPc.toFixed(2)}</td>
                     <td className="p-1 text-[var(--t-primary)]">{r.maxThrust.toFixed(2)}</td>
                     <td className="p-1 text-[var(--t-primary)]">{r.initialKn.toFixed(0)}</td>

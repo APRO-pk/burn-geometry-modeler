@@ -64,8 +64,8 @@ const mm = (m: number) => (m * 1000).toFixed(2);
 const FEA_BANDS = [
   'var(--c-1)',
   'var(--c-6)',
-  'var(--sem-warn)',
-  'var(--sem-danger)',
+  'var(--c-4)',
+  'var(--c-5)',
   'var(--sem-danger)',
 ];
 
@@ -157,11 +157,10 @@ export function StructuralTab({
             </div>
             <div className="verdict-detail">
               <div>
-                <strong>{MPa(s.maxVonMises)} MPa</strong> peak von Mises against{' '}
-                {casingYieldStress} MPa yield
+                <strong>{MPa(s.maxVonMises)} MPa</strong> von Mises · {casingYieldStress} MPa yield
               </div>
               <div className="verdict-where">
-                governed by {s.whereMax} · margin of safety {s.marginOfSafety.toFixed(3)}
+                {s.whereMax} · MoS {s.marginOfSafety.toFixed(3)}
               </div>
             </div>
           </div>
@@ -204,18 +203,17 @@ export function StructuralTab({
                     <rect x={100 + i * 100} y={145} width={100} height={15} fill={FEA_BANDS[i]} />
                   </g>
                 ))}
-                <rect x="590" y="30" width="22" height="140" fill="var(--sem-danger)" />
+                <rect x="590" y="30" width="22" height="140" fill="var(--c-5)" />
                 <rect x="88" y="30" width="22" height="140" fill="var(--c-1)" />
                 <text x="350" y="30" fill="var(--t-secondary)" fontSize="11" textAnchor="middle" fontFamily="var(--font)">
                   bore hoop ≈ {MPa(s.lame.inner.hoop)} MPa
                 </text>
-                <text x="601" y="185" fill="var(--sem-danger)" fontSize="11" textAnchor="middle" fontFamily="var(--font)">
+                <text x="601" y="185" fill="var(--t-secondary)" fontSize="11" textAnchor="middle" fontFamily="var(--font)">
                   {MPa(s.maxVonMises)} MPa
                 </text>
               </svg>
               <p className="sec-note" style={{ borderTop: 0, padding: '6px 0 0' }}>
-                Indicative only. A schematic, not a mesh. The numbers come from the closed-form
-                analysis; the colours do not.
+                Schematic only; colours are indicative.
               </p>
             </div>
           </section>
@@ -241,7 +239,7 @@ export function StructuralTab({
                   <td className="is-num">{MPa(s.lame.inner.hoop)}</td>
                   <td className="is-num">{MPa(s.lame.inner.radial)}</td>
                   <td className="is-num">{MPa(s.lame.inner.axial)}</td>
-                  <td className="is-num" style={{ color: 'var(--sem-warn)' }}>
+                  <td className="is-num" style={{ color: 'var(--a-accent)' }}>
                     {MPa(s.lame.inner.vonMises)}
                   </td>
                 </tr>
@@ -250,7 +248,7 @@ export function StructuralTab({
                   <td className="is-num">{MPa(s.lame.outer.hoop)}</td>
                   <td className="is-num">{MPa(s.lame.outer.radial)}</td>
                   <td className="is-num">{MPa(s.lame.outer.axial)}</td>
-                  <td className="is-num" style={{ color: 'var(--sem-warn)' }}>
+                  <td className="is-num" style={{ color: 'var(--a-accent)' }}>
                     {MPa(s.lame.outer.vonMises)}
                   </td>
                 </tr>
@@ -336,9 +334,7 @@ export function StructuralTab({
             ]}
           />
           <p className="sec-note">
-            Design to the thread stress area (≈74% of the shank), not the shank. Shorter
-            engagement than shown lets the threads strip before the bolt yields, a failure the
-            tension numbers do not cover.
+            Design to thread stress area (≈74% of shank), not shank.
           </p>
         </section>
 
@@ -360,9 +356,8 @@ export function StructuralTab({
                 },
               ]}
             />
-            <p className="sec-note" style={{ color: 'var(--sem-warn)' }}>
-              Order of magnitude only. The heat-transfer coefficient is roughly 7× the real Bartz
-              correlation and uncalibrated here. Compare materials with it; do not size hardware.
+            <p className="sec-note" style={{ color: 'var(--a-accent)' }}>
+              Order of magnitude only. Compare materials; do not size hardware.
             </p>
           </section>
         )}

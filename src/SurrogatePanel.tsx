@@ -384,38 +384,19 @@ export function SurrogatePanel({
   return (
     <div className="tab-doc">
       {/* ---- provenance ---- */}
-      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-3 text-[10px] text-[var(--t-secondary)] leading-snug">
-        <span className="text-[var(--a-accent)] font-bold">SURROGATE MODEL</span>: one Gaussian process
-        covering all {info.grainKinds.length} grain geometries, trained on {String(info.dataset.trainRows)}{' '}
-        solves of the same Rust core the Run button uses ({String(info.dataset.totalRows)} sampled,{' '}
-        {String(info.dataset.testRows)} held out). It predicts from the grain's burn-back CURVES
-        rather than its parameters, which is why one model covers every geometry.
-        <div className="mt-1">
-          Held-out, all geometries:{' '}
-          {TARGETS.map((t) => `${SHORT[t]} R²=${metrics[t].r2.toFixed(4)}`).join(', ')}.
-          {kindMetrics && (
-            <>
-              {' '}For <span className="text-[var(--a-accent)]">{kind}</span> specifically: Pc R²=
-              {kindMetrics.peak_pc.r2.toFixed(4)} / {kindMetrics.peak_pc.mape.toFixed(2)}% MAPE,
-              It R²={kindMetrics.total_impulse.r2.toFixed(4)}, tb R²=
-              {kindMetrics.burn_time.r2.toFixed(4)}.
-            </>
-          )}
-        </div>
+      <div className="bg-[var(--s-canvas)] border border-[var(--b-soft)] p-3 text-[10px] text-[var(--t-muted)] leading-snug">
+        <span className="text-[var(--t-secondary)] font-bold">SURROGATE MODEL</span>{' · '}
+        GP trained on {String(info.dataset.trainRows)} solves, {String(info.dataset.testRows)} held out.{' '}
+        Held-out R²: {TARGETS.map((t) => `${SHORT[t]}=${metrics[t].r2.toFixed(4)}`).join(', ')}.
+        {kindMetrics && (
+          <>{' '}{kind}: Pc R²={kindMetrics.peak_pc.r2.toFixed(4)} / {kindMetrics.peak_pc.mape.toFixed(2)}% MAPE.</>
+        )}
       </div>
 
       {burnRateRegimes.length > 0 && (
-        <div className="bg-[var(--sem-warn-wash)] border border-[var(--sem-warn)] p-3 text-[10px] text-[var(--sem-warn)] leading-snug">
-          <span className="font-bold">PIECEWISE BURN LAW: predictions below are approximate.</span>
-          <div className="mt-1 text-[var(--sem-warn)]">
-            This propellant uses a measured {burnRateRegimes.length}-band burn-rate law, but the
-            surrogate is trained on single power-law solves and takes a={design.a.toExponential(3)},
-            n={design.n.toFixed(4)} as its inputs. Those are the propellant's fallback coefficients,
-            not the law the solver integrates, so everything on this tab: prediction, inverse
-            design and Monte Carlo: describes a slightly different motor. Press{' '}
-            <span className="text-[var(--sem-ok)]">Verify</span> against the real core, or run the full
-            simulation, for a number you can size hardware from.
-          </div>
+        <div className="bg-[var(--sem-warn-wash)] border border-[var(--sem-warn)] p-2 text-[10px] text-[var(--sem-warn)] leading-snug">
+          <span className="font-bold">PIECEWISE BURN LAW</span>{' — '}
+          {burnRateRegimes.length}-band law active; surrogate uses single power-law (a={design.a.toExponential(3)}, n={design.n.toFixed(4)}). Verify against the full solver.
         </div>
       )}
 
@@ -460,14 +441,14 @@ export function SurrogatePanel({
               return (
                 <tr key={t} className="border-t border-[var(--b-soft)]">
                   <td className="py-1">{LABEL[t]}</td>
-                  <td className="text-right text-[var(--sem-warn)]">{FORMAT[t](prediction.mean[t])}</td>
+                  <td className="text-right text-[var(--a-accent)]">{FORMAT[t](prediction.mean[t])}</td>
                   <td className="text-right text-[var(--t-secondary)]">
                     {FORMAT[t](prediction.lower[t])} to {FORMAT[t](prediction.upper[t])}
                   </td>
-                  {verify && <td className="text-right text-[var(--sem-ok)]">{FORMAT[t](verify.truth[t])}</td>}
+                  {verify && <td className="text-right text-[var(--t-primary)]">{FORMAT[t](verify.truth[t])}</td>}
                   {verify && (
-                    <td className={`text-right ${Math.abs(delta) < 0.05 ? 'text-[var(--sem-ok)]' : 'text-[var(--sem-warn)]'}`}>
-                      {(delta * 100).toFixed(2)}%{covered ? ' ok' : ' out'}
+                    <td className={`text-right ${Math.abs(delta) < 0.05 ? 'text-[var(--t-primary)]' : 'text-[var(--sem-danger)]'}`}>
+                      {(delta * 100).toFixed(2)}%{covered ? '' : ' !'}
                     </td>
                   )}
                 </tr>
@@ -477,9 +458,7 @@ export function SurrogatePanel({
         </table>
         {verify && (
           <p className="text-[var(--t-muted)] text-[10px] mt-2">
-            Full solve took {verify.ms.toFixed(0)} ms versus {predictMs.toFixed(2)} ms for the
-            surrogate, a {(verify.ms / Math.max(predictMs, 1e-6)).toFixed(0)}× speedup. "ok" means
-            the true value fell inside the predicted band.
+            Full solve: {verify.ms.toFixed(0)} ms ({(verify.ms / Math.max(predictMs, 1e-6)).toFixed(0)}× slower)
           </p>
         )}
       </div>
@@ -511,7 +490,7 @@ export function SurrogatePanel({
           <button
             onClick={runSearch}
             disabled={searching}
-            className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1.5 font-bold flex items-center hover:brightness-110 disabled:opacity-50"
+            className="bg-[var(--a-accent-dim)] border border-[var(--a-accent)] text-white px-4 py-1.5 font-bold flex items-center hover:bg-[var(--a-accent)] disabled:opacity-50"
           >
             <Play className="w-3 h-3 mr-1" /> {searching ? 'Searching…' : 'Find design'}
           </button>
@@ -522,20 +501,8 @@ export function SurrogatePanel({
           )}
         </div>
 
-        <p className="text-[var(--t-muted)] text-[10px] mb-2 leading-snug">
-          {shapeSpec.length > 0 ? (
-            <>
-              Free variables: length, casing radius, throat, expansion ratio, and this geometry's
-              shape: {shapeSpec.map((p) => p.label.toLowerCase()).join(', ')}. Propellant is held
-              fixed.
-            </>
-          ) : (
-            <>
-              A Custom DXF cross-section comes from a traced file, so there is no shape to optimise:
-              the search moves length, casing radius, throat and expansion ratio only, keeping your
-              profile.
-            </>
-          )}
+        <p className="text-[var(--t-muted)] text-[10px] mb-2">
+          Free variables: length, casing radius, throat, expansion ratio{shapeSpec.length > 0 ? `, ${shapeSpec.map((p) => p.label.toLowerCase()).join(', ')}` : ''}. Propellant is held fixed.
         </p>
 
         {candidates && candidates.length > 0 && (
@@ -562,8 +529,8 @@ export function SurrogatePanel({
                     <td className="pl-3 text-[10px] text-[var(--t-primary)]">{describeShape(c.design.grain)}</td>
                     <td className="text-right">{(c.design.throat_diameter * 1000).toFixed(1)} mm</td>
                     <td className="text-right">{c.design.expansion_ratio.toFixed(1)}</td>
-                    <td className="text-right text-[var(--sem-warn)]">{c.predicted.total_impulse.toFixed(0)}</td>
-                    <td className="text-right text-[var(--sem-warn)]">{(c.predicted.peak_pc / 1e6).toFixed(2)}</td>
+                    <td className="text-right text-[var(--a-accent)]">{c.predicted.total_impulse.toFixed(0)}</td>
+                    <td className="text-right text-[var(--a-accent)]">{(c.predicted.peak_pc / 1e6).toFixed(2)}</td>
                     <td className={`text-right ${c.band > 0.1 ? 'text-[var(--sem-danger)]' : 'text-[var(--t-secondary)]'}`}>
                       {(c.band * 100).toFixed(1)}%
                     </td>
@@ -584,24 +551,15 @@ export function SurrogatePanel({
             </table>
 
             {candidateTruth ? (
-              <div className="mt-3 border border-[var(--sem-ok)] bg-[var(--sem-ok-wash)] p-2 text-[10px]">
-                <div className="flex items-center space-x-1 text-[var(--sem-ok)] font-bold mb-1">
+              <div className="mt-3 border border-[var(--b-strong)] bg-[var(--s-panel)] p-2 text-[10px]">
+                <div className="flex items-center space-x-1 text-[var(--t-secondary)] font-bold mb-1">
                   <Ok className="w-3 h-3" />
-                  <span>CANDIDATE 1 VERIFIED AGAINST THE PHYSICS CORE</span>
+                  <span>CANDIDATE 1 VERIFIED</span>
                 </div>
-                <div className="text-[var(--sem-ok)]">
-                  Impulse {candidateTruth.total_impulse.toFixed(0)} N·s (surrogate said{' '}
-                  {candidates[0].predicted.total_impulse.toFixed(0)},{' '}
-                  {(((candidates[0].predicted.total_impulse - candidateTruth.total_impulse) /
-                    candidateTruth.total_impulse) * 100).toFixed(2)}
-                  % off) · Peak Pc {(candidateTruth.peak_pc / 1e6).toFixed(2)} MPa (surrogate said{' '}
-                  {(candidates[0].predicted.peak_pc / 1e6).toFixed(2)},{' '}
-                  {(((candidates[0].predicted.peak_pc - candidateTruth.peak_pc) / candidateTruth.peak_pc) * 100).toFixed(2)}
-                  % off)
+                <div className="text-[var(--t-primary)]">
+                  It {candidateTruth.total_impulse.toFixed(0)} N·s ({(((candidates[0].predicted.total_impulse - candidateTruth.total_impulse) / candidateTruth.total_impulse) * 100).toFixed(2)}% off) · Pc {(candidateTruth.peak_pc / 1e6).toFixed(2)} MPa ({(((candidates[0].predicted.peak_pc - candidateTruth.peak_pc) / candidateTruth.peak_pc) * 100).toFixed(2)}% off)
                 </div>
                 {(() => {
-                  // A design that produces no thrust trivially satisfies
-                  // "impulse <= X", so usefulness is checked before compliance.
                   const useless = !(candidateTruth.total_impulse > 0.5 * targetImpulse);
                   const meets =
                     candidateTruth.total_impulse <= targetImpulse &&
@@ -609,17 +567,13 @@ export function SurrogatePanel({
                   if (useless) {
                     return (
                       <div className="mt-1 text-[var(--sem-danger)]">
-                        REJECT: the verified design delivers only{' '}
-                        {candidateTruth.total_impulse.toFixed(0)} N·s. It satisfies the ceiling by
-                        not working. Widen the bounds or relax the pressure limit.
+                        Rejected: only {candidateTruth.total_impulse.toFixed(0)} N·s. Widen bounds or relax pressure limit.
                       </div>
                     );
                   }
                   return (
-                    <div className={`mt-1 ${meets ? 'text-[var(--sem-ok)]' : 'text-[var(--sem-danger)]'}`}>
-                      {meets
-                        ? 'The verified design meets both constraints.'
-                        : 'WARNING: the verified design misses a constraint the surrogate thought it met. Trust this row, not the one above.'}
+                    <div className={`mt-1 ${meets ? 'text-[var(--t-secondary)]' : 'text-[var(--sem-danger)]'}`}>
+                      {meets ? 'Meets both constraints.' : 'Misses a constraint. Trust verified values.'}
                     </div>
                   );
                 })()}
@@ -661,7 +615,7 @@ export function SurrogatePanel({
             </select>
           </label>
           <button onClick={runMonteCarlo}
-            className="bg-[var(--sem-warn)] text-[var(--t-inverse)] px-4 py-1.5 font-bold flex items-center hover:brightness-110">
+            className="bg-[var(--a-accent-dim)] border border-[var(--a-accent)] text-white px-4 py-1.5 font-bold flex items-center hover:bg-[var(--a-accent)]">
             <Play className="w-3 h-3 mr-1" /> Run
           </button>
           {mcResult && (
@@ -705,18 +659,15 @@ export function SurrogatePanel({
                 )
               )}
             </div>
-            <p className="text-[var(--t-muted)] text-[10px] mt-2 leading-snug">
-              The spread here is manufacturing dispersion, not model error. The surrogate's own
-              uncertainty on this design is ±{(prediction.relativeBand[mcTarget] * 100).toFixed(1)}%
-              and is reported separately above, so a wide distribution is never confused with an
-              unsure model.
+            <p className="text-[var(--t-muted)] text-[10px] mt-2">
+              Manufacturing dispersion (model uncertainty ±{(prediction.relativeBand[mcTarget] * 100).toFixed(1)}% reported separately above).
             </p>
 
             {mcConfirm && (
-              <div className="mt-3 border border-[var(--sem-ok)] bg-[var(--sem-ok-wash)] p-2 text-[10px]">
-                <div className="flex items-center space-x-1 text-[var(--sem-ok)] font-bold mb-1">
+              <div className="mt-3 border border-[var(--b-strong)] bg-[var(--s-panel)] p-2 text-[10px]">
+                <div className="flex items-center space-x-1 text-[var(--t-secondary)] font-bold mb-1">
                   <Ok className="w-3 h-3" />
-                  <span>CONFIRMED WITH {mcConfirm.n} FULL SOLVES ({mcConfirm.ms.toFixed(0)} ms)</span>
+                  <span>CONFIRMED · {mcConfirm.n} FULL SOLVES · {mcConfirm.ms.toFixed(0)} ms</span>
                 </div>
                 {(() => {
                   const mean = mcConfirm.values.reduce((a, b) => a + b, 0) / mcConfirm.values.length;
@@ -726,11 +677,8 @@ export function SurrogatePanel({
                   const dMean = ((mcResult[mcTarget].mean - mean) / mean) * 100;
                   const dSd = sd > 0 ? ((mcResult[mcTarget].sd - sd) / sd) * 100 : 0;
                   return (
-                    <div className="text-[var(--sem-ok)]">
-                      Physics mean {FORMAT[mcTarget](mean)} (surrogate {dMean >= 0 ? '+' : ''}
-                      {dMean.toFixed(2)}%), physics σ {FORMAT[mcTarget](sd)} (surrogate{' '}
-                      {dSd >= 0 ? '+' : ''}{dSd.toFixed(1)}%). The subsample uses the same
-                      perturbations as the surrogate sweep, so these are like-for-like.
+                    <div className="text-[var(--t-primary)]">
+                      Mean {FORMAT[mcTarget](mean)} ({dMean >= 0 ? '+' : ''}{dMean.toFixed(2)}%) · σ {FORMAT[mcTarget](sd)} ({dSd >= 0 ? '+' : ''}{dSd.toFixed(1)}%)
                     </div>
                   );
                 })()}

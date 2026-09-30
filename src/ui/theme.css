@@ -71,12 +71,12 @@
    * Desaturated to roughly the weight of a printed warning label. Bright enough
    * to find, dull enough that three of them on screen do not fight.
    */
-  --sem-ok: #6f9e6a;
-  --sem-warn: #b08a45;
-  --sem-danger: #b4574c;
-  --sem-ok-wash: #6f9e6a1c;
-  --sem-warn-wash: #b08a451c;
-  --sem-danger-wash: #b4574c1c;
+  --sem-ok: #6a8f8f;
+  --sem-warn: #8a8898;
+  --sem-danger: #8a7080;
+  --sem-ok-wash: #6a8f8f14;
+  --sem-warn-wash: #8a889814;
+  --sem-danger-wash: #8a708014;
 
   /*
    * ---- chart series -----------------------------------------------------
